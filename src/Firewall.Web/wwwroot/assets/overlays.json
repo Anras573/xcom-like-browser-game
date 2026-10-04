@@ -1,0 +1,21 @@
+{
+  "texture": "assets/overlays.png",
+  "columns": 4,
+  "rows": 4,
+  "frames": {
+    "overlay.move_range": 0,
+    "overlay.dash_range": 1,
+    "overlay.attack_range": 2,
+    "overlay.cursor": 3,
+    "overlay.path_dot": 4,
+    "overlay.path_end": 5,
+    "overlay.selection_ring": 6,
+    "overlay.shield_half": 7,
+    "overlay.shield_full": 8,
+    "overlay.crosshair": 9,
+    "status.overwatch": 10,
+    "status.hunker": 11,
+    "status.bleeding": 12,
+    "decal.corpse_scrap": 13
+  }
+}

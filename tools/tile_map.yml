@@ -1,0 +1,101 @@
+# Semantic tile names for tiles.png (Kenney tilesheet_complete.png, 27 x 20 grid of 64x64 tiles).
+# Format: `name: [col, row]`. build_sheets.py converts it to `row * 27 + col` in tiles.json.
+#
+# Walls are *blob auto-tiles* drawn on a dark floor cell: each tile has a wall on every edge that
+# borders the outside (N/E/S/W), plus a small "knob" in a corner where only the diagonal
+# neighbour is outside (a concave corner). Names say which edges/knobs a tile has, so an
+# auto-tiler picks a tile from the cell's edge mask and knob mask:
+#   wall.grey.<edges>[.knob_<corners>]   e.g. wall.grey.n.knob_sw_se = wall on N, knobs SW and SE.
+# Only the grey style is mapped so far; the orange and tan styles use the same layout one block over.
+
+# --- ground ---
+ground.grass.0: [0, 0]
+ground.grass.1: [1, 0]
+ground.grass.2: [2, 0]
+ground.grass.3: [3, 0]
+ground.dirt.0: [4, 0]
+ground.dirt.1: [5, 0]
+ground.concrete.0: [6, 0]
+ground.concrete.1: [7, 0]
+ground.concrete.2: [8, 0]
+ground.concrete.3: [9, 0]
+ground.concrete.4: [10, 0]
+ground.water.0: [18, 0]
+ground.water.1: [19, 0]
+floor.grey.0: [0, 10]
+floor.grey.1: [1, 10]
+floor.grey.2: [2, 10]
+floor.grey.3: [3, 10]
+floor.grey.4: [0, 12]
+floor.grey.5: [1, 12]
+floor.wood.0: [14, 1]
+floor.wood.1: [15, 1]
+floor.wood.2: [16, 1]
+floor.wood.3: [17, 1]
+floor.wood.4: [18, 1]
+floor.wood.5: [19, 1]
+
+# --- grey wall style: edge pieces (a single wall along one tile edge) ---
+wall.grey.n: [13, 13]
+wall.grey.s: [14, 13]
+wall.grey.w: [13, 12]
+wall.grey.e: [14, 12]
+wall.grey.interior: [15, 12]
+
+# --- grey wall style: straights, corners, T-junctions, cross, end caps ---
+wall.grey.straight_h: [11, 10]
+wall.grey.straight_v: [11, 11]
+wall.grey.corner_nw: [9, 10]
+wall.grey.corner_ne: [10, 10]
+wall.grey.corner_sw: [9, 11]
+wall.grey.corner_se: [10, 11]
+wall.grey.corner_nw.plain: [16, 10]
+wall.grey.corner_ne.plain: [17, 10]
+wall.grey.corner_sw.plain: [16, 11]
+wall.grey.corner_se.plain: [17, 11]
+wall.grey.t_n: [12, 10]
+wall.grey.t_s: [13, 10]
+wall.grey.t_w: [12, 11]
+wall.grey.t_e: [13, 11]
+wall.grey.cross: [16, 12]
+wall.grey.end_n: [15, 10]
+wall.grey.end_e: [15, 11]
+wall.grey.end_s: [14, 11]
+wall.grey.end_w: [14, 10]
+wall.grey.enclosed: [15, 13]
+
+# --- grey wall style: concave-corner knobs on an otherwise open floor cell ---
+wall.grey.knob_se: [9, 12]
+wall.grey.knob_sw: [10, 12]
+wall.grey.knob_sw_se: [11, 12]
+wall.grey.knob_nw_ne: [12, 12]
+wall.grey.knob_ne: [9, 13]
+wall.grey.knob_nw: [10, 13]
+wall.grey.knob_ne_se: [11, 13]
+wall.grey.knob_nw_sw: [12, 13]
+
+# --- props ---
+prop.crate.large: [20, 4]
+prop.crate.small: [21, 4]
+prop.crate.large_alt: [20, 5]
+prop.crate.small_alt: [21, 5]
+prop.tree.green: [18, 6]
+prop.tree.orange: [21, 6]
+prop.bush.green: [20, 6]
+prop.bush.small_green: [18, 8]
+prop.bush.small_orange: [19, 8]
+prop.plant.leaf: [20, 7]
+prop.rock.0: [20, 8]
+prop.rock.1: [21, 8]
+prop.rock.2: [22, 8]
+prop.armchair.green: [17, 16]
+prop.armchair.orange: [17, 17]
+prop.armchair.dark: [17, 18]
+prop.table.round: [19, 18]
+
+# --- decals ---
+decal.stain: [22, 11]
+decal.scrap: [21, 11]
+decal.rubble.0: [18, 10]
+decal.rubble.1: [19, 10]
+decal.shards: [20, 10]

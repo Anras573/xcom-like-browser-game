@@ -1,5 +1,7 @@
 @inject NavigationManager Nav
+@inject HttpClient Http
 @using System.Numerics
+@using Firewall.Web.Assets
 @using Yaeger.Browser
 @using Yaeger.Platform
 @implements IDisposable
@@ -17,16 +19,21 @@
         // Base-relative, so GitHub Pages sub-paths work.
         await YaegerBrowser.InitializeAsync(Nav.BaseUri);
 
+        var registry = await AssetRegistry.LoadAsync(Http);
+
         _surface = new BrowserRenderSurface("yaeger-canvas")
         {
             ClearColor = new Vector4(0.07f, 0.08f, 0.1f, 1f),
         };
         _surface.Initialize();
 
-        // Preload so the textured quad never shows as a white placeholder.
-        await _surface.PreloadAsync(GameApp.TexturePaths, new Progress<float>());
+        // tiles.png has no spacing between tiles; see tools/README.md "Sampling" for the decision.
+        await BrowserTextRenderSurface.LoadFontAsync(DebugSheetScene.FontFamily, DebugSheetScene.FontUrl);
 
-        var app = new GameApp(_surface);
+        // Preload so quads never show as white placeholders.
+        await _surface.PreloadAsync(registry.TexturePaths, new Progress<float>());
+
+        var app = new GameApp(_surface, registry);
         YaegerBrowser.StartGameLoop(app.Tick);
     }
 
