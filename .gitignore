@@ -6,3 +6,4 @@ publish/
 *.user
 tools/.cache/
 __pycache__/
+site/
