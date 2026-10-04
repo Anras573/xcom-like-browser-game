@@ -27,8 +27,11 @@
         };
         _surface.Initialize();
 
-        // tiles.png has no spacing between tiles; see tools/README.md "Sampling" for the decision.
         await BrowserTextRenderSurface.LoadFontAsync(DebugSheetScene.FontFamily, DebugSheetScene.FontUrl);
+
+        // tiles.png has no spacing between tiles, so Linear bleeds neighbours at fractional
+        // camera positions. Must be set before the texture loads (see tools/README.md).
+        _surface.SetSampling("assets/tiles.png", TextureSampling.Pixelated);
 
         // Preload so quads never show as white placeholders.
         await _surface.PreloadAsync(registry.TexturePaths, new Progress<float>());

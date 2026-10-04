@@ -56,7 +56,7 @@ Names are dotted and unique across all manifests (`AssetRegistry` rejects duplic
   A few long-weapon frames (`gun`, `machine`, `silencer`) would overflow the cell, so they shift left by the overflow and list the shift in `pivotOffsets`.
 - `overlay.*`, `status.*`, `decal.*`: `overlay.move_range`, `overlay.shield_half`, `status.overwatch`, `decal.corpse_scrap`.
 - `fx.<name>.<nn>`: `fx.explosion.03`; `fx.<name>` is also a flipbook (`AssetRegistry.Flipbook`).
-- Tiles (from `tile_map.yml`): `ground.*`, `floor.*`, `wall.<style>.*`, `prop.*`, `decal.*`.
+- Tiles (from `tile_map.yml`): `ground.*`, `floor.*`, `wall.<style>.*`, `prop.*`, `decal.*`. Trees are 2×2 multi-cell props (`prop.tree.green.tl/tr/bl/br`); #16 must place all four parts.
 - UI: `ui.<panel|button|bar…>`, `icon.<kenneyName>`, `crosshair.light.<nnn>`.
 
 ### Tile map and wall auto-tiling
@@ -80,9 +80,11 @@ The orange and tan wall styles use the same layout one block over and can be add
 
 ## Sampling decision
 
-The engine default is `TextureSampling.Default` (Linear + Clamp, no mipmaps). `tiles.png` has no spacing between tiles, so
-linear filtering could bleed neighbours. The debug scene (`DebugSheetScene`, shown at startup; keys `1`/`2`/`3` = 0.5×/1×/2×,
-WASD or arrows pan) draws every sheet contiguously. Checked in headless Chromium at 0.5×, 1× and 2× with whole-cell camera
-positions: **no visible seams with the default sampling**, so `SetSampling(..., Pixelated)` is not used and no Yaeger issue was filed.
-If seams show up at fractional camera positions on a real map (#16), switch `assets/tiles.png` to `TextureSampling.Pixelated`
-first, and if that is unacceptable ask Yaeger for margin/spacing support on `SpriteSheet`/`Tileset`.
+`tiles.png` has no spacing between tiles, so the default `TextureSampling.Default` (Linear + Clamp) bleeds neighbouring
+cells at fractional camera positions. A checkerboard `Tilemap` of grass and water (cells that are not adjacent in the
+texture) showed 1 px seams at 1× and 2× when panned to sub-pixel positions, and none with `Pixelated`. The debug scene
+cannot show this, because it draws sheets in their source layout, so a bleed there samples a matching colour.
+
+**Decision:** `assets/tiles.png` uses `TextureSampling.Pixelated`, set in `Game.razor` before preload. The other sheets keep
+the default: their cells are drawn as sprites with transparent padding. #16 should re-check the real map, and if
+`Pixelated` looks too blocky at some zoom, ask Yaeger for margin/spacing support on `SpriteSheet`/`Tileset`.
