@@ -2,13 +2,13 @@
 
 [![CI](https://github.com/Anras573/xcom-like-browser-game/actions/workflows/ci.yml/badge.svg)](https://github.com/Anras573/xcom-like-browser-game/actions/workflows/ci.yml)
 [![Deploy](https://github.com/Anras573/xcom-like-browser-game/actions/workflows/deploy.yml/badge.svg)](https://github.com/Anras573/xcom-like-browser-game/actions/workflows/deploy.yml)
-[![Play](https://img.shields.io/badge/play-in%20your%20browser-3fd0ff)](https://anras573.github.io/xcom-like-browser-game/)
+[![Play](https://img.shields.io/badge/play-in%20your%20browser-3fd0ff)](https://anbora.dk/xcom-like-browser-game/)
 
 A turn-based squad tactics game with a strategy layer (XCOM: Enemy Unknown style) that runs in the browser. Lead Task Force FIREWALL against MERIDIAN, a rogue logistics AI, in the quarantined city of Port Halden. Built with C# / .NET 10 on the [Yaeger](https://github.com/Anras573/Yaeger) engine, running as Blazor WebAssembly + WebGL 2. Art is CC0 from Kenney (see [CREDITS.md](CREDITS.md)).
 
 Design: [docs/GDD.md](docs/GDD.md). Agent/contributor guidance: [CLAUDE.md](CLAUDE.md).
 
-**Play:** https://anras573.github.io/xcom-like-browser-game/
+**Play:** https://anbora.dk/xcom-like-browser-game/
 
 ## Build and run
 
@@ -35,7 +35,9 @@ Format with `dotnet tool restore && dotnet csharpier format .`.
 
 ## Deployment (GitHub Pages)
 
-Every push to `main` deploys the game to **https://anras573.github.io/xcom-like-browser-game/** through [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). You can also run it by hand from the Actions tab (**Deploy to GitHub Pages → Run workflow**).
+Every push to `main` deploys the game to **https://anbora.dk/xcom-like-browser-game/** through [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). You can also run it by hand from the Actions tab (**Deploy to GitHub Pages → Run workflow**).
+
+The domain comes from the owner's GitHub Pages user site (`anbora.dk`), which GitHub applies to every project site under the account. This repo has no `CNAME` of its own, and `https://anras573.github.io/xcom-like-browser-game/` redirects there. The game is still served from the `/xcom-like-browser-game/` sub-path, which is why the `<base href>` rewrite below is needed.
 
 ### One-time repository setup (already done)
 
