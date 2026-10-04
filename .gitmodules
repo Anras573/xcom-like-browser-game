@@ -1,0 +1,3 @@
+[submodule "external/Yaeger"]
+	path = external/Yaeger
+	url = https://github.com/Anras573/Yaeger

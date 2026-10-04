@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/external/" />
+  <Folder Name="/external/Yaeger/" />
+  <Folder Name="/external/Yaeger/src/" />
+  <Folder Name="/external/Yaeger/src/Engine/">
+    <Project Path="external/Yaeger/src/Engine/Yaeger.Browser/Yaeger.Browser.csproj" />
+    <Project Path="external/Yaeger/src/Engine/Yaeger.Core/Yaeger.Core.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Firewall.Rules/Firewall.Rules.csproj" />
+    <Project Path="src/Firewall.Web/Firewall.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Firewall.Rules.Tests/Firewall.Rules.Tests.csproj" />
+  </Folder>
+</Solution>
