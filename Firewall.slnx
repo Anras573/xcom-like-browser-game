@@ -12,5 +12,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Firewall.Rules.Tests/Firewall.Rules.Tests.csproj" />
+    <Project Path="tests/Firewall.Web.Tests/Firewall.Web.Tests.csproj" />
   </Folder>
 </Solution>

@@ -1,0 +1,171 @@
+{
+  "texture": "assets/characters.png",
+  "columns": 6,
+  "rows": 9,
+  "frames": {
+    "unit.hitman1.gun": 0,
+    "unit.hitman1.hold": 1,
+    "unit.hitman1.machine": 2,
+    "unit.hitman1.reload": 3,
+    "unit.hitman1.silencer": 4,
+    "unit.hitman1.stand": 5,
+    "unit.manBlue.gun": 6,
+    "unit.manBlue.hold": 7,
+    "unit.manBlue.machine": 8,
+    "unit.manBlue.reload": 9,
+    "unit.manBlue.silencer": 10,
+    "unit.manBlue.stand": 11,
+    "unit.manBrown.gun": 12,
+    "unit.manBrown.hold": 13,
+    "unit.manBrown.machine": 14,
+    "unit.manBrown.reload": 15,
+    "unit.manBrown.silencer": 16,
+    "unit.manBrown.stand": 17,
+    "unit.manOld.gun": 18,
+    "unit.manOld.hold": 19,
+    "unit.manOld.machine": 20,
+    "unit.manOld.reload": 21,
+    "unit.manOld.silencer": 22,
+    "unit.manOld.stand": 23,
+    "unit.robot1.gun": 24,
+    "unit.robot1.hold": 25,
+    "unit.robot1.machine": 26,
+    "unit.robot1.reload": 27,
+    "unit.robot1.silencer": 28,
+    "unit.robot1.stand": 29,
+    "unit.soldier1.gun": 30,
+    "unit.soldier1.hold": 31,
+    "unit.soldier1.machine": 32,
+    "unit.soldier1.reload": 33,
+    "unit.soldier1.silencer": 34,
+    "unit.soldier1.stand": 35,
+    "unit.survivor1.gun": 36,
+    "unit.survivor1.hold": 37,
+    "unit.survivor1.machine": 38,
+    "unit.survivor1.reload": 39,
+    "unit.survivor1.silencer": 40,
+    "unit.survivor1.stand": 41,
+    "unit.womanGreen.gun": 42,
+    "unit.womanGreen.hold": 43,
+    "unit.womanGreen.machine": 44,
+    "unit.womanGreen.reload": 45,
+    "unit.womanGreen.silencer": 46,
+    "unit.womanGreen.stand": 47,
+    "unit.zombie1.gun": 48,
+    "unit.zombie1.hold": 49,
+    "unit.zombie1.machine": 50,
+    "unit.zombie1.reload": 51,
+    "unit.zombie1.silencer": 52,
+    "unit.zombie1.stand": 53
+  },
+  "pivotOffsets": {
+    "unit.hitman1.gun": [
+      -1,
+      0
+    ],
+    "unit.hitman1.machine": [
+      -1,
+      0
+    ],
+    "unit.hitman1.silencer": [
+      -6,
+      0
+    ],
+    "unit.manBlue.gun": [
+      -1,
+      0
+    ],
+    "unit.manBlue.machine": [
+      -1,
+      0
+    ],
+    "unit.manBlue.silencer": [
+      -6,
+      0
+    ],
+    "unit.manBrown.gun": [
+      -1,
+      0
+    ],
+    "unit.manBrown.machine": [
+      -1,
+      0
+    ],
+    "unit.manBrown.silencer": [
+      -6,
+      0
+    ],
+    "unit.manOld.gun": [
+      -1,
+      0
+    ],
+    "unit.manOld.machine": [
+      -1,
+      0
+    ],
+    "unit.manOld.silencer": [
+      -6,
+      0
+    ],
+    "unit.robot1.gun": [
+      -1,
+      0
+    ],
+    "unit.robot1.machine": [
+      -1,
+      0
+    ],
+    "unit.robot1.silencer": [
+      -6,
+      0
+    ],
+    "unit.soldier1.gun": [
+      -2,
+      0
+    ],
+    "unit.soldier1.machine": [
+      -2,
+      0
+    ],
+    "unit.soldier1.silencer": [
+      -7,
+      0
+    ],
+    "unit.survivor1.gun": [
+      -2,
+      0
+    ],
+    "unit.survivor1.machine": [
+      -2,
+      0
+    ],
+    "unit.survivor1.silencer": [
+      -7,
+      0
+    ],
+    "unit.womanGreen.gun": [
+      -2,
+      0
+    ],
+    "unit.womanGreen.machine": [
+      -2,
+      0
+    ],
+    "unit.womanGreen.silencer": [
+      -7,
+      0
+    ],
+    "unit.zombie1.gun": [
+      -1,
+      0
+    ],
+    "unit.zombie1.machine": [
+      -1,
+      0
+    ],
+    "unit.zombie1.silencer": [
+      -6,
+      0
+    ]
+  }
+}
