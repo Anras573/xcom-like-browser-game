@@ -1,0 +1,38 @@
+@inject NavigationManager Nav
+@using System.Numerics
+@using Yaeger.Browser
+@using Yaeger.Platform
+@implements IDisposable
+
+<canvas id="yaeger-canvas"></canvas>
+
+@code {
+    private BrowserRenderSurface? _surface;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        // Base-relative, so GitHub Pages sub-paths work.
+        await YaegerBrowser.InitializeAsync(Nav.BaseUri);
+
+        _surface = new BrowserRenderSurface("yaeger-canvas")
+        {
+            ClearColor = new Vector4(0.07f, 0.08f, 0.1f, 1f),
+        };
+        _surface.Initialize();
+
+        // Preload so the textured quad never shows as a white placeholder.
+        await _surface.PreloadAsync(GameApp.TexturePaths, new Progress<float>());
+
+        var app = new GameApp(_surface);
+        YaegerBrowser.StartGameLoop(app.Tick);
+    }
+
+    public void Dispose()
+    {
+        YaegerBrowser.StopGameLoop();
+        _surface?.Dispose();
+    }
+}
