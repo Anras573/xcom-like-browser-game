@@ -33,6 +33,9 @@ public sealed class TacticalCamera
 
     public Camera2D ToCamera2D() => new(Center, Zoom);
 
+    /// <summary>Canvas (CSS) pixels per tile at the current zoom.</summary>
+    public float PixelsPerTile(float canvasHeight) => canvasHeight / TilesVisibleVertically;
+
     /// <summary><see cref="Camera2D.Zoom"/> that shows <paramref name="tilesVisibleVertically"/> tiles.</summary>
     public static float ZoomFor(float tilesVisibleVertically) => 2f / tilesVisibleVertically;
 

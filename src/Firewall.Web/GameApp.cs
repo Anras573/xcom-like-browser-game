@@ -28,26 +28,31 @@ public sealed class GameApp
     private readonly FrameRenderer _frame;
     private readonly TacticalCamera _camera = new() { Center = new Vector2(10f, 10f) };
     private readonly Entity _cameraEntity;
+    private readonly DebugTextScene _textScene;
 
     public GameApp(BrowserRenderSurface surface, AssetRegistry registry)
     {
         _surface = surface;
         _stats = new RenderStatsSurface(surface);
-        var text = new BrowserTextRenderSurface(
-            _stats,
-            new BrowserGlyphAtlas(() => surface.PixelRatio)
-        );
+        var atlas = new BrowserGlyphAtlas(() => surface.PixelRatio);
+        var text = new BrowserTextRenderSurface(_stats, atlas);
         var entities = new UnifiedRenderSystem(_stats, text, _world, surface);
         _frame = new FrameRenderer(_stats, text, entities, surface)
         {
             WorldPass = DrawWorldOverlay,
-            ScreenPass = DrawPanel,
+            ScreenPass = DrawScreen,
+            TextServices = new TextServices(
+                atlas,
+                (font, size, content) => atlas.Prepare(font, size, content),
+                options => text.Options = options
+            ),
         };
 
         // Arrow keys would otherwise scroll the page.
         BrowserInputState.SetPreventDefaultKeys([Keys.Up, Keys.Down, Keys.Left, Keys.Right]);
 
         DebugTacticalScene.Build(_world, registry);
+        _textScene = new DebugTextScene(_world, registry);
 
         _cameraEntity = _world.CreateEntity("camera");
         _world.AddComponent(_cameraEntity, _camera.ToCamera2D());
@@ -58,6 +63,7 @@ public sealed class GameApp
         _timeSource.Advance(timestampMs);
         BrowserInputState.BeginFrame();
         UpdateDebugCamera();
+        _textScene.Update(_timeSource.DeltaTime, _camera.PixelsPerTile(_surface.Size.Y));
         _frame.Render();
         BrowserInputState.EndFrame();
     }
@@ -104,6 +110,12 @@ public sealed class GameApp
     }
 
     // Stays put in the top-left of the letterboxed 1280x720 UI while the world camera moves.
+    private void DrawScreen(ScreenCanvas canvas)
+    {
+        DrawPanel(canvas);
+        DebugTextScene.DrawPanel(canvas);
+    }
+
     private void DrawPanel(ScreenCanvas canvas)
     {
         canvas.FillRect(new Vector2(16, 16), new Vector2(300, 112), new Vector4(0f, 0f, 0f, 0.6f));

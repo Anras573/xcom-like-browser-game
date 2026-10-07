@@ -25,6 +25,9 @@ public static class RenderLayers
     /// <summary>Particles and other effects.</summary>
     public const int Fx = 50;
 
+    /// <summary>Drop shadow behind <see cref="WorldText"/>.</summary>
+    public const int WorldTextShadow = 55;
+
     /// <summary>Floating damage numbers and similar world-space text.</summary>
     public const int WorldText = 60;
 
@@ -37,6 +40,7 @@ public static class RenderLayers
         Units,
         UnitOverlay,
         Fx,
+        WorldTextShadow,
         WorldText,
     ];
 

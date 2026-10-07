@@ -24,7 +24,7 @@ World-space textures are **uniform grids of 64×64 cells**: the engine draws a `
 | `fx.png` | 8×11 | Smoke, explosion, flash and puff flipbooks, each starting on its own row. |
 | `ui.png` | 1024×512 | Shelf-packed 9-slice panels/buttons, bars, game icons, crosshairs. Every region has 2 px extruded edges. |
 
-Fonts are not baked. Only `fonts/KenneyFuture.ttf` is copied (the debug scene needs it); load other fonts at runtime from the `kenney-fonts` pack.
+Fonts are not baked. `fonts/` holds `KenneyFuture.ttf`, `KenneyFutureNarrow.ttf` and `KenneyMiniSquare.ttf`, loaded at runtime (see `TextStyles`).
 Each pack's `License.txt` is copied to `licenses/<pack>.txt`.
 
 ## Manifests

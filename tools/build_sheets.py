@@ -441,6 +441,13 @@ LICENSE_PACKS = [
 ]
 
 
+FONTS = {
+    "KenneyFuture.ttf": "Kenney Future.ttf",
+    "KenneyFutureNarrow.ttf": "Kenney Future Narrow.ttf",
+    "KenneyMiniSquare.ttf": "Kenney Mini Square.ttf",
+}
+
+
 def copy_licenses_and_fonts() -> None:
     for name in LICENSE_PACKS:
         z = pack(name)
@@ -450,10 +457,11 @@ def copy_licenses_and_fonts() -> None:
             sys.exit(f"{name}.zip has no License.txt")
         (OUT / "licenses").mkdir(parents=True, exist_ok=True)
         (OUT / "licenses" / f"{name}.txt").write_bytes(z.read(lic[0]))
-    # Fonts are loaded at runtime (not baked); ship only the one the debug scene needs.
+    # Fonts are loaded at runtime (not baked).
     fonts = OUT / "fonts"
     fonts.mkdir(parents=True, exist_ok=True)
-    (fonts / "KenneyFuture.ttf").write_bytes(read("kenney-fonts", "Fonts/Kenney Future.ttf"))
+    for out_name, member in FONTS.items():
+        (fonts / out_name).write_bytes(read("kenney-fonts", f"Fonts/{member}"))
 
 
 def main() -> int:

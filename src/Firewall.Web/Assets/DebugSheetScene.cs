@@ -12,8 +12,7 @@ namespace Firewall.Web.Assets;
 /// </summary>
 public static class DebugSheetScene
 {
-    public const string FontFamily = "KenneyFuture";
-    public const string FontUrl = "assets/fonts/KenneyFuture.ttf";
+    public const string FontFamily = Rendering.TextStyles.Future;
 
     private const float LabelScale = 1f / 64f; // text lays out in pixels; 1 cell = 64 px
     private static readonly Color LabelColor = new(255, 220, 90);
