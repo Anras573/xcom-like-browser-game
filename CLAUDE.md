@@ -44,6 +44,7 @@ Yaeger is maintained by this project's owner. If a browser gap blocks you, file 
 - Text: `BrowserTextRenderSurface` (Canvas 2D glyph atlas), `LoadFontAsync`, `TextLayout`.
 - Input: `BrowserInputState` with `WasKeyPressed/Released` and `WasMouseButtonPressed/Released` edges. Call `BrowserInputState.BeginFrame()` once per tick.
 - Audio: `IAudioOutput` / `BrowserAudioOutput` (WebAudio; unlocks on first gesture).
+- Any `IRenderSurface` wrapper (e.g. `RenderStatsSurface`) must forward `GetTextureSize`. Otherwise it inherits the default "unknown size" and the engine silently skips its half-texel UV inset that stops neighbour bleed on tiles, sprite sheets and particles.
 - Textures: `PreloadAsync`, `IsReady`, `GetTextureSize`, `GetLoadError`. Preload before the first frame to avoid white placeholders. `TextureSampling` defaults to Linear + Clamp, no mipmaps.
 - Particles can use atlas regions via `ParticleEmitter.UvMin/UvMax`.
 - Limits: `UnifiedRenderSystem` draws whole textures, uniform-grid `SpriteSheet` frames, `Tilemap`s and `Text`, not arbitrary atlas sub-rects, so world textures are uniform 64x64 grids. `UiRenderSystem` is native-only, so UI draws game-side (hit-testing helpers in Core are fine). No gamepad in the browser.
@@ -57,4 +58,4 @@ cd ../.. && dotnet build && dotnet test
 git add external/Yaeger && git commit -m "Bump Yaeger to <commit>"
 ```
 
-The pin must be `8b64368` or later (the browser-parity epic).
+The pin must be `78bdace` or later (browser parity plus the half-texel UV inset, Yaeger #315/#317).
