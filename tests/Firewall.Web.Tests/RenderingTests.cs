@@ -32,6 +32,9 @@ public class RenderingTests
             Vector2 uvMax,
             Vector4 color
         ) => Textures.Add(texturePath);
+
+        public Vector2 GetTextureSize(string path) =>
+            path == "tiles.png" ? new Vector2(1728, 1280) : Vector2.Zero;
     }
 
     private sealed record Viewport(Vector2 Size) : IViewport
@@ -220,5 +223,14 @@ public class RenderingTests
 
         Assert.Equal(6, stats.LastFrameQuads);
         Assert.Equal(4, stats.LastFrameDrawBatches);
+    }
+
+    [Fact]
+    public void StatsSurfaceForwardsTextureSize()
+    {
+        IRenderSurface stats = new RenderStatsSurface(new RecordingSurface());
+
+        Assert.Equal(new Vector2(1728, 1280), stats.GetTextureSize("tiles.png"));
+        Assert.Equal(Vector2.Zero, stats.GetTextureSize("unknown.png"));
     }
 }

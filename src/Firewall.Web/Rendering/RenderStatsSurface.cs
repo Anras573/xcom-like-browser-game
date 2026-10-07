@@ -73,6 +73,12 @@ public sealed class RenderStatsSurface(IRenderSurface inner) : IRenderSurface
         inner.SubmitQuad(transform, texturePath, uvMin, uvMax, color);
     }
 
+    /// <summary>
+    /// Must forward: the engine insets sprite-sheet, tile and particle UVs by half a texel
+    /// only when it knows the texture size, and the interface default reports "unknown".
+    /// </summary>
+    public Vector2 GetTextureSize(string path) => inner.GetTextureSize(path);
+
     private void Count(string texturePath)
     {
         Quads++;
