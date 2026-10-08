@@ -57,8 +57,8 @@ public sealed class DebugTextScene
     {
         _time += (float)deltaSeconds;
         var pos = new Vector2(
-            10f + 3f * MathF.Cos(_time * 0.6f),
-            13f + 2f * MathF.Sin(_time * 0.6f)
+            14f + 2f * MathF.Cos(_time * 0.6f),
+            13f + 1.5f * MathF.Sin(_time * 0.6f)
         );
         _world.AddComponent(_mover, new Transform2D(pos, _time * 0.6f + MathF.PI));
 
