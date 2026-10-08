@@ -17,8 +17,6 @@ public sealed class GameApp
     private const float PanTilesPerSecond = 8f;
 
     private static readonly FontHandle Font = new(DebugSheetScene.FontFamily);
-    private static readonly Vector4 RangeFill = new(0.2f, 0.6f, 1f, 0.28f);
-    private static readonly Vector4 RangeOutline = new(0.4f, 0.8f, 1f, 0.9f);
 
     private readonly World _world = new();
     private readonly BrowserRenderSurface _surface;
@@ -89,18 +87,10 @@ public sealed class GameApp
         _world.AddComponent(_cameraEntity, _camera.ToCamera2D());
     }
 
-    // Move-range preview around the soldier; changes freely per frame, so it isn't in the ECS.
+    // Immediate-mode world drawing for things that may sit above world text: path/AoE preview.
     private static void DrawWorldOverlay(WorldOverlay overlay)
     {
         var (sx, sy) = DebugTacticalScene.Soldier;
-        for (var dy = -3; dy <= 3; dy++)
-        for (var dx = -3; dx <= 3; dx++)
-        {
-            if (dx * dx + dy * dy > 9)
-                continue;
-            overlay.FillTile(sx + dx, sy + dy, RangeFill);
-            overlay.OutlineTile(sx + dx, sy + dy, 0.04f, RangeOutline);
-        }
         overlay.Line(
             TacticalCamera.TileCenter(sx, sy),
             TacticalCamera.TileCenter(sx + 3, sy + 1),

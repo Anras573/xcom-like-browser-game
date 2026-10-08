@@ -19,6 +19,9 @@ public static class RenderLayers
 
     public const int Units = 30;
 
+    /// <summary>Move-range and similar tile highlights; below world text so they never tint it.</summary>
+    public const int Highlights = 35;
+
     /// <summary>HP pips and status icons.</summary>
     public const int UnitOverlay = 40;
 
@@ -38,6 +41,7 @@ public static class RenderLayers
         GroundDecal,
         Props,
         Units,
+        Highlights,
         UnitOverlay,
         Fx,
         WorldTextShadow,
