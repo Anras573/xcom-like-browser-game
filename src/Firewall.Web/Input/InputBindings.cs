@@ -12,6 +12,8 @@ public enum GameAction
     ZoomIn,
     ZoomOut,
     EndTurn,
+
+    /// <summary>Cycles forward; consumers treat <c>Shift</c> held with this action as cycling backwards.</summary>
     NextUnit,
     Ability1,
     Ability2,

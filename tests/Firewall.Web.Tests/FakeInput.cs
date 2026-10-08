@@ -23,6 +23,7 @@ internal sealed class FakeInput : IInputState
     private float _stagedScroll;
 
     public Vector2 MousePosition { get; set; }
+    public bool IsMouseInside { get; set; } = true;
     public Vector2 MousePositionNdc => Vector2.Zero;
     public float ScrollDelta { get; private set; }
 

@@ -67,6 +67,32 @@ public class TacticalCameraControllerTests
     }
 
     [Fact]
+    public void EdgeScroll_OffWhenFlaggedOutside_EvenIfPositionIsInBand()
+    {
+        _input.MousePosition = new Vector2(Canvas.X - 5f, 2f);
+        _input.IsMouseInside = false;
+        Step();
+        Assert.Equal(new Vector2(10f, 10f), _camera.Center);
+    }
+
+    [Fact]
+    public void Wheel_WhenOutside_DoesNotZoom_AndKeysZoomAroundScreenCentre()
+    {
+        _input.MousePosition = new Vector2(1200f, 100f);
+        _input.IsMouseInside = false;
+        _input.Scroll(-500f);
+        Step();
+        Assert.Equal(1f, _controller.ZoomFactor, 3);
+
+        var before = _camera.CanvasToWorld(Middle, Canvas);
+        _input.Press(Keys.Plus);
+        for (var i = 0; i < 10; i++)
+            Step();
+        Assert.True(_controller.ZoomFactor > 1f);
+        Assert.InRange(Vector2.Distance(_camera.CanvasToWorld(Middle, Canvas), before), 0f, 0.01f);
+    }
+
+    [Fact]
     public void Wheel_ZoomsWithinLimits()
     {
         for (var i = 0; i < 100; i++)

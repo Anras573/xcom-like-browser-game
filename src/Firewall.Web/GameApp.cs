@@ -95,7 +95,13 @@ public sealed class GameApp
     private (int X, int Y)? PickTile(Vector2 canvas)
     {
         var mouse = _input.MousePosition;
-        if (mouse.X < 0f || mouse.Y < 0f || mouse.X >= canvas.X || mouse.Y >= canvas.Y)
+        if (
+            !_input.IsMouseInside
+            || mouse.X < 0f
+            || mouse.Y < 0f
+            || mouse.X >= canvas.X
+            || mouse.Y >= canvas.Y
+        )
             return null;
         var vp = _camera.ToCamera2D().ViewProjection(canvas.X / MathF.Max(canvas.Y, 1f));
         var world = Picking.ScreenToWorld(Picking.CanvasToNdc(mouse, canvas), vp);

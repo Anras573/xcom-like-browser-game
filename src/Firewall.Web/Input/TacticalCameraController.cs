@@ -82,8 +82,13 @@ public sealed class TacticalCameraController(
     {
         RightClicked = false;
         var mouse = input.MousePosition;
+        // MousePosition keeps its last value after the pointer leaves, so check the flag first.
         var inCanvas =
-            mouse.X >= 0f && mouse.Y >= 0f && mouse.X < canvasSize.X && mouse.Y < canvasSize.Y;
+            input.IsMouseInside
+            && mouse.X >= 0f
+            && mouse.Y >= 0f
+            && mouse.X < canvasSize.X
+            && mouse.Y < canvasSize.Y;
 
         UpdateRightButton(mouse, canvasSize, inCanvas);
         var panned = _dragging;
