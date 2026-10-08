@@ -72,14 +72,12 @@ public sealed class GameApp
     public void Tick(double timestampMs)
     {
         _timeSource.Advance(timestampMs);
-        BrowserInputState.BeginFrame();
         _clicks.BeginFrame();
         if (_input.WasKeyPressed(Keys.F1))
             _showGallery = !_showGallery;
         UpdateCamera();
         _textScene.Update(_timeSource.DeltaTime, _camera.PixelsPerTile(_surface.Size.Y));
         _frame.Render();
-        BrowserInputState.EndFrame();
     }
 
     private void UpdateCamera()
@@ -92,7 +90,7 @@ public sealed class GameApp
             var (sx, sy) = DebugTacticalScene.Soldier;
             _cameraController.FocusOn(TacticalCamera.TileCenter(sx, sy), 0.4f);
         }
-        _cameraController.Update(dt, canvas);
+        _cameraController.Update(dt, canvas, _ui.PointerOverUi);
 
         _world.AddComponent(_cameraEntity, _camera.ToCamera2D());
         // Don't pick tiles (or later, click them) through UI drawn last frame.

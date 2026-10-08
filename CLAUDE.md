@@ -42,7 +42,7 @@ Yaeger is maintained by this project's owner. If a browser gap blocks you, file 
 - `BrowserRenderSurface.ClearColor` sets the clear colour. `SetCamera` flushes queued quads automatically.
 - `UnifiedRenderSystem` and `CameraFollowSystem` live in `Yaeger.Core` and take an `IViewport` (`BrowserRenderSurface` implements it).
 - Text: `BrowserTextRenderSurface` (Canvas 2D glyph atlas), `LoadFontAsync`, `TextLayout`.
-- Input: `BrowserInputState` with `WasKeyPressed/Released` and `WasMouseButtonPressed/Released` edges. Call `BrowserInputState.BeginFrame()` once per tick.
+- Input: `BrowserInputState` with `WasKeyPressed/Released` and `WasMouseButtonPressed/Released` edges. `YaegerBrowser.StartGameLoop` owns the input frame (it calls `BeginFrame()`/`EndFrame()` around every tick), so don't call them yourself.
 - Audio: `IAudioOutput` / `BrowserAudioOutput` (WebAudio; unlocks on first gesture).
 - Any `IRenderSurface` wrapper (e.g. `RenderStatsSurface`) must forward `GetTextureSize`. Otherwise it inherits the default "unknown size" and the engine silently skips its half-texel UV inset that stops neighbour bleed on tiles, sprite sheets and particles.
 - Textures: `PreloadAsync`, `IsReady`, `GetTextureSize`, `GetLoadError`. Preload before the first frame to avoid white placeholders. `TextureSampling` defaults to Linear + Clamp, no mipmaps.
@@ -58,4 +58,4 @@ cd ../.. && dotnet build && dotnet test
 git add external/Yaeger && git commit -m "Bump Yaeger to <commit>"
 ```
 
-The pin must be `7ab0680` or later (browser parity, the half-texel UV inset, Yaeger #315/#317, and `IInputState.IsMouseInside`, Yaeger #319).
+The pin must be `8d33292` or later (browser parity, the half-texel UV inset, Yaeger #315/#317, `IInputState.IsMouseInside`, Yaeger #319, and the game loop owning the input frame so edges survive into the screen pass, Yaeger #321).

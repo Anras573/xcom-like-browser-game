@@ -235,6 +235,7 @@ public sealed class UiContext(
     )
     {
         var id = IdOf(text, rect);
+        _blockers.Add(rect);
         var state = _input.Interact(id, rect, enabled, Blocked);
         var visual =
             !enabled ? ButtonVisual.Disabled
@@ -310,6 +311,7 @@ public sealed class UiContext(
     {
         var usable = enabled && cooldown <= 0;
         var id = IdOf(icon, rect);
+        _blockers.Add(rect);
         var state = _input.Interact(id, rect, usable, Blocked);
         var visual =
             !usable ? ButtonVisual.Disabled
@@ -463,6 +465,7 @@ public sealed class UiContext(
     )
     {
         var key = IdOf(id, rect);
+        _blockers.Add(rect);
         var offset = _scroll.GetValueOrDefault(key);
         if (!Blocked && _input.IsHover(rect) && _input.ScrollDelta != 0f)
             offset += _input.ScrollDelta * WheelScale;
@@ -493,6 +496,7 @@ public sealed class UiContext(
     public bool Tabs(UiRect rect, IReadOnlyList<string> labels, ref int selected)
     {
         var changed = false;
+        _blockers.Add(rect);
         var w = rect.W / MathF.Max(1, labels.Count);
         for (var i = 0; i < labels.Count; i++)
         {
@@ -552,8 +556,14 @@ public sealed class UiContext(
             const float width = 480f;
             var style = Theme.Body;
             var textW = width - 2f * Theme.Padding;
-            var lines = body.Split('\n')
-                .Sum(l => Math.Max(1, (int)MathF.Ceiling(_canvas.Measure(l, style) / textW)));
+            // Tagged bodies are drawn line by line as rich text (no wrapping); plain bodies wrap.
+            var tagged = body.Contains("[c=", StringComparison.Ordinal);
+            var bodyLines = body.Split('\n');
+            var lines = tagged
+                ? bodyLines.Length
+                : bodyLines.Sum(l =>
+                    Math.Max(1, (int)MathF.Ceiling(_canvas.Measure(l, style) / textW))
+                );
             var bodyH = lines * style.Size * 1.3f;
             var height = Theme.TitleBarHeight + bodyH + 48f + 3f * Theme.Padding + 12f;
             var panel = new UiRect(
@@ -564,7 +574,15 @@ public sealed class UiContext(
             );
 
             var content = Panel(panel, title);
-            _canvas.WrappedText(body, content.Position, style, content.W);
+            if (tagged)
+                for (var i = 0; i < bodyLines.Length; i++)
+                    _canvas.RichText(
+                        bodyLines[i],
+                        content.Position + new Vector2(0f, i * style.Size * 1.3f),
+                        style
+                    );
+            else
+                _canvas.WrappedText(body, content.Position, style, content.W);
 
             var result = ModalPending;
             var bw = Math.Min(
