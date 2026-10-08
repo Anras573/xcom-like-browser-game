@@ -31,6 +31,9 @@ public sealed class FrameRenderer(
     /// <summary>Screen-space drawing in logical UI pixels.</summary>
     public Action<ScreenCanvas>? ScreenPass { get; set; }
 
+    /// <summary>Glyph metrics and wrap control; needed for rich and wrapped screen text.</summary>
+    public TextServices? TextServices { get; set; }
+
     public void Render()
     {
         entities.Render();
@@ -40,7 +43,7 @@ public sealed class FrameRenderer(
         // Changing the matrix flushes the world quads first.
         var ui = new UiSpace(viewport.Size);
         surface.SetCamera(ui.ViewProjection());
-        ScreenPass?.Invoke(new ScreenCanvas(surface, text));
+        ScreenPass?.Invoke(new ScreenCanvas(surface, text, TextServices));
         surface.FlushQueuedQuads();
     }
 }
@@ -72,9 +75,25 @@ public readonly struct WorldOverlay(IRenderSurface surface)
         * Matrix4x4.CreateTranslation(min.X + size.X / 2f, min.Y + size.Y / 2f, 0f);
 }
 
+/// <summary>What <see cref="ScreenCanvas"/> needs beyond plain <c>DrawText</c>.</summary>
+/// <param name="Metrics">Glyph metrics, for measuring runs.</param>
+/// <param name="Prepare">Rasterizes glyphs ahead of a measure (font key, size, text).</param>
+/// <param name="SetOptions">Sets the wrap width and alignment applied to following draws.</param>
+public sealed record TextServices(
+    IGlyphMetricsProvider Metrics,
+    Action<string, int, string> Prepare,
+    Action<TextLayoutOptions> SetOptions
+);
+
 /// <summary>Drawing in logical UI pixels: origin top-left, +Y down, 1280x720.</summary>
-public readonly struct ScreenCanvas(IRenderSurface surface, ITextRenderSurface text)
+public readonly struct ScreenCanvas(
+    IRenderSurface surface,
+    ITextRenderSurface text,
+    TextServices? services = null
+)
 {
+    private static readonly Vector2 ShadowOffset = new(1f, 1f);
+
     public void FillRect(Vector2 topLeft, Vector2 size, Vector4 color) =>
         surface.SubmitQuad(WorldOverlay.RectTransform(topLeft, size), color);
 
@@ -92,5 +111,58 @@ public readonly struct ScreenCanvas(IRenderSurface surface, ITextRenderSurface t
             fontSize,
             color
         );
+    }
+
+    /// <summary>Draws text in <paramref name="style"/>, with a 60 % black shadow if it asks for one.</summary>
+    public void Text(string content, Vector2 topLeft, TextStyle style)
+    {
+        if (style.Shadow)
+            Text(content, topLeft + ShadowOffset, style.Font, style.Size, WorldText.ShadowColor);
+        Text(content, topLeft, style.Font, style.Size, style.Color);
+    }
+
+    /// <summary>Word-wrapped (and aligned) text in a block <paramref name="maxWidth"/> wide.</summary>
+    public void WrappedText(
+        string content,
+        Vector2 topLeft,
+        TextStyle style,
+        float maxWidth,
+        TextAlignment alignment = TextAlignment.Left
+    )
+    {
+        services?.SetOptions(new TextLayoutOptions(maxWidth, alignment));
+        try
+        {
+            Text(content, topLeft, style);
+        }
+        finally
+        {
+            services?.SetOptions(default);
+        }
+    }
+
+    /// <summary>
+    /// Single-line text with inline <c>[c=#RRGGBB]…[/c]</c> colour tags (see <see cref="RichText"/>).
+    /// Returns the width drawn. Without <see cref="TextServices"/> the tags are stripped and the
+    /// text is drawn in one colour.
+    /// </summary>
+    public float RichText(string content, Vector2 topLeft, TextStyle style)
+    {
+        var runs = Rendering.RichText.Parse(content);
+        if (services is null)
+        {
+            Text(Rendering.RichText.Strip(runs), topLeft, style);
+            return 0f;
+        }
+
+        services.Prepare(style.Family, style.Size, Rendering.RichText.Strip(runs));
+        var placed = Rendering.RichText.Position(runs, services.Metrics, style.Family, style.Size);
+        foreach (var run in placed)
+            Text(run.Text, topLeft + new Vector2(run.X, 0f), style.With(run.Color ?? style.Color));
+
+        return placed.Count == 0
+            ? 0f
+            : placed[^1].X
+                + TextLayout.Measure(placed[^1].Text, services.Metrics, style.Family, style.Size).X;
     }
 }

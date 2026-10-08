@@ -7,7 +7,7 @@ All assets are CC0 — Kenney (www.kenney.nl). Each pack's `License.txt` is copi
 |---|---|---|
 | [Top-down Shooter](https://kenney.nl/assets/top-down-shooter) | `tiles.png`, `characters.png`, corpse/scrap decal | CC0 — Kenney (www.kenney.nl) |
 | [UI Pack – Sci-Fi](https://kenney.nl/assets/ui-pack-sci-fi) | `ui.png` panels, buttons, bars | CC0 — Kenney (www.kenney.nl) |
-| [Kenney Fonts](https://kenney.nl/assets/kenney-fonts) | Kenney Future font | CC0 — Kenney (www.kenney.nl) |
+| [Kenney Fonts](https://kenney.nl/assets/kenney-fonts) | Kenney Future, Future Narrow and Mini Square fonts (`wwwroot/assets/fonts/`) | CC0 — Kenney (www.kenney.nl) |
 | [Crosshair Pack](https://kenney.nl/assets/crosshair-pack) | crosshairs in `overlays.png` and `ui.png` | CC0 — Kenney (www.kenney.nl) |
 | [Game Icons](https://kenney.nl/assets/game-icons) | ability icons in `ui.png` | CC0 — Kenney (www.kenney.nl) |
 | [Smoke Particles](https://kenney.nl/assets/smoke-particles) | `fx.png` | CC0 — Kenney (www.kenney.nl) |

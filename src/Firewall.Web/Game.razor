@@ -2,6 +2,7 @@
 @inject HttpClient Http
 @using System.Numerics
 @using Firewall.Web.Assets
+@using Firewall.Web.Rendering
 @using Yaeger.Browser
 @using Yaeger.Platform
 @implements IDisposable
@@ -27,7 +28,7 @@
         };
         _surface.Initialize();
 
-        await BrowserTextRenderSurface.LoadFontAsync(DebugSheetScene.FontFamily, DebugSheetScene.FontUrl);
+        await TextStyles.LoadAsync();
 
         // tiles.png has no spacing between tiles, so Linear bleeds neighbours at fractional
         // camera positions. Must be set before the texture loads (see tools/README.md).

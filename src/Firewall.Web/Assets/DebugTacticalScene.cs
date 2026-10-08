@@ -58,10 +58,42 @@ public static class DebugTacticalScene
         AddTilemap(world, new Tilemap(tileset, MapSize, MapSize, decals), RenderLayers.GroundDecal);
         AddTilemap(world, new Tilemap(tileset, MapSize, MapSize, props), RenderLayers.Props);
 
+        AddMoveRange(world);
+
         AddUnit(world, registry, "unit.soldier1.machine", Soldier.X, Soldier.Y, MathF.PI / 4f);
         AddUnit(world, registry, "unit.manBlue.gun", 8, 11, MathF.PI);
         AddUnit(world, registry, "unit.zombie1.stand", 13, 8, -MathF.PI / 2f);
         AddUnit(world, registry, "unit.robot1.gun", 11, 13, 0f);
+    }
+
+    // Entities on the Highlights layer rather than a WorldPass overlay, so world text drawn on
+    // a higher layer isn't tinted by the translucent fill.
+    private static void AddMoveRange(World world)
+    {
+        var fill = new Color(51, 153, 255, 71);
+        var outline = new Color(102, 204, 255, 230);
+        const float t = 0.04f;
+        var (sx, sy) = Soldier;
+        for (var dy = -3; dy <= 3; dy++)
+        for (var dx = -3; dx <= 3; dx++)
+        {
+            if (dx * dx + dy * dy > 9)
+                continue;
+            var min = new Vector2(sx + dx, sy + dy);
+            AddRect(world, min, Vector2.One, fill);
+            AddRect(world, min, new Vector2(1f, t), outline);
+            AddRect(world, min + new Vector2(0f, 1f - t), new Vector2(1f, t), outline);
+            AddRect(world, min + new Vector2(0f, t), new Vector2(t, 1f - 2f * t), outline);
+            AddRect(world, min + new Vector2(1f - t, t), new Vector2(t, 1f - 2f * t), outline);
+        }
+    }
+
+    private static void AddRect(World world, Vector2 min, Vector2 size, Color color)
+    {
+        var e = world.CreateEntity();
+        world.AddComponent(e, new Transform2D(min + size / 2f, scale: size));
+        world.AddComponent(e, new Sprite("", color));
+        world.AddComponent(e, RenderLayers.Of(RenderLayers.Highlights));
     }
 
     private static void AddTilemap(World world, Tilemap map, int layer)

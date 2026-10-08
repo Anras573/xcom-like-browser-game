@@ -19,11 +19,17 @@ public static class RenderLayers
 
     public const int Units = 30;
 
+    /// <summary>Move-range and similar tile highlights; above props, below units and world text, so they tint neither.</summary>
+    public const int Highlights = 25;
+
     /// <summary>HP pips and status icons.</summary>
     public const int UnitOverlay = 40;
 
     /// <summary>Particles and other effects.</summary>
     public const int Fx = 50;
+
+    /// <summary>Drop shadow behind <see cref="WorldText"/>.</summary>
+    public const int WorldTextShadow = 55;
 
     /// <summary>Floating damage numbers and similar world-space text.</summary>
     public const int WorldText = 60;
@@ -34,9 +40,11 @@ public static class RenderLayers
         Ground,
         GroundDecal,
         Props,
+        Highlights,
         Units,
         UnitOverlay,
         Fx,
+        WorldTextShadow,
         WorldText,
     ];
 
