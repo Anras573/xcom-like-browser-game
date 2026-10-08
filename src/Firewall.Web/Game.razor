@@ -1,7 +1,6 @@
 @inject NavigationManager Nav
 @inject HttpClient Http
 @using System.Numerics
-@using Firewall.Web.Assets
 @using Firewall.Web.Rendering
 @using Yaeger.Browser
 @using Yaeger.Platform
@@ -20,24 +19,14 @@
         // Base-relative, so GitHub Pages sub-paths work.
         await YaegerBrowser.InitializeAsync(Nav.BaseUri);
 
-        var registry = await AssetRegistry.LoadAsync(Http);
-
         _surface = new BrowserRenderSurface("yaeger-canvas")
         {
             ClearColor = new Vector4(0.07f, 0.08f, 0.1f, 1f),
         };
         _surface.Initialize();
 
-        await TextStyles.LoadAsync();
-
-        // tiles.png has no spacing between tiles, so Linear bleeds neighbours at fractional
-        // camera positions. Must be set before the texture loads (see tools/README.md).
-        _surface.SetSampling("assets/tiles.png", TextureSampling.Pixelated);
-
-        // Preload so quads never show as white placeholders.
-        await _surface.PreloadAsync(registry.TexturePaths, new Progress<float>());
-
-        var app = new GameApp(_surface, registry);
+        // Fonts, manifests, textures and game data load inside the boot scene, behind a progress bar.
+        var app = new GameApp(_surface, Http);
         YaegerBrowser.StartGameLoop(app.Tick);
     }
 

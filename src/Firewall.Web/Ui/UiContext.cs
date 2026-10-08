@@ -100,7 +100,13 @@ public sealed class UiContext(
         _blockers.Clear();
     }
 
-    private bool Blocked => _modalWasOpenBeforeThisFrame && !_inModal;
+    /// <summary>
+    /// Set by the scene manager for scenes that are shown but must not react: those under an
+    /// overlay or a fade. Widgets still draw, but report no hover, clicks, scrolling or hotkeys.
+    /// </summary>
+    public bool InputSuspended { get; set; }
+
+    private bool Blocked => InputSuspended || (_modalWasOpenBeforeThisFrame && !_inModal);
 
     private static int IdOf(string key, UiRect r) => HashCode.Combine(key, (int)r.X, (int)r.Y);
 
@@ -604,7 +610,7 @@ public sealed class UiContext(
             }
 
             // The keystroke that opened the modal must not also dismiss it.
-            if (result == ModalPending && _modalWasOpenBeforeThisFrame)
+            if (result == ModalPending && _modalWasOpenBeforeThisFrame && !InputSuspended)
             {
                 if (bindings.WasPressed(GameAction.Cancel))
                     result = cancelIndex >= 0 ? cancelIndex : ModalDismissed;

@@ -34,6 +34,17 @@ public sealed class FrameRenderer(
     /// <summary>Glyph metrics and wrap control; needed for rich and wrapped screen text.</summary>
     public TextServices? TextServices { get; set; }
 
+    /// <summary>
+    /// Screen pass only, drawn over whatever is already on the canvas (no clear): for overlay scenes.
+    /// </summary>
+    public void RenderScreenOnly()
+    {
+        var ui = new UiSpace(viewport.Size);
+        surface.SetCamera(ui.ViewProjection());
+        ScreenPass?.Invoke(new ScreenCanvas(surface, text, TextServices));
+        surface.FlushQueuedQuads();
+    }
+
     public void Render()
     {
         entities.Render();
