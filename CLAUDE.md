@@ -58,4 +58,4 @@ cd ../.. && dotnet build && dotnet test
 git add external/Yaeger && git commit -m "Bump Yaeger to <commit>"
 ```
 
-The pin must be `78bdace` or later (browser parity plus the half-texel UV inset, Yaeger #315/#317).
+The pin must be `7ab0680` or later (browser parity, the half-texel UV inset, Yaeger #315/#317, and `IInputState.IsMouseInside`, Yaeger #319).
