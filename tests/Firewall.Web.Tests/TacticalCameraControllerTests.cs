@@ -30,6 +30,20 @@ public class TacticalCameraControllerTests
     }
 
     [Fact]
+    public void PointerOverUi_IgnoresWheelAndEdgeScroll()
+    {
+        _input.Scroll(-500f);
+        _input.NextFrame();
+        _controller.Update(0.5f, Canvas, pointerOverUi: true);
+        Assert.Equal(1f, _controller.ZoomFactor, 3);
+
+        _input.MousePosition = new Vector2(2f, Middle.Y);
+        _input.NextFrame();
+        _controller.Update(0.5f, Canvas, pointerOverUi: true);
+        Assert.Equal(10f, _camera.Center.X, 3);
+    }
+
+    [Fact]
     public void WasdPansAndSpeedScalesWithZoom()
     {
         _input.Press(Keys.D);

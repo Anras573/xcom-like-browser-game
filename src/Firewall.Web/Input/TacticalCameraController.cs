@@ -78,7 +78,8 @@ public sealed class TacticalCameraController(
         _focusElapsed = 0f;
     }
 
-    public void Update(float deltaTime, Vector2 canvasSize)
+    /// <param name="pointerOverUi">The pointer is over UI: no drag start, edge scroll or wheel zoom.</param>
+    public void Update(float deltaTime, Vector2 canvasSize, bool pointerOverUi = false)
     {
         RightClicked = false;
         var mouse = input.MousePosition;
@@ -90,7 +91,7 @@ public sealed class TacticalCameraController(
             && mouse.X < canvasSize.X
             && mouse.Y < canvasSize.Y;
 
-        UpdateRightButton(mouse, canvasSize, inCanvas);
+        UpdateRightButton(mouse, canvasSize, inCanvas && !pointerOverUi);
         var panned = _dragging;
 
         var pan = Vector2.Zero;
@@ -103,7 +104,7 @@ public sealed class TacticalCameraController(
         if (bindings.IsDown(GameAction.PanDown))
             pan.Y -= 1f;
 
-        if (EdgeScrollEnabled && inCanvas && !_rmbDown)
+        if (EdgeScrollEnabled && inCanvas && !pointerOverUi && !_rmbDown)
         {
             if (mouse.X <= EdgeScrollPixels)
                 pan.X -= 1f;
@@ -126,7 +127,7 @@ public sealed class TacticalCameraController(
             camera.Center += Vector2.Normalize(pan) * speed * deltaTime;
         }
 
-        UpdateZoom(deltaTime, mouse, canvasSize, inCanvas);
+        UpdateZoom(deltaTime, mouse, canvasSize, inCanvas, pointerOverUi);
 
         if (_focusing && !panned)
         {
@@ -179,10 +180,16 @@ public sealed class TacticalCameraController(
         }
     }
 
-    private void UpdateZoom(float deltaTime, Vector2 mouse, Vector2 canvasSize, bool inCanvas)
+    private void UpdateZoom(
+        float deltaTime,
+        Vector2 mouse,
+        Vector2 canvasSize,
+        bool inCanvas,
+        bool pointerOverUi
+    )
     {
         // Browser wheel: positive delta = scrolled down = zoom out.
-        if (inCanvas && input.ScrollDelta != 0f)
+        if (inCanvas && !pointerOverUi && input.ScrollDelta != 0f)
             _targetZoom = Math.Clamp(
                 _targetZoom * MathF.Exp(-input.ScrollDelta * ZoomPerScrollPixel),
                 MinZoom,

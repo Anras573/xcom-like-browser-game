@@ -97,6 +97,35 @@ public readonly struct ScreenCanvas(
     public void FillRect(Vector2 topLeft, Vector2 size, Vector4 color) =>
         surface.SubmitQuad(WorldOverlay.RectTransform(topLeft, size), color);
 
+    /// <summary>Textured quad from a UI atlas region (UVs already flipped for the Y-up texture).</summary>
+    public void Image(
+        string texture,
+        Vector2 topLeft,
+        Vector2 size,
+        Vector2 uvMin,
+        Vector2 uvMax,
+        Vector4 tint
+    ) =>
+        // Negative Y scale: the UI space is Y-down but the quad's UVs run Y-up.
+        surface.SubmitQuad(
+            Matrix4x4.CreateScale(size.X, -size.Y, 1f)
+                * Matrix4x4.CreateTranslation(topLeft.X + size.X / 2f, topLeft.Y + size.Y / 2f, 0f),
+            texture,
+            uvMin,
+            uvMax,
+            tint
+        );
+
+    /// <summary>Width of single-line text (colour tags ignored); a rough estimate without <see cref="TextServices"/>.</summary>
+    public float Measure(string content, TextStyle style)
+    {
+        var plain = Rendering.RichText.Strip(Rendering.RichText.Parse(content));
+        if (services is null)
+            return plain.Length * style.Size * 0.5f;
+        services.Prepare(style.Family, style.Size, plain);
+        return TextLayout.Measure(plain, services.Metrics, style.Family, style.Size).X;
+    }
+
     /// <summary>Draws text with its top-left corner at <paramref name="topLeft"/>.</summary>
     public void Text(string content, Vector2 topLeft, FontHandle font, int fontSize, Color color)
     {
