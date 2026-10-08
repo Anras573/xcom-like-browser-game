@@ -26,7 +26,8 @@ public readonly record struct UiRegion(
     string TexturePath,
     Vector2 UvMin,
     Vector2 UvMax,
-    UiInsets Insets
+    UiInsets Insets,
+    Vector2 PixelSize = default
 );
 
 public static class UiUv

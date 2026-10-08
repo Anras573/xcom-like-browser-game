@@ -2,6 +2,7 @@ using System.Numerics;
 using Firewall.Web.Assets;
 using Firewall.Web.Input;
 using Firewall.Web.Rendering;
+using Firewall.Web.Ui;
 using Yaeger.Browser;
 using Yaeger.ECS;
 using Yaeger.Graphics;
@@ -29,6 +30,9 @@ public sealed class GameApp
     private readonly TacticalCameraController _cameraController;
     private (int X, int Y)? _hoverTile;
     private readonly DebugTextScene _textScene;
+    private readonly UiContext _ui;
+    private readonly UiGalleryScene _gallery = new();
+    private bool _showGallery;
 
     public GameApp(BrowserRenderSurface surface, AssetRegistry registry)
     {
@@ -57,6 +61,7 @@ public sealed class GameApp
             MapSize = new Vector2(DebugTacticalScene.MapSize),
         };
 
+        _ui = new UiContext(_input, _clicks, _bindings, registry);
         DebugTacticalScene.Build(_world, registry);
         _textScene = new DebugTextScene(_world, registry);
 
@@ -69,6 +74,8 @@ public sealed class GameApp
         _timeSource.Advance(timestampMs);
         BrowserInputState.BeginFrame();
         _clicks.BeginFrame();
+        if (_input.WasKeyPressed(Keys.F1))
+            _showGallery = !_showGallery;
         UpdateCamera();
         _textScene.Update(_timeSource.DeltaTime, _camera.PixelsPerTile(_surface.Size.Y));
         _frame.Render();
@@ -88,7 +95,8 @@ public sealed class GameApp
         _cameraController.Update(dt, canvas);
 
         _world.AddComponent(_cameraEntity, _camera.ToCamera2D());
-        _hoverTile = PickTile(canvas);
+        // Don't pick tiles (or later, click them) through UI drawn last frame.
+        _hoverTile = _ui.PointerOverUi ? null : PickTile(canvas);
     }
 
     // Uses the same view-projection the renderer does, so the highlight matches the pixels.
@@ -134,8 +142,16 @@ public sealed class GameApp
     // Stays put in the top-left of the letterboxed 1280x720 UI while the world camera moves.
     private void DrawScreen(ScreenCanvas canvas)
     {
-        DrawPanel(canvas);
-        DebugTextScene.DrawPanel(canvas);
+        _ui.Begin(canvas, new UiSpace(_surface.Size), (float)_timeSource.DeltaTime);
+        if (_showGallery)
+            _gallery.Draw(_ui);
+        else
+        {
+            DrawPanel(canvas);
+            DebugTextScene.DrawPanel(canvas);
+            _ui.Label(new UiRect(16, 156, 300, 20), "F1: UI gallery", TextStyles.Small);
+        }
+        _ui.End();
     }
 
     private void DrawPanel(ScreenCanvas canvas)

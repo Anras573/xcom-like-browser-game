@@ -53,7 +53,7 @@ public sealed class AssetRegistry
             var (uvMin, uvMax) = UiUv.FromPixelRect(r.X, r.Y, r.W, r.H, ui.Width, ui.Height);
             var i = r.Insets;
             var insets = i is { Length: 4 } ? new UiInsets(i[0], i[1], i[2], i[3]) : default;
-            _ui.Add(name, new UiRegion(ui.Texture, uvMin, uvMax, insets));
+            _ui.Add(name, new UiRegion(ui.Texture, uvMin, uvMax, insets, new Vector2(r.W, r.H)));
         }
         UiAtlas = ui;
     }
