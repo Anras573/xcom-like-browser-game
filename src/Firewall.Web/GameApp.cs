@@ -1,5 +1,6 @@
 using System.Numerics;
 using Firewall.Web.Assets;
+using Firewall.Web.Input;
 using Firewall.Web.Rendering;
 using Yaeger.Browser;
 using Yaeger.ECS;
@@ -13,9 +14,6 @@ namespace Firewall.Web;
 /// <summary>Owns the Yaeger world and is ticked once per animation frame.</summary>
 public sealed class GameApp
 {
-    private static readonly float[] TilesVisibleLevels = [22f, 11f, 5.5f];
-    private const float PanTilesPerSecond = 8f;
-
     private static readonly FontHandle Font = new(DebugSheetScene.FontFamily);
 
     private readonly World _world = new();
@@ -26,6 +24,10 @@ public sealed class GameApp
     private readonly FrameRenderer _frame;
     private readonly TacticalCamera _camera = new() { Center = new Vector2(10f, 10f) };
     private readonly Entity _cameraEntity;
+    private readonly InputBindings _bindings;
+    private readonly ClickGate _clicks;
+    private readonly TacticalCameraController _cameraController;
+    private (int X, int Y)? _hoverTile;
     private readonly DebugTextScene _textScene;
 
     public GameApp(BrowserRenderSurface surface, AssetRegistry registry)
@@ -46,8 +48,14 @@ public sealed class GameApp
             ),
         };
 
-        // Arrow keys would otherwise scroll the page.
-        BrowserInputState.SetPreventDefaultKeys([Keys.Up, Keys.Down, Keys.Left, Keys.Right]);
+        // Tab, Space, Backspace and the arrows would otherwise move focus or scroll the page.
+        BrowserInputState.SetPreventDefaultKeys(InputBindings.PreventDefaultKeys);
+        _bindings = new InputBindings(_input);
+        _clicks = new ClickGate(_input);
+        _cameraController = new TacticalCameraController(_camera, _input, _bindings)
+        {
+            MapSize = new Vector2(DebugTacticalScene.MapSize),
+        };
 
         DebugTacticalScene.Build(_world, registry);
         _textScene = new DebugTextScene(_world, registry);
@@ -60,36 +68,54 @@ public sealed class GameApp
     {
         _timeSource.Advance(timestampMs);
         BrowserInputState.BeginFrame();
-        UpdateDebugCamera();
+        _clicks.BeginFrame();
+        UpdateCamera();
         _textScene.Update(_timeSource.DeltaTime, _camera.PixelsPerTile(_surface.Size.Y));
         _frame.Render();
         BrowserInputState.EndFrame();
     }
 
-    // Debug controls: 1/2/3 show 22/11/5.5 tiles vertically, WASD or arrows pan.
-    private void UpdateDebugCamera()
+    private void UpdateCamera()
     {
-        for (var i = 0; i < TilesVisibleLevels.Length; i++)
-            if (_input.WasKeyPressed(Keys.Num1 + i))
-                _camera.TilesVisibleVertically = TilesVisibleLevels[i];
+        var canvas = _surface.Size;
+        var dt = (float)_timeSource.DeltaTime;
 
-        var pan = Vector2.Zero;
-        if (_input.IsKeyPressed(Keys.A) || _input.IsKeyPressed(Keys.Left))
-            pan.X -= 1;
-        if (_input.IsKeyPressed(Keys.D) || _input.IsKeyPressed(Keys.Right))
-            pan.X += 1;
-        if (_input.IsKeyPressed(Keys.W) || _input.IsKeyPressed(Keys.Up))
-            pan.Y += 1;
-        if (_input.IsKeyPressed(Keys.S) || _input.IsKeyPressed(Keys.Down))
-            pan.Y -= 1;
-        _camera.Center += pan * PanTilesPerSecond * (float)_timeSource.DeltaTime;
+        if (_bindings.WasPressed(GameAction.CenterCamera))
+        {
+            var (sx, sy) = DebugTacticalScene.Soldier;
+            _cameraController.FocusOn(TacticalCamera.TileCenter(sx, sy), 0.4f);
+        }
+        _cameraController.Update(dt, canvas);
 
         _world.AddComponent(_cameraEntity, _camera.ToCamera2D());
+        _hoverTile = PickTile(canvas);
+    }
+
+    // Uses the same view-projection the renderer does, so the highlight matches the pixels.
+    private (int X, int Y)? PickTile(Vector2 canvas)
+    {
+        var mouse = _input.MousePosition;
+        if (mouse.X < 0f || mouse.Y < 0f || mouse.X >= canvas.X || mouse.Y >= canvas.Y)
+            return null;
+        var vp = _camera.ToCamera2D().ViewProjection(canvas.X / MathF.Max(canvas.Y, 1f));
+        var world = Picking.ScreenToWorld(Picking.CanvasToNdc(mouse, canvas), vp);
+        var tile = Picking.WorldToTile(world);
+        return
+            tile.X is >= 0 and < DebugTacticalScene.MapSize
+            && tile.Y is >= 0 and < DebugTacticalScene.MapSize
+            ? tile
+            : null;
     }
 
     // Immediate-mode world drawing for things that may sit above world text: path/AoE preview.
-    private static void DrawWorldOverlay(WorldOverlay overlay)
+    private void DrawWorldOverlay(WorldOverlay overlay)
     {
+        if (_hoverTile is var (hx, hy))
+        {
+            overlay.FillTile(hx, hy, new Vector4(1f, 1f, 1f, 0.18f));
+            overlay.OutlineTile(hx, hy, 0.05f, new Vector4(1f, 0.9f, 0.3f, 1f));
+        }
+
         var (sx, sy) = DebugTacticalScene.Soldier;
         overlay.Line(
             TacticalCamera.TileCenter(sx, sy),
@@ -108,7 +134,7 @@ public sealed class GameApp
 
     private void DrawPanel(ScreenCanvas canvas)
     {
-        canvas.FillRect(new Vector2(16, 16), new Vector2(300, 112), new Vector4(0f, 0f, 0f, 0.6f));
+        canvas.FillRect(new Vector2(16, 16), new Vector2(300, 134), new Vector4(0f, 0f, 0f, 0.6f));
         canvas.Text("FIREWALL  debug", new Vector2(28, 24), Font, 20, new Color(255, 220, 90));
         canvas.Text(
             $"camera  {_camera.Center.X:0.0}, {_camera.Center.Y:0.0}",
@@ -118,7 +144,7 @@ public sealed class GameApp
             Color.White
         );
         canvas.Text(
-            $"tiles visible  {_camera.TilesVisibleVertically:0.#}",
+            $"zoom  {_cameraController.ZoomFactor:0.00}x",
             new Vector2(28, 76),
             Font,
             16,
@@ -127,6 +153,13 @@ public sealed class GameApp
         canvas.Text(
             $"batches {_stats.LastFrameDrawBatches}  quads {_stats.LastFrameQuads}",
             new Vector2(28, 98),
+            Font,
+            16,
+            Color.White
+        );
+        canvas.Text(
+            _hoverTile is var (tx, ty) ? $"tile  {tx}, {ty}" : "tile  -",
+            new Vector2(28, 120),
             Font,
             16,
             Color.White

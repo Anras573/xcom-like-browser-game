@@ -43,8 +43,7 @@ public sealed class TacticalCamera
     public static Vector2 TileCenter(int x, int y) => new(x + 0.5f, y + 0.5f);
 
     /// <summary>The tile containing a world position.</summary>
-    public static (int X, int Y) WorldToTile(Vector2 world) =>
-        ((int)MathF.Floor(world.X), (int)MathF.Floor(world.Y));
+    public static (int X, int Y) WorldToTile(Vector2 world) => Input.Picking.WorldToTile(world);
 
     /// <summary>World position under a canvas pixel (CSS pixels, origin top-left).</summary>
     public Vector2 CanvasToWorld(Vector2 canvasPixels, Vector2 canvasSize)
