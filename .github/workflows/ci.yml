@@ -26,6 +26,14 @@ jobs:
       - name: Check formatting
         run: dotnet csharpier check .
 
+      - name: Forbid reflection-based JSON
+        run: |
+          # Reflection serializers break under Blazor trimming; use a JsonSerializerContext.
+          if grep -rnE 'JsonSerializer\.(Serialize|Deserialize)(Async)?<|(Get|Post|Put|Read)FromJsonAsync<' --include='*.cs' src tests; then
+            echo "Use source-generated JsonTypeInfo instead of reflection-based JSON." >&2
+            exit 1
+          fi
+
       - name: Build
         run: dotnet build Firewall.slnx -c Release -warnaserror
 

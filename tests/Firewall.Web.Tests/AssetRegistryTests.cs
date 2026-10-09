@@ -27,18 +27,16 @@ public class AssetRegistryTests
         );
     }
 
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
-
     private static GridManifest LoadGrid(string name) =>
-        JsonSerializer.Deserialize<GridManifest>(
+        JsonSerializer.Deserialize(
             File.ReadAllText(Path.Combine(AssetsDir, name + ".json")),
-            Json
+            AssetJsonContext.Default.GridManifest
         )!;
 
     private static UiManifest LoadUi() =>
-        JsonSerializer.Deserialize<UiManifest>(
+        JsonSerializer.Deserialize(
             File.ReadAllText(Path.Combine(AssetsDir, "ui.json")),
-            Json
+            AssetJsonContext.Default.UiManifest
         )!;
 
     private static AssetRegistry LoadRegistry() => new(GridNames.Select(LoadGrid), LoadUi());

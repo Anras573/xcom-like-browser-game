@@ -1,0 +1,89 @@
+[
+  {
+    "id": "frag_grenade",
+    "name": "Frag Grenade",
+    "description": "3 damage to all units within 1.5 tiles of the impact tile. Throw range 10, needs LOS. Destroys destructible cover and removes 1 armor.",
+    "kind": "Grenade",
+    "charges": 1,
+    "parameters": {
+      "damage": 3,
+      "radius": 1.5,
+      "range": 10,
+      "armorShred": 1,
+      "destroysCover": 1
+    }
+  },
+  {
+    "id": "medkit",
+    "name": "Medkit",
+    "description": "Heal 4 HP, or stabilize a bleeding-out soldier. Target must be adjacent (or self).",
+    "kind": "Medkit",
+    "charges": 2,
+    "parameters": {
+      "heal": 4,
+      "range": 1
+    }
+  },
+  {
+    "id": "smoke_grenade",
+    "name": "Smoke Grenade",
+    "description": "+20 defense to units in radius 1.5 for 2 turns.",
+    "kind": "Grenade",
+    "charges": 1,
+    "parameters": {
+      "defense": 20,
+      "radius": 1.5,
+      "turns": 2,
+      "range": 10
+    }
+  },
+  {
+    "id": "arc_stunner",
+    "name": "Arc Stunner",
+    "description": "Melee, 70% base hit. A Proxy at 60% HP or less becomes Stunned (capturable). A robot takes 2 damage and is stunned for 1 turn.",
+    "kind": "Melee",
+    "charges": 1,
+    "parameters": {
+      "baseHit": 70,
+      "captureHpPercent": 60,
+      "robotDamage": 2,
+      "robotStunTurns": 1
+    }
+  },
+  {
+    "id": "lace_jammer",
+    "name": "Lace Jammer",
+    "description": "Grenade: stuns Husks in radius 2 for 1 turn.",
+    "kind": "Grenade",
+    "charges": 1,
+    "parameters": {
+      "radius": 2,
+      "stunTurns": 1,
+      "range": 10
+    }
+  },
+  {
+    "id": "breach_charge",
+    "name": "Breach Charge",
+    "description": "5 damage, radius 1. Can destroy walls (# becomes rubble).",
+    "kind": "Grenade",
+    "charges": 1,
+    "parameters": {
+      "damage": 5,
+      "radius": 1,
+      "destroysWalls": 1,
+      "destroysCover": 1,
+      "range": 10
+    }
+  },
+  {
+    "id": "targeting_scope",
+    "name": "Targeting Scope",
+    "description": "Passive +10 aim.",
+    "kind": "Passive",
+    "charges": 0,
+    "parameters": {
+      "aim": 10
+    }
+  }
+]

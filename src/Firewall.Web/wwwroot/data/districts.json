@@ -1,0 +1,38 @@
+[
+  {
+    "id": "harbor",
+    "name": "Harbor",
+    "biome": "Industrial"
+  },
+  {
+    "id": "tramyards",
+    "name": "Tramyards",
+    "biome": "Industrial"
+  },
+  {
+    "id": "old_town",
+    "name": "Old Town",
+    "biome": "Urban"
+  },
+  {
+    "id": "uptown",
+    "name": "Uptown",
+    "biome": "Urban"
+  },
+  {
+    "id": "greenbelt",
+    "name": "Greenbelt",
+    "biome": "Suburban"
+  },
+  {
+    "id": "campus",
+    "name": "Campus",
+    "biome": "Suburban"
+  },
+  {
+    "id": "halden_spire",
+    "name": "Halden Spire",
+    "biome": "None",
+    "locked": true
+  }
+]

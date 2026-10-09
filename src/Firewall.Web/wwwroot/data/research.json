@@ -1,0 +1,185 @@
+[
+  {
+    "id": "husk_autopsy",
+    "name": "Husk Autopsy",
+    "description": "Dissect a Husk to learn how the lace controls it.",
+    "baseDays": 5,
+    "requires": [
+      {
+        "kind": "EnemyKilled",
+        "id": "husk"
+      }
+    ],
+    "unlocks": [
+      "lace_jammer"
+    ]
+  },
+  {
+    "id": "drone_teardown",
+    "name": "Drone Teardown",
+    "description": "Strip a Warden for parts and designs.",
+    "baseDays": 6,
+    "requires": [
+      {
+        "kind": "EnemyKilled",
+        "id": "warden"
+      }
+    ],
+    "unlocks": [
+      "salvage_plating",
+      "arc_stunner"
+    ]
+  },
+  {
+    "id": "field_medicine",
+    "name": "Field Medicine",
+    "description": "Better medkits and a faster Infirmary.",
+    "baseDays": 5,
+    "effects": {
+      "medkitHeal": 2,
+      "infirmaryBuildDaysReduction": 2
+    }
+  },
+  {
+    "id": "optics",
+    "name": "Optics",
+    "description": "Targeting optics reverse-engineered from drone sensors.",
+    "baseDays": 6,
+    "requires": [
+      {
+        "kind": "Research",
+        "id": "drone_teardown"
+      }
+    ],
+    "unlocks": [
+      "targeting_scope"
+    ]
+  },
+  {
+    "id": "coil_weapons",
+    "name": "Coil Weapons",
+    "description": "Tier-2 weapons.",
+    "baseDays": 10,
+    "requires": [
+      {
+        "kind": "Research",
+        "id": "drone_teardown"
+      },
+      {
+        "kind": "Salvage",
+        "amount": 10
+      }
+    ],
+    "unlocks": [
+      "upgrade_coil"
+    ]
+  },
+  {
+    "id": "shaped_charges",
+    "name": "Shaped Charges",
+    "description": "Directional explosives.",
+    "baseDays": 6,
+    "requires": [
+      {
+        "kind": "Research",
+        "id": "husk_autopsy"
+      }
+    ],
+    "unlocks": [
+      "breach_charge"
+    ],
+    "effects": {
+      "fragDamage": 1
+    }
+  },
+  {
+    "id": "proxy_interrogation",
+    "name": "Proxy Interrogation",
+    "description": "Question a captured Proxy. Reveals a MERIDIAN Relay.",
+    "baseDays": 7,
+    "story": true,
+    "requires": [
+      {
+        "kind": "EnemyCaptured",
+        "id": "proxy"
+      }
+    ],
+    "unlocks": [
+      "relay_hunt"
+    ]
+  },
+  {
+    "id": "aegis_composites",
+    "name": "Aegis Composites",
+    "description": "Armor plating from coil alloys.",
+    "baseDays": 12,
+    "requires": [
+      {
+        "kind": "Research",
+        "id": "coil_weapons"
+      },
+      {
+        "kind": "Cores",
+        "amount": 2
+      }
+    ],
+    "unlocks": [
+      "aegis_rig"
+    ]
+  },
+  {
+    "id": "arc_weapons",
+    "name": "Arc Weapons",
+    "description": "Tier-3 weapons.",
+    "baseDays": 14,
+    "requires": [
+      {
+        "kind": "Research",
+        "id": "coil_weapons"
+      },
+      {
+        "kind": "KeyItem",
+        "id": "relay_core"
+      }
+    ],
+    "unlocks": [
+      "upgrade_arc"
+    ]
+  },
+  {
+    "id": "relay_core_analysis",
+    "name": "Relay Core Analysis",
+    "description": "Locate the Cradle beneath the Spire.",
+    "baseDays": 8,
+    "story": true,
+    "requires": [
+      {
+        "kind": "MissionWon",
+        "id": "relay_hunt"
+      }
+    ],
+    "effects": {
+      "revealCradle": 1
+    }
+  },
+  {
+    "id": "meridian_killcode",
+    "name": "Meridian Killcode",
+    "description": "Build the killcode that ends MERIDIAN.",
+    "baseDays": 10,
+    "story": true,
+    "requires": [
+      {
+        "kind": "Research",
+        "id": "relay_core_analysis"
+      },
+      {
+        "kind": "Cores",
+        "amount": 3
+      }
+    ],
+    "unlocks": [
+      "hard_shutdown"
+    ]
+  }
+]

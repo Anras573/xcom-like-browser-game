@@ -1,0 +1,99 @@
+[
+  {
+    "id": "build_frag_grenade",
+    "name": "Frag Grenade",
+    "kind": "Item",
+    "targetId": "frag_grenade",
+    "credits": 20,
+    "salvage": 5
+  },
+  {
+    "id": "build_medkit",
+    "name": "Medkit",
+    "kind": "Item",
+    "targetId": "medkit",
+    "credits": 20,
+    "salvage": 5
+  },
+  {
+    "id": "build_smoke_grenade",
+    "name": "Smoke Grenade",
+    "kind": "Item",
+    "targetId": "smoke_grenade",
+    "credits": 15,
+    "salvage": 5
+  },
+  {
+    "id": "build_arc_stunner",
+    "name": "Arc Stunner",
+    "kind": "Item",
+    "targetId": "arc_stunner",
+    "credits": 30,
+    "salvage": 10,
+    "minEngineers": 2
+  },
+  {
+    "id": "build_lace_jammer",
+    "name": "Lace Jammer",
+    "kind": "Item",
+    "targetId": "lace_jammer",
+    "credits": 25,
+    "salvage": 8
+  },
+  {
+    "id": "build_breach_charge",
+    "name": "Breach Charge",
+    "kind": "Item",
+    "targetId": "breach_charge",
+    "credits": 30,
+    "salvage": 10
+  },
+  {
+    "id": "build_targeting_scope",
+    "name": "Targeting Scope",
+    "kind": "Item",
+    "targetId": "targeting_scope",
+    "credits": 40,
+    "salvage": 10,
+    "minEngineers": 2
+  },
+  {
+    "id": "build_salvage_plating",
+    "name": "Salvage Plating",
+    "kind": "Armor",
+    "targetId": "salvage_plating",
+    "credits": 50,
+    "salvage": 15
+  },
+  {
+    "id": "build_aegis_rig",
+    "name": "Aegis Rig",
+    "kind": "Armor",
+    "targetId": "aegis_rig",
+    "credits": 100,
+    "salvage": 30,
+    "cores": 2,
+    "minEngineers": 4
+  },
+  {
+    "id": "upgrade_coil",
+    "name": "Coil Weapons Upgrade",
+    "kind": "TierUpgrade",
+    "tier": 2,
+    "credits": 100,
+    "salvage": 40,
+    "minEngineers": 2,
+    "buildDays": 5
+  },
+  {
+    "id": "upgrade_arc",
+    "name": "Arc Weapons Upgrade",
+    "kind": "TierUpgrade",
+    "tier": 3,
+    "credits": 200,
+    "salvage": 80,
+    "cores": 5,
+    "minEngineers": 4,
+    "buildDays": 5
+  }
+]
