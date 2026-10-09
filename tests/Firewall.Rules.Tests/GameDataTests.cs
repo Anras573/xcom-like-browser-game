@@ -148,20 +148,63 @@ public class GameDataTests
     private static IReadOnlyList<string> ValidateWith(string file, Func<string, string> edit) =>
         Load(f => f == file ? edit(Read(f)) : null).Validate();
 
+    private static string RemoveKey(string json, string key, bool inFirstArrayItem)
+    {
+        var node = System.Text.Json.Nodes.JsonNode.Parse(json)!;
+        var target = inFirstArrayItem ? node.AsArray()[0]!.AsObject() : node.AsObject();
+        Assert.True(target.Remove(key));
+        return node.ToJsonString();
+    }
+
     [Fact]
     public void MissingRequiredListsAreRejected()
     {
         var noRange = Assert.Throws<InvalidDataException>(() =>
-            Load(f => f == GameDataFiles.Weapons ? Read(f).Replace("\"range\"", "\"rng\"") : null)
+            Load(f =>
+                f == GameDataFiles.Weapons
+                    ? RemoveKey(Read(f), "range", inFirstArrayItem: true)
+                    : null
+            )
         );
         Assert.Contains("weapons.json", noRange.Message);
+        Assert.Contains("range", noRange.Message);
 
         var noNames = Assert.Throws<InvalidDataException>(() =>
             Load(f =>
-                f == GameDataFiles.Names ? Read(f).Replace("\"lastNames\"", "\"surnames\"") : null
+                f == GameDataFiles.Names
+                    ? RemoveKey(Read(f), "lastNames", inFirstArrayItem: false)
+                    : null
             )
         );
         Assert.Contains("names.json", noNames.Message);
+        Assert.Contains("lastNames", noNames.Message);
+    }
+
+    [Fact]
+    public void ResearchCyclesAreDetected()
+    {
+        // optics requires drone_teardown; make drone_teardown require optics -> 2-cycle.
+        var errors = ValidateWith(
+            GameDataFiles.Research,
+            t =>
+            {
+                var node = System.Text.Json.Nodes.JsonNode.Parse(t)!.AsArray();
+                var drone = node.Single(n => n!["id"]!.GetValue<string>() == "drone_teardown")!;
+                drone["requires"]!
+                    .AsArray()
+                    .Add(
+                        System.Text.Json.Nodes.JsonNode.Parse(
+                            "{\"kind\":\"Research\",\"id\":\"optics\"}"
+                        )
+                    );
+                return node.ToJsonString();
+            }
+        );
+        Assert.Contains(
+            errors,
+            e =>
+                e.Contains("research cycle") && e.Contains("optics") && e.Contains("drone_teardown")
+        );
     }
 
     [Fact]

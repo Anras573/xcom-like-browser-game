@@ -194,6 +194,34 @@ internal static class GameDataValidator
                     Err($"{p}: unlocks unknown id '{id}'");
         }
 
+        // Research prerequisites must not loop (A -> B -> A).
+        var state = new Dictionary<string, bool>(StringComparer.Ordinal); // false = on stack, true = done
+        void Visit(ResearchDef r, Stack<string> path)
+        {
+            if (state.TryGetValue(r.Id, out var done))
+            {
+                if (!done)
+                    Err(
+                        $"research cycle: {string.Join(" -> ", path.Reverse().SkipWhile(x => x != r.Id).Append(r.Id))}"
+                    );
+                return;
+            }
+            state[r.Id] = false;
+            path.Push(r.Id);
+            foreach (var req in r.Requires)
+                if (
+                    req.Kind == RequirementKind.Research
+                    && req.Id is not null
+                    && req.Id != r.Id
+                    && d.Research.TryGet(req.Id, out var next)
+                )
+                    Visit(next, path);
+            path.Pop();
+            state[r.Id] = true;
+        }
+        foreach (var r in d.Research)
+            Visit(r, new Stack<string>());
+
         foreach (var f in d.Facilities)
         {
             var p = $"facility '{f.Id}'";

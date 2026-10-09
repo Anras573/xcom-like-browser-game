@@ -48,6 +48,15 @@ public class Pcg32RandomTests
     }
 
     [Fact]
+    public void ForkDependsOnTheParentStream()
+    {
+        Assert.NotEqual(
+            Draw(new Pcg32Random(5, 1).Fork("x"), 20),
+            Draw(new Pcg32Random(5, 2).Fork("x"), 20)
+        );
+    }
+
+    [Fact]
     public void ForkDoesNotConsumeParentNumbers()
     {
         var a = new Pcg32Random(9);

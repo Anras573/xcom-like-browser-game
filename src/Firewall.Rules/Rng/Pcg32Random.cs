@@ -80,7 +80,7 @@ public sealed class Pcg32Random : IRandom
     public IRandom Fork(string label)
     {
         ArgumentNullException.ThrowIfNull(label);
-        var childSeed = SplitMix(Fnv1A(label) ^ SplitMix(_seed));
+        var childSeed = SplitMix(Fnv1A(label) ^ SplitMix(_seed) ^ SplitMix(_stream + 1));
         var childStream = SplitMix(childSeed + 0x9E3779B97F4A7C15UL);
         return new Pcg32Random(childSeed, childStream);
     }
