@@ -30,6 +30,12 @@ dotnet tool restore && dotnet csharpier format .   # format (CI runs `dotnet csh
 - All Yaeger ECS components must be `struct`s.
 - JSON uses System.Text.Json source generation (`JsonSerializerContext`). Reflection-based serialization breaks under Blazor trimming.
 
+## Scenes
+
+- Scenes implement `IScene` (derive from `SceneBase`), own their own `World`, and move via `SceneManager.Push/Pop/Replace`. Overlays (`IsOverlay`) draw over the scene below, which is frozen and has its UI input suspended.
+- Hang test scenes on the debug menu with `DebugScenes.Register("name", () => new XScene())`.
+- Dims and fades must cover `UiSpace.CanvasRect` (letterbox bars included), not just the logical 1280x720.
+
 ## Prefer engine features over game-side code
 
 Yaeger is maintained by this project's owner. If a browser gap blocks you, file an issue on
@@ -45,7 +51,7 @@ Yaeger is maintained by this project's owner. If a browser gap blocks you, file 
 - Input: `BrowserInputState` with `WasKeyPressed/Released` and `WasMouseButtonPressed/Released` edges. `YaegerBrowser.StartGameLoop` owns the input frame (it calls `BeginFrame()`/`EndFrame()` around every tick), so don't call them yourself.
 - Audio: `IAudioOutput` / `BrowserAudioOutput` (WebAudio; unlocks on first gesture).
 - Any `IRenderSurface` wrapper (e.g. `RenderStatsSurface`) must forward `GetTextureSize`. Otherwise it inherits the default "unknown size" and the engine silently skips its half-texel UV inset that stops neighbour bleed on tiles, sprite sheets and particles.
-- Textures: `PreloadAsync`, `IsReady`, `GetTextureSize`, `GetLoadError`. Preload before the first frame to avoid white placeholders. `TextureSampling` defaults to Linear + Clamp, no mipmaps.
+- Textures: `PreloadAsync`, `IsReady`, `GetTextureSize`, `GetLoadError`. Preload before the first frame to avoid white placeholders (the boot scene does this, plus fonts and manifests; see `Scenes/BootSteps.cs`). `TextureSampling` defaults to Linear + Clamp, no mipmaps.
 - Particles can use atlas regions via `ParticleEmitter.UvMin/UvMax`.
 - Limits: `UnifiedRenderSystem` draws whole textures, uniform-grid `SpriteSheet` frames, `Tilemap`s and `Text`, not arbitrary atlas sub-rects, so world textures are uniform 64x64 grids. `UiRenderSystem` is native-only, so UI draws game-side (hit-testing helpers in Core are fine). No gamepad in the browser.
 - `index.html` keeps `<base href="/" />`; CI rewrites it for GitHub Pages.

@@ -62,6 +62,9 @@ public sealed class UiContext(
     /// <summary>Raised for UI sounds (button click); wire to audio later.</summary>
     public Action<UiSound>? Sound { get; set; }
 
+    /// <summary>This frame's canvas-to-logical mapping; <see cref="UiSpace.CanvasRect"/> covers the letterbox bars.</summary>
+    public UiSpace Space { get; private set; } = new(UiSpace.LogicalSize);
+
     public Vector2 Mouse => _input.Mouse;
 
     public bool PointerOverUi => _prevBlockers.Exists(r => r.Contains(_input.Mouse));
@@ -74,6 +77,7 @@ public sealed class UiContext(
     public void Begin(ScreenCanvas canvas, UiSpace space, float deltaSeconds)
     {
         _canvas = canvas;
+        Space = space;
         _dt = deltaSeconds;
         _input.Begin(space);
         _tooltipCandidate = 0;
@@ -100,7 +104,13 @@ public sealed class UiContext(
         _blockers.Clear();
     }
 
-    private bool Blocked => _modalWasOpenBeforeThisFrame && !_inModal;
+    /// <summary>
+    /// Set by the scene manager for scenes that are shown but must not react: those under an
+    /// overlay or a fade. Widgets still draw, but report no hover, clicks, scrolling or hotkeys.
+    /// </summary>
+    public bool InputSuspended { get; set; }
+
+    private bool Blocked => InputSuspended || (_modalWasOpenBeforeThisFrame && !_inModal);
 
     private static int IdOf(string key, UiRect r) => HashCode.Combine(key, (int)r.X, (int)r.Y);
 
@@ -548,7 +558,7 @@ public sealed class UiContext(
         _inModal = true;
         try
         {
-            var screen = new UiRect(0, 0, UiSpace.LogicalWidth, UiSpace.LogicalHeight);
+            var screen = Space.CanvasRect;
             Fill(screen, Theme.Dim);
             _blockers.Add(screen);
             _input.Swallow(screen);
@@ -604,7 +614,7 @@ public sealed class UiContext(
             }
 
             // The keystroke that opened the modal must not also dismiss it.
-            if (result == ModalPending && _modalWasOpenBeforeThisFrame)
+            if (result == ModalPending && _modalWasOpenBeforeThisFrame && !InputSuspended)
             {
                 if (bindings.WasPressed(GameAction.Cancel))
                     result = cancelIndex >= 0 ? cancelIndex : ModalDismissed;

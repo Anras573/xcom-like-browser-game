@@ -4,7 +4,7 @@ using Yaeger.Platform;
 
 namespace Firewall.Web.Ui;
 
-/// <summary>Debug screen (F1) showing every widget in all of its states, plus live interactive ones.</summary>
+/// <summary>Debug screen showing every widget in all of its states, plus live interactive ones.</summary>
 public sealed class UiGalleryScene
 {
     private static readonly string[] TabLabels = ["Barracks", "Research", "Workshop", "Map"];
@@ -20,13 +20,15 @@ public sealed class UiGalleryScene
 
     private int _tab;
     private bool _modalOpen;
+
+    public bool ModalOpen => _modalOpen;
     private int _clicks;
     private string _lastModal = "-";
 
     public void Draw(UiContext ui)
     {
         var t = ui.Theme;
-        var body = ui.Panel(new UiRect(16, 16, 620, 688), "UI gallery  (F1 to close)");
+        var body = ui.Panel(new UiRect(16, 16, 620, 688), "UI gallery  (Esc to go back)");
         var x = body.X;
         var y = body.Y;
 
