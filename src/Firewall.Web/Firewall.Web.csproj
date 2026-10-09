@@ -13,6 +13,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Firewall.Web.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\external\Yaeger\src\Engine\Yaeger.Browser\Yaeger.Browser.csproj" />
     <ProjectReference Include="..\Firewall.Rules\Firewall.Rules.csproj" />
   </ItemGroup>

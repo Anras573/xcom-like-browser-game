@@ -1,3 +1,4 @@
+using Firewall.Rules.Data;
 using Firewall.Web.Assets;
 using Firewall.Web.Rendering;
 using Yaeger.Browser;
@@ -33,13 +34,20 @@ public static class BootSteps
                     await surface.PreloadAsync(registry!.TexturePaths, progress);
                 }
             ),
-            // GameData JSON (#15) loads here once it exists.
             new(
                 "Loading game data",
-                _ =>
+                async _ =>
                 {
-                    ctx.Install(registry!, GameData.Empty);
-                    return Task.CompletedTask;
+                    var files = new Dictionary<string, string>();
+                    foreach (var file in GameDataFiles.All)
+                        files[file] = await http.GetStringAsync($"data/{file}");
+                    var data = GameData.Load(f => files[f]);
+                    var errors = data.Validate();
+                    if (errors.Count > 0)
+                        throw new InvalidDataException(
+                            "Game data is invalid:\n" + string.Join('\n', errors)
+                        );
+                    ctx.Install(registry!, data);
                 }
             ),
         ];

@@ -1,0 +1,163 @@
+[
+  {
+    "id": "breacher",
+    "name": "Breacher",
+    "role": "Assault",
+    "weaponClass": "Shotgun",
+    "pose": "machine",
+    "abilityTree": [
+      {
+        "rank": "Corporal",
+        "pick": 0,
+        "abilities": [
+          "run_and_gun"
+        ]
+      },
+      {
+        "rank": "Sergeant",
+        "pick": 1,
+        "abilities": [
+          "close_combat",
+          "lightning_reflexes"
+        ]
+      },
+      {
+        "rank": "Lieutenant",
+        "pick": 1,
+        "abilities": [
+          "rapid_fire",
+          "hit_and_run"
+        ]
+      },
+      {
+        "rank": "Captain",
+        "pick": 1,
+        "abilities": [
+          "untouchable",
+          "killing_zone"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "marksman",
+    "name": "Marksman",
+    "role": "Sniper",
+    "weaponClass": "Sniper",
+    "pose": "silencer",
+    "abilityTree": [
+      {
+        "rank": "Corporal",
+        "pick": 0,
+        "abilities": [
+          "squadsight"
+        ]
+      },
+      {
+        "rank": "Sergeant",
+        "pick": 1,
+        "abilities": [
+          "snap_shot",
+          "steady_aim"
+        ]
+      },
+      {
+        "rank": "Lieutenant",
+        "pick": 1,
+        "abilities": [
+          "sentinel",
+          "low_profile"
+        ]
+      },
+      {
+        "rank": "Captain",
+        "pick": 1,
+        "abilities": [
+          "in_the_zone",
+          "headshot"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "gunner",
+    "name": "Gunner",
+    "role": "Heavy",
+    "weaponClass": "Lmg",
+    "pose": "machine",
+    "abilityTree": [
+      {
+        "rank": "Corporal",
+        "pick": 0,
+        "abilities": [
+          "suppression"
+        ]
+      },
+      {
+        "rank": "Sergeant",
+        "pick": 1,
+        "abilities": [
+          "shredder",
+          "bulletstorm"
+        ]
+      },
+      {
+        "rank": "Lieutenant",
+        "pick": 1,
+        "abilities": [
+          "grenadier",
+          "danger_zone"
+        ]
+      },
+      {
+        "rank": "Captain",
+        "pick": 1,
+        "abilities": [
+          "mayhem",
+          "rupture"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tech",
+    "name": "Tech",
+    "role": "Support",
+    "weaponClass": "Rifle",
+    "pose": "machine",
+    "extraUtilitySlotRank": "Sergeant",
+    "abilityTree": [
+      {
+        "rank": "Corporal",
+        "pick": 0,
+        "abilities": [
+          "field_medic"
+        ]
+      },
+      {
+        "rank": "Sergeant",
+        "pick": 1,
+        "abilities": [
+          "smoke_screen",
+          "revive"
+        ]
+      },
+      {
+        "rank": "Lieutenant",
+        "pick": 1,
+        "abilities": [
+          "hack",
+          "sprinter"
+        ]
+      },
+      {
+        "rank": "Captain",
+        "pick": 1,
+        "abilities": [
+          "savior",
+          "overclock"
+        ]
+      }
+    ]
+  }
+]

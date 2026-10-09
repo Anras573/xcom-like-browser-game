@@ -1,0 +1,43 @@
+{
+  "hp": 4,
+  "hpBonusRanks": [
+    "Corporal",
+    "Lieutenant",
+    "Captain"
+  ],
+  "aim": 65,
+  "aimPerRank": 3,
+  "mobility": 6,
+  "defense": 0,
+  "sight": 12,
+  "ranks": [
+    {
+      "rank": "Rookie",
+      "xp": 0
+    },
+    {
+      "rank": "Corporal",
+      "xp": 2
+    },
+    {
+      "rank": "Sergeant",
+      "xp": 6
+    },
+    {
+      "rank": "Lieutenant",
+      "xp": 14
+    },
+    {
+      "rank": "Captain",
+      "xp": 26
+    }
+  ],
+  "startingWeaponClass": "Rifle",
+  "appearanceSets": [
+    "soldier1",
+    "manBlue",
+    "manBrown",
+    "womanGreen",
+    "survivor1"
+  ]
+}

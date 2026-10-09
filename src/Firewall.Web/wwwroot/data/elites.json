@@ -1,0 +1,22 @@
+[
+  {
+    "id": "mk2",
+    "name": "Mk II",
+    "minConvergence": 4,
+    "hp": 2,
+    "aim": 5,
+    "armor": 0,
+    "tint": "#a060e0",
+    "lootMultiplier": 1.5
+  },
+  {
+    "id": "mk3",
+    "name": "Mk III",
+    "minConvergence": 8,
+    "hp": 4,
+    "aim": 10,
+    "armor": 1,
+    "tint": "#e060a0",
+    "lootMultiplier": 1.5
+  }
+]

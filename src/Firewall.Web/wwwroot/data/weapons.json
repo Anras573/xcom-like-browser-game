@@ -1,0 +1,272 @@
+[
+  {
+    "id": "rifle_t1",
+    "name": "Ballistic Rifle",
+    "class": "Rifle",
+    "tier": 1,
+    "dmgMin": 3,
+    "dmgMax": 5,
+    "clip": 4,
+    "crit": 10,
+    "range": [
+      {
+        "maxDist": 3,
+        "mod": 10
+      },
+      {
+        "maxDist": 12,
+        "mod": 0
+      },
+      {
+        "perTileBeyond": 12,
+        "mod": -3
+      }
+    ]
+  },
+  {
+    "id": "rifle_t2",
+    "name": "Coil Rifle",
+    "class": "Rifle",
+    "tier": 2,
+    "dmgMin": 5,
+    "dmgMax": 7,
+    "clip": 4,
+    "crit": 10,
+    "range": [
+      {
+        "maxDist": 3,
+        "mod": 10
+      },
+      {
+        "maxDist": 12,
+        "mod": 0
+      },
+      {
+        "perTileBeyond": 12,
+        "mod": -3
+      }
+    ]
+  },
+  {
+    "id": "rifle_t3",
+    "name": "Arc Rifle",
+    "class": "Rifle",
+    "tier": 3,
+    "dmgMin": 7,
+    "dmgMax": 9,
+    "clip": 4,
+    "crit": 10,
+    "range": [
+      {
+        "maxDist": 3,
+        "mod": 10
+      },
+      {
+        "maxDist": 12,
+        "mod": 0
+      },
+      {
+        "perTileBeyond": 12,
+        "mod": -3
+      }
+    ]
+  },
+  {
+    "id": "shotgun_t1",
+    "name": "Ballistic Shotgun",
+    "class": "Shotgun",
+    "tier": 1,
+    "dmgMin": 4,
+    "dmgMax": 6,
+    "clip": 4,
+    "crit": 20,
+    "range": [
+      {
+        "maxDist": 2,
+        "mod": 30
+      },
+      {
+        "maxDist": 4,
+        "mod": 15
+      },
+      {
+        "maxDist": 7,
+        "mod": 0
+      },
+      {
+        "perTileBeyond": 7,
+        "mod": -5
+      }
+    ]
+  },
+  {
+    "id": "shotgun_t2",
+    "name": "Coil Shotgun",
+    "class": "Shotgun",
+    "tier": 2,
+    "dmgMin": 6,
+    "dmgMax": 8,
+    "clip": 4,
+    "crit": 20,
+    "range": [
+      {
+        "maxDist": 2,
+        "mod": 30
+      },
+      {
+        "maxDist": 4,
+        "mod": 15
+      },
+      {
+        "maxDist": 7,
+        "mod": 0
+      },
+      {
+        "perTileBeyond": 7,
+        "mod": -5
+      }
+    ]
+  },
+  {
+    "id": "shotgun_t3",
+    "name": "Arc Shotgun",
+    "class": "Shotgun",
+    "tier": 3,
+    "dmgMin": 8,
+    "dmgMax": 10,
+    "clip": 4,
+    "crit": 20,
+    "range": [
+      {
+        "maxDist": 2,
+        "mod": 30
+      },
+      {
+        "maxDist": 4,
+        "mod": 15
+      },
+      {
+        "maxDist": 7,
+        "mod": 0
+      },
+      {
+        "perTileBeyond": 7,
+        "mod": -5
+      }
+    ]
+  },
+  {
+    "id": "sniper_t1",
+    "name": "Ballistic Sniper Rifle",
+    "class": "Sniper",
+    "tier": 1,
+    "dmgMin": 4,
+    "dmgMax": 6,
+    "clip": 3,
+    "crit": 25,
+    "range": [
+      {
+        "maxDist": 4,
+        "mod": -20
+      }
+    ],
+    "flags": [
+      "NoFireAfterMove"
+    ]
+  },
+  {
+    "id": "sniper_t2",
+    "name": "Coil Sniper Rifle",
+    "class": "Sniper",
+    "tier": 2,
+    "dmgMin": 6,
+    "dmgMax": 8,
+    "clip": 3,
+    "crit": 25,
+    "range": [
+      {
+        "maxDist": 4,
+        "mod": -20
+      }
+    ],
+    "flags": [
+      "NoFireAfterMove"
+    ]
+  },
+  {
+    "id": "sniper_t3",
+    "name": "Arc Sniper Rifle",
+    "class": "Sniper",
+    "tier": 3,
+    "dmgMin": 8,
+    "dmgMax": 10,
+    "clip": 3,
+    "crit": 25,
+    "range": [
+      {
+        "maxDist": 4,
+        "mod": -20
+      }
+    ],
+    "flags": [
+      "NoFireAfterMove"
+    ]
+  },
+  {
+    "id": "lmg_t1",
+    "name": "Ballistic LMG",
+    "class": "Lmg",
+    "tier": 1,
+    "dmgMin": 4,
+    "dmgMax": 6,
+    "clip": 3,
+    "crit": 0,
+    "range": [
+      {
+        "mod": -5
+      },
+      {
+        "perTileBeyond": 12,
+        "mod": -2
+      }
+    ]
+  },
+  {
+    "id": "lmg_t2",
+    "name": "Coil LMG",
+    "class": "Lmg",
+    "tier": 2,
+    "dmgMin": 6,
+    "dmgMax": 8,
+    "clip": 3,
+    "crit": 0,
+    "range": [
+      {
+        "mod": -5
+      },
+      {
+        "perTileBeyond": 12,
+        "mod": -2
+      }
+    ]
+  },
+  {
+    "id": "lmg_t3",
+    "name": "Arc LMG",
+    "class": "Lmg",
+    "tier": 3,
+    "dmgMin": 8,
+    "dmgMax": 10,
+    "clip": 3,
+    "crit": 0,
+    "range": [
+      {
+        "mod": -5
+      },
+      {
+        "perTileBeyond": 12,
+        "mod": -2
+      }
+    ]
+  }
+]
