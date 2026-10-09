@@ -23,6 +23,15 @@ public readonly record struct UiSpace(Vector2 CanvasSize)
     /// <summary>Canvas position of the logical (0, 0): the letterbox margin.</summary>
     public Vector2 Offset => (CanvasSize - LogicalSize * Scale) / 2f;
 
+    /// <summary>The whole canvas in logical UI pixels, letterbox bars included (for dims and fades).</summary>
+    public Ui.UiRect CanvasRect =>
+        new(
+            -Offset.X / Scale,
+            -Offset.Y / Scale,
+            MathF.Max(CanvasSize.X, 1f) / Scale,
+            MathF.Max(CanvasSize.Y, 1f) / Scale
+        );
+
     /// <summary>Mouse position (CSS pixels) to logical UI pixels.</summary>
     public Vector2 FromCanvasPixels(Vector2 canvas) => (canvas - Offset) / Scale;
 

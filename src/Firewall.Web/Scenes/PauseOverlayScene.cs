@@ -20,7 +20,7 @@ public sealed class PauseOverlayScene : SceneBase
 
     protected override void DrawScreen(ScreenCanvas canvas, UiContext ui)
     {
-        canvas.FillRect(Vector2.Zero, UiSpace.LogicalSize, ui.Theme.Dim);
+        canvas.FillRect(ui.Space.CanvasRect.Position, ui.Space.CanvasRect.Size, ui.Theme.Dim);
         var body = ui.Panel(
             new UiRect(
                 (UiSpace.LogicalWidth - 360) / 2f,

@@ -34,7 +34,11 @@ public sealed class TitleScene : SceneBase
 
     protected override void DrawScreen(ScreenCanvas canvas, UiContext ui)
     {
-        canvas.FillRect(Vector2.Zero, UiSpace.LogicalSize, new Vector4(0f, 0f, 0f, 0.6f));
+        canvas.FillRect(
+            ui.Space.CanvasRect.Position,
+            ui.Space.CanvasRect.Size,
+            new Vector4(0f, 0f, 0f, 0.6f)
+        );
 
         var logo = new TextStyle(TextStyles.Future, 72, new Color(255, 220, 90), Shadow: true);
         var lw = canvas.Measure("FIREWALL", logo);

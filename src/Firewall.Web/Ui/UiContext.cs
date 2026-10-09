@@ -62,6 +62,9 @@ public sealed class UiContext(
     /// <summary>Raised for UI sounds (button click); wire to audio later.</summary>
     public Action<UiSound>? Sound { get; set; }
 
+    /// <summary>This frame's canvas-to-logical mapping; <see cref="UiSpace.CanvasRect"/> covers the letterbox bars.</summary>
+    public UiSpace Space { get; private set; } = new(UiSpace.LogicalSize);
+
     public Vector2 Mouse => _input.Mouse;
 
     public bool PointerOverUi => _prevBlockers.Exists(r => r.Contains(_input.Mouse));
@@ -74,6 +77,7 @@ public sealed class UiContext(
     public void Begin(ScreenCanvas canvas, UiSpace space, float deltaSeconds)
     {
         _canvas = canvas;
+        Space = space;
         _dt = deltaSeconds;
         _input.Begin(space);
         _tooltipCandidate = 0;
@@ -554,7 +558,7 @@ public sealed class UiContext(
         _inModal = true;
         try
         {
-            var screen = new UiRect(0, 0, UiSpace.LogicalWidth, UiSpace.LogicalHeight);
+            var screen = Space.CanvasRect;
             Fill(screen, Theme.Dim);
             _blockers.Add(screen);
             _input.Swallow(screen);

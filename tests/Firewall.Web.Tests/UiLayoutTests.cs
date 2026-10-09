@@ -76,3 +76,28 @@ public class UiLayoutTests
     [Fact]
     public void EmptyListShowsNothing() => Assert.Equal((0, 0), ScrollMath.Visible(0, 0, 36, 360));
 }
+
+public class UiSpaceCanvasRectTests
+{
+    [Fact]
+    public void CanvasRectCoversLetterboxBars()
+    {
+        var space = new Firewall.Web.Rendering.UiSpace(new Vector2(1000, 700));
+        var r = space.CanvasRect;
+        Assert.Equal(
+            new Vector2(0, 0),
+            space.ToCanvasPixels(r.Position) - new Vector2(0, 0),
+            new Vector2Comparer()
+        );
+        Assert.Equal(1000f, space.ToCanvasPixels(new Vector2(r.Right, r.Bottom)).X, 2);
+        Assert.Equal(700f, space.ToCanvasPixels(new Vector2(r.Right, r.Bottom)).Y, 2);
+        Assert.True(r.Y < 0f); // the bars sit above and below the logical area
+    }
+
+    private sealed class Vector2Comparer : IEqualityComparer<Vector2>
+    {
+        public bool Equals(Vector2 a, Vector2 b) => Vector2.Distance(a, b) < 0.01f;
+
+        public int GetHashCode(Vector2 v) => v.GetHashCode();
+    }
+}

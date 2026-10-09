@@ -33,9 +33,10 @@ public sealed class RenderServices(
     {
         var ui = new UiSpace(CanvasSize);
         stats.SetCamera(ui.ViewProjection());
+        var all = ui.CanvasRect;
         new ScreenCanvas(stats, text, textServices).FillRect(
-            Vector2.Zero,
-            UiSpace.LogicalSize,
+            all.Position,
+            all.Size,
             new Vector4(0f, 0f, 0f, alpha)
         );
         stats.FlushQueuedQuads();
