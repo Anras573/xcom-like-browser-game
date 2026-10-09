@@ -42,8 +42,9 @@ public sealed record WeaponDef : IDef
     [JsonRequired]
     public int Crit { get; init; }
 
-    [JsonRequired]
     private readonly IReadOnlyList<RangeBand>? _range;
+
+    [JsonRequired]
     public IReadOnlyList<RangeBand> Range
     {
         get => _range ?? [];

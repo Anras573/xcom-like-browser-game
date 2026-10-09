@@ -12,8 +12,9 @@ public sealed record ClassRankDef
     [JsonRequired]
     public int Pick { get; init; }
 
-    [JsonRequired]
     private readonly IReadOnlyList<string>? _abilities;
+
+    [JsonRequired]
     public IReadOnlyList<string> Abilities
     {
         get => _abilities ?? [];
@@ -42,8 +43,9 @@ public sealed record ClassDef : IDef
     /// <summary>Rank at which the class gains a 2nd utility slot, if any.</summary>
     public Rank? ExtraUtilitySlotRank { get; init; }
 
-    [JsonRequired]
     private readonly IReadOnlyList<ClassRankDef>? _abilityTree;
+
+    [JsonRequired]
     public IReadOnlyList<ClassRankDef> AbilityTree
     {
         get => _abilityTree ?? [];
@@ -67,8 +69,9 @@ public sealed record SoldierDef
     [JsonRequired]
     public int Hp { get; init; }
 
-    [JsonRequired]
     private readonly IReadOnlyList<Rank>? _hpBonusRanks;
+
+    [JsonRequired]
     public IReadOnlyList<Rank> HpBonusRanks
     {
         get => _hpBonusRanks ?? [];
@@ -90,8 +93,9 @@ public sealed record SoldierDef
     [JsonRequired]
     public int Sight { get; init; }
 
-    [JsonRequired]
     private readonly IReadOnlyList<RankXp>? _ranks;
+
+    [JsonRequired]
     public IReadOnlyList<RankXp> Ranks
     {
         get => _ranks ?? [];
@@ -101,8 +105,9 @@ public sealed record SoldierDef
     [JsonRequired]
     public WeaponClass StartingWeaponClass { get; init; }
 
-    [JsonRequired]
     private readonly IReadOnlyList<string>? _appearanceSets;
+
+    [JsonRequired]
     public IReadOnlyList<string> AppearanceSets
     {
         get => _appearanceSets ?? [];

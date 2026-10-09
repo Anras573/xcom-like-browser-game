@@ -149,6 +149,22 @@ public class GameDataTests
         Load(f => f == file ? edit(Read(f)) : null).Validate();
 
     [Fact]
+    public void MissingRequiredListsAreRejected()
+    {
+        var noRange = Assert.Throws<InvalidDataException>(() =>
+            Load(f => f == GameDataFiles.Weapons ? Read(f).Replace("\"range\"", "\"rng\"") : null)
+        );
+        Assert.Contains("weapons.json", noRange.Message);
+
+        var noNames = Assert.Throws<InvalidDataException>(() =>
+            Load(f =>
+                f == GameDataFiles.Names ? Read(f).Replace("\"lastNames\"", "\"surnames\"") : null
+            )
+        );
+        Assert.Contains("names.json", noNames.Message);
+    }
+
+    [Fact]
     public void ValidationCatchesBrokenFixtures()
     {
         // dmgMin > dmgMax

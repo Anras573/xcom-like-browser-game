@@ -172,24 +172,27 @@ public sealed record DistrictDef : IDef
 
 public sealed record NameLists
 {
-    [JsonRequired]
     private readonly IReadOnlyList<string>? _firstNames;
+
+    [JsonRequired]
     public IReadOnlyList<string> FirstNames
     {
         get => _firstNames ?? [];
         init => _firstNames = value;
     }
 
-    [JsonRequired]
     private readonly IReadOnlyList<string>? _lastNames;
+
+    [JsonRequired]
     public IReadOnlyList<string> LastNames
     {
         get => _lastNames ?? [];
         init => _lastNames = value;
     }
 
-    [JsonRequired]
     private readonly IReadOnlyList<string>? _nicknames;
+
+    [JsonRequired]
     public IReadOnlyList<string> Nicknames
     {
         get => _nicknames ?? [];
