@@ -178,4 +178,19 @@ public class AssetRegistryTests
         Assert.Equal("assets/fx.png", first.TexturePath);
         Assert.Equal(first.FrameIndex, registry.Frame("fx.explosion.00").FrameIndex);
     }
+
+    [Fact]
+    public void SheetGalleryFitsInsideItsExtent()
+    {
+        var world = new Yaeger.ECS.World();
+        DebugSheetScene.Build(world, LoadRegistry(), new Vector2(0f, DebugSheetScene.Extent.Y));
+
+        // Every cell, backdrop and label lies inside [0, Extent], so the camera clamp shows it all.
+        foreach (var e in world.Entities)
+        {
+            var t = world.GetComponent<Yaeger.Graphics.Transform2D>(e);
+            Assert.InRange(t.Position.X, 0f, DebugSheetScene.Extent.X);
+            Assert.InRange(t.Position.Y, 0f, DebugSheetScene.Extent.Y);
+        }
+    }
 }

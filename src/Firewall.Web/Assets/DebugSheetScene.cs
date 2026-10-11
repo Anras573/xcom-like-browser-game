@@ -27,15 +27,22 @@ public static class DebugSheetScene
         ("assets/fx.png", new Vector2(42, -2)),
     ];
 
-    public static void Build(World world, AssetRegistry registry)
+    /// <summary>Width and height, in cells, of everything <see cref="Build"/> draws below its offset.</summary>
+    public static Vector2 Extent => new(51f, 34f);
+
+    /// <summary>
+    /// Builds the grids. The layout grows down from <paramref name="offset"/>; pass
+    /// <c>(0, Extent.Y)</c> to keep it all in positive coordinates.
+    /// </summary>
+    public static void Build(World world, AssetRegistry registry, Vector2 offset = default)
     {
         foreach (var grid in registry.Grids)
         {
             var origin = Array.Find(Layout, l => l.Texture == grid.Texture).Origin;
-            AddGrid(world, grid, origin);
+            AddGrid(world, grid, origin + offset);
         }
 
-        AddUiAtlas(world, registry.UiAtlas, new Vector2(2, -25));
+        AddUiAtlas(world, registry.UiAtlas, new Vector2(2, -25) + offset);
     }
 
     private static void AddGrid(World world, GridManifest grid, Vector2 origin)
