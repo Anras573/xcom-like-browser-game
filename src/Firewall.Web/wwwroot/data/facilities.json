@@ -1,0 +1,131 @@
+[
+  {
+    "id": "barracks",
+    "name": "Barracks",
+    "cost": 0,
+    "buildDays": 0,
+    "preBuilt": true,
+    "description": "Houses the roster (12 soldiers).",
+    "effects": {
+      "rosterMax": 12,
+      "recruitCost": 40
+    },
+    "upgrades": [
+      {
+        "id": "barracks_expansion",
+        "name": "Barracks Expansion",
+        "cost": 200,
+        "effects": {
+          "rosterMax": 16
+        }
+      }
+    ],
+    "maxCount": 1
+  },
+  {
+    "id": "lab",
+    "name": "Lab",
+    "cost": 0,
+    "buildDays": 0,
+    "preBuilt": true,
+    "description": "Research.",
+    "maxCount": 1
+  },
+  {
+    "id": "workshop",
+    "name": "Workshop",
+    "cost": 0,
+    "buildDays": 0,
+    "preBuilt": true,
+    "description": "Engineering.",
+    "maxCount": 1
+  },
+  {
+    "id": "infirmary",
+    "name": "Infirmary",
+    "cost": 120,
+    "buildDays": 10,
+    "description": "Wound recovery is 2x faster.",
+    "effects": {
+      "woundRecoveryMult": 2
+    },
+    "maxCount": 1
+  },
+  {
+    "id": "training_room",
+    "name": "Training Room",
+    "cost": 100,
+    "buildDays": 8,
+    "description": "Choose the class at promotion. Retrain an ability. Unlocks Squad Size upgrades.",
+    "effects": {
+      "chooseClass": 1,
+      "retrainCost": 50,
+      "retrainDays": 5
+    },
+    "upgrades": [
+      {
+        "id": "squad_size_1",
+        "name": "Squad Size I",
+        "cost": 150,
+        "effects": {
+          "squadSize": 5
+        }
+      },
+      {
+        "id": "squad_size_2",
+        "name": "Squad Size II",
+        "cost": 250,
+        "requires": "squad_size_1",
+        "effects": {
+          "squadSize": 6
+        }
+      }
+    ],
+    "maxCount": 1
+  },
+  {
+    "id": "comms_uplink",
+    "name": "Comms Uplink",
+    "cost": 150,
+    "buildDays": 12,
+    "description": "-1 incursion Unrest in 2 chosen districts.",
+    "effects": {
+      "incursionUnrestReduction": 1,
+      "districts": 2
+    },
+    "maxCount": 1
+  },
+  {
+    "id": "lab_annex",
+    "name": "Lab Annex",
+    "cost": 160,
+    "buildDays": 12,
+    "description": "+25% research speed (stacks up to 2).",
+    "maxCount": 2,
+    "effects": {
+      "researchSpeedBonus": 0.25
+    }
+  },
+  {
+    "id": "fabricator",
+    "name": "Fabricator",
+    "cost": 160,
+    "buildDays": 12,
+    "description": "+2 effective engineers (stacks up to 2).",
+    "maxCount": 2,
+    "effects": {
+      "engineers": 2
+    }
+  },
+  {
+    "id": "generator",
+    "name": "Generator",
+    "cost": 80,
+    "buildDays": 6,
+    "description": "Each Generator powers 3 facilities. Needed once a 3rd non-Generator facility is built.",
+    "maxCount": 6,
+    "effects": {
+      "powersFacilities": 3
+    }
+  }
+]

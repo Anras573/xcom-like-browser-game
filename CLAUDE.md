@@ -17,6 +17,7 @@ dotnet tool restore && dotnet csharpier format .   # format (CI runs `dotnet csh
 ## Layout
 
 - `src/Firewall.Rules`: pure C# rules library. No package or project references.
+- `src/Firewall.Web/wwwroot/data/*.json`: game content (weapons, enemies, research, ...). Loaded into `GameData` at boot and linked into the rules tests; `GameData.Validate()` must return no errors. Records in `Firewall.Rules.Data` use `init` properties: source generation overwrites unset `init` props with `default`, so optional collections go through null-normalising backing fields and non-zero scalars are `[JsonRequired]`.
 - `src/Firewall.Web`: Blazor WASM host and all presentation, built on Yaeger.
 - `tests/Firewall.Rules.Tests`: xUnit tests.
 - `external/Yaeger`: engine, a git submodule (excluded from csharpier via `.csharpierignore`).
@@ -28,7 +29,8 @@ dotnet tool restore && dotnet csharpier format .   # format (CI runs `dotnet csh
 - Rules are deterministic given a seed: inject `IRandom`, never use `Random.Shared` or the clock.
 - Presentation sends commands to the rules and plays back the resulting events.
 - All Yaeger ECS components must be `struct`s.
-- JSON uses System.Text.Json source generation (`JsonSerializerContext`). Reflection-based serialization breaks under Blazor trimming.
+- JSON uses System.Text.Json source generation (`JsonSerializerContext`). Reflection-based serialization breaks under Blazor trimming. CI greps for `JsonSerializer.Deserialize<T>` and `FromJsonAsync<T>`.
+- Randomness: take an `IRandom` (`Pcg32Random`); use `Fork(label)` per subsystem so rolls don't shift each other.
 
 ## Scenes
 

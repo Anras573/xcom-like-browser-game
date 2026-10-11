@@ -1,0 +1,25 @@
+[
+  {
+    "id": "tac_vest",
+    "name": "Tac Vest",
+    "hp": 0,
+    "armor": 0,
+    "mobility": 0
+  },
+  {
+    "id": "salvage_plating",
+    "name": "Salvage Plating",
+    "hp": 3,
+    "armor": 0,
+    "mobility": 0,
+    "unlockedBy": "drone_teardown"
+  },
+  {
+    "id": "aegis_rig",
+    "name": "Aegis Rig",
+    "hp": 5,
+    "armor": 1,
+    "mobility": 1,
+    "unlockedBy": "aegis_composites"
+  }
+]

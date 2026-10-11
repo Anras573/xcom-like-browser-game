@@ -1,3 +1,4 @@
+using Firewall.Rules.Data;
 using Firewall.Web.Assets;
 using Firewall.Web.Input;
 using Firewall.Web.Rendering;
@@ -5,12 +6,6 @@ using Firewall.Web.Ui;
 using Yaeger.Platform;
 
 namespace Firewall.Web.Scenes;
-
-/// <summary>Placeholder for the game data tables (units, items, research); filled in by #15.</summary>
-public sealed class GameData
-{
-    public static readonly GameData Empty = new();
-}
 
 /// <summary>Audio service stub; wired to <c>IAudioOutput</c> later.</summary>
 public sealed class AudioService

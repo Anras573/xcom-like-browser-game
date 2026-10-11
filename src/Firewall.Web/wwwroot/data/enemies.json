@@ -1,0 +1,242 @@
+[
+  {
+    "id": "husk",
+    "name": "Husk",
+    "hp": 4,
+    "aim": 85,
+    "dmgMin": 2,
+    "dmgMax": 3,
+    "mobility": 8,
+    "defense": 0,
+    "armor": 0,
+    "sight": 9,
+    "behavior": {
+      "kind": "Charger",
+      "melee": true,
+      "prefersCivilians": true,
+      "usesCover": false,
+      "flankWeight": 0,
+      "coverWeight": 0
+    },
+    "sprite": {
+      "set": "zombie1",
+      "pose": "hold",
+      "scale": 1.0
+    },
+    "podMin": 3,
+    "podMax": 4,
+    "abilities": [
+      "melee_attack"
+    ]
+  },
+  {
+    "id": "warden",
+    "name": "Warden",
+    "hp": 6,
+    "aim": 60,
+    "dmgMin": 2,
+    "dmgMax": 4,
+    "mobility": 6,
+    "defense": 10,
+    "armor": 1,
+    "sight": 11,
+    "behavior": {
+      "kind": "CoverShooter",
+      "usesCover": true,
+      "overwatches": true,
+      "coverWeight": 1.5,
+      "preferredRangeMin": 5,
+      "preferredRangeMax": 10,
+      "flankWeight": 1.0
+    },
+    "sprite": {
+      "set": "robot1",
+      "pose": "gun",
+      "scale": 1.0
+    },
+    "robot": true,
+    "tier": 1,
+    "abilities": [
+      "shoot",
+      "overwatch"
+    ],
+    "loot": [
+      {
+        "resource": "Salvage",
+        "amount": 2,
+        "chancePercent": 100
+      }
+    ],
+    "podMin": 1,
+    "podMax": 4
+  },
+  {
+    "id": "proxy",
+    "name": "Proxy",
+    "hp": 5,
+    "aim": 70,
+    "dmgMin": 3,
+    "dmgMax": 4,
+    "mobility": 7,
+    "defense": 10,
+    "armor": 0,
+    "sight": 11,
+    "behavior": {
+      "kind": "Flanker",
+      "usesCover": true,
+      "overwatches": true,
+      "flankWeight": 2,
+      "preferredRangeMin": 4,
+      "preferredRangeMax": 9,
+      "coverWeight": 1.0
+    },
+    "sprite": {
+      "set": "hitman1",
+      "pose": "silencer",
+      "scale": 1.0
+    },
+    "capturable": true,
+    "abilities": [
+      "shoot",
+      "overwatch",
+      "proxy_overclock"
+    ],
+    "loot": [
+      {
+        "resource": "Salvage",
+        "amount": 1,
+        "chancePercent": 100
+      },
+      {
+        "resource": "Credits",
+        "amount": 20,
+        "chancePercent": 100
+      }
+    ],
+    "podMin": 1,
+    "podMax": 4
+  },
+  {
+    "id": "enforcer",
+    "name": "Enforcer",
+    "hp": 10,
+    "aim": 65,
+    "dmgMin": 4,
+    "dmgMax": 6,
+    "mobility": 5,
+    "defense": 0,
+    "armor": 2,
+    "sight": 11,
+    "behavior": {
+      "kind": "Suppressor",
+      "usesCover": true,
+      "flankWeight": 2,
+      "coverWeight": 0.5,
+      "preferredRangeMin": 4,
+      "preferredRangeMax": 9
+    },
+    "sprite": {
+      "set": "robot1",
+      "pose": "machine",
+      "tint": "#e04040",
+      "scale": 1.15
+    },
+    "robot": true,
+    "tier": 2,
+    "abilities": [
+      "shoot",
+      "suppression"
+    ],
+    "loot": [
+      {
+        "resource": "Salvage",
+        "amount": 4,
+        "chancePercent": 100
+      },
+      {
+        "resource": "Cores",
+        "amount": 1,
+        "chancePercent": 20
+      }
+    ],
+    "podMin": 1,
+    "podMax": 4
+  },
+  {
+    "id": "relay_node",
+    "name": "Relay Node",
+    "hp": 12,
+    "aim": 0,
+    "dmgMin": 0,
+    "dmgMax": 0,
+    "mobility": 0,
+    "defense": 0,
+    "armor": 1,
+    "sight": 0,
+    "behavior": {
+      "kind": "Stationary",
+      "flankWeight": 1.0,
+      "coverWeight": 1.0
+    },
+    "sprite": {
+      "set": "robot1",
+      "pose": "stand",
+      "scale": 1.0
+    },
+    "kind": "Object",
+    "robot": true,
+    "podMax": 1,
+    "summon": {
+      "enemyId": "husk",
+      "count": 1,
+      "everyTurns": 2
+    },
+    "loot": [
+      {
+        "resource": "Cores",
+        "amount": 3,
+        "chancePercent": 100
+      }
+    ],
+    "podMin": 1
+  },
+  {
+    "id": "cradle_guardian",
+    "name": "Cradle Guardian",
+    "hp": 30,
+    "aim": 75,
+    "dmgMin": 5,
+    "dmgMax": 7,
+    "mobility": 4,
+    "defense": 10,
+    "armor": 3,
+    "sight": 14,
+    "behavior": {
+      "kind": "Boss",
+      "usesCover": true,
+      "preferredRangeMin": 4,
+      "preferredRangeMax": 10,
+      "flankWeight": 1.0,
+      "coverWeight": 1.0
+    },
+    "sprite": {
+      "set": "robot1",
+      "pose": "machine",
+      "tint": "#e0b040",
+      "scale": 1.6
+    },
+    "robot": true,
+    "tier": 3,
+    "podMax": 1,
+    "abilities": [
+      "shoot",
+      "double_shot"
+    ],
+    "summon": {
+      "enemyId": "warden",
+      "count": 2,
+      "belowHpPercent": 50
+    },
+    "podMin": 1
+  }
+]

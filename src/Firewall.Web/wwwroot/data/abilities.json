@@ -1,0 +1,376 @@
+[
+  {
+    "id": "shoot",
+    "name": "Shoot",
+    "description": "Fire the equipped weapon.",
+    "apCost": 1,
+    "endsTurn": true,
+    "targeting": "Enemy"
+  },
+  {
+    "id": "overwatch",
+    "name": "Overwatch",
+    "description": "Fire a reaction shot at the first enemy that moves in line of sight during the enemy phase.",
+    "apCost": 1,
+    "endsTurn": true,
+    "targeting": "Self",
+    "parameters": {
+      "reactionAimMult": 0.7
+    }
+  },
+  {
+    "id": "reload",
+    "name": "Reload",
+    "description": "Refill the clip.",
+    "apCost": 1,
+    "endsTurn": false,
+    "targeting": "Self"
+  },
+  {
+    "id": "hunker_down",
+    "name": "Hunker Down",
+    "description": "Double cover defense until your next turn. Needs cover.",
+    "apCost": 1,
+    "endsTurn": true,
+    "targeting": "Self",
+    "parameters": {
+      "coverMult": 2
+    }
+  },
+  {
+    "id": "melee_attack",
+    "name": "Melee",
+    "description": "Strike an adjacent target.",
+    "apCost": 1,
+    "endsTurn": true,
+    "targeting": "Enemy"
+  },
+  {
+    "id": "run_and_gun",
+    "name": "Run & Gun",
+    "description": "May fire after a dash, once every 3 turns.",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive",
+    "cooldown": 3
+  },
+  {
+    "id": "close_combat",
+    "name": "Close Combat",
+    "description": "+20 crit within 4 tiles.",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive",
+    "parameters": {
+      "crit": 20,
+      "maxDist": 4
+    }
+  },
+  {
+    "id": "lightning_reflexes",
+    "name": "Lightning Reflexes",
+    "description": "The first reaction shot against this unit each enemy phase misses.",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive"
+  },
+  {
+    "id": "rapid_fire",
+    "name": "Rapid Fire",
+    "description": "Two shots at -15 aim each for 1 AP.",
+    "apCost": 1,
+    "endsTurn": true,
+    "targeting": "Enemy",
+    "cooldown": 3,
+    "parameters": {
+      "shots": 2,
+      "aim": -15
+    }
+  },
+  {
+    "id": "hit_and_run",
+    "name": "Hit & Run",
+    "description": "A shot at a flanked target refunds 1 AP (once per turn).",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive",
+    "parameters": {
+      "apRefund": 1
+    }
+  },
+  {
+    "id": "untouchable",
+    "name": "Untouchable",
+    "description": "After a kill, the next attack against this unit misses.",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive"
+  },
+  {
+    "id": "killing_zone",
+    "name": "Killing Zone",
+    "description": "Overwatch fires at every mover in LOS (max 3 shots).",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive",
+    "parameters": {
+      "maxShots": 3
+    }
+  },
+  {
+    "id": "squadsight",
+    "name": "Squadsight",
+    "description": "Can target enemies visible to any squadmate.",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive"
+  },
+  {
+    "id": "snap_shot",
+    "name": "Snap Shot",
+    "description": "May fire after moving, at -20 aim.",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive",
+    "parameters": {
+      "aim": -20
+    }
+  },
+  {
+    "id": "steady_aim",
+    "name": "Steady Aim",
+    "description": "+15 aim on this soldier's first shot of each mission.",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive",
+    "parameters": {
+      "aim": 15
+    }
+  },
+  {
+    "id": "sentinel",
+    "name": "Sentinel",
+    "description": "Reaction shots can crit.",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive"
+  },
+  {
+    "id": "low_profile",
+    "name": "Low Profile",
+    "description": "Half cover counts as full.",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive"
+  },
+  {
+    "id": "in_the_zone",
+    "name": "In The Zone",
+    "description": "Killing a flanked or uncovered target refunds the action (max 3 per turn).",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive",
+    "parameters": {
+      "maxPerTurn": 3
+    }
+  },
+  {
+    "id": "headshot",
+    "name": "Headshot",
+    "description": "+3 damage.",
+    "apCost": 1,
+    "endsTurn": true,
+    "targeting": "Enemy",
+    "cooldown": 3,
+    "parameters": {
+      "damage": 3
+    }
+  },
+  {
+    "id": "suppression",
+    "name": "Suppression",
+    "description": "Costs 1 AP, ends the turn, uses 2 ammo. The target gets -30 aim, and if it moves it takes a reaction shot. Lasts until the next turn.",
+    "apCost": 1,
+    "endsTurn": true,
+    "targeting": "Enemy",
+    "parameters": {
+      "ammo": 2,
+      "aim": -30
+    }
+  },
+  {
+    "id": "shredder",
+    "name": "Shredder",
+    "description": "Hits remove 1 armor permanently.",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive",
+    "parameters": {
+      "armorShred": 1
+    }
+  },
+  {
+    "id": "bulletstorm",
+    "name": "Bulletstorm",
+    "description": "Firing doesn't end the turn if the soldier hasn't moved this turn.",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive"
+  },
+  {
+    "id": "grenadier",
+    "name": "Grenadier",
+    "description": "+1 grenade charge and +1 grenade damage.",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive",
+    "parameters": {
+      "charges": 1,
+      "damage": 1
+    }
+  },
+  {
+    "id": "danger_zone",
+    "name": "Danger Zone",
+    "description": "+1 radius for suppression area and explosives.",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive",
+    "parameters": {
+      "radius": 1
+    }
+  },
+  {
+    "id": "mayhem",
+    "name": "Mayhem",
+    "description": "+2 damage for suppression reaction shots and explosives.",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive",
+    "parameters": {
+      "damage": 2
+    }
+  },
+  {
+    "id": "rupture",
+    "name": "Rupture",
+    "description": "The next shot always crits and the target takes +3 damage from all sources for the rest of the mission.",
+    "apCost": 1,
+    "endsTurn": false,
+    "targeting": "Enemy",
+    "cooldown": 4,
+    "parameters": {
+      "damage": 3
+    }
+  },
+  {
+    "id": "field_medic",
+    "name": "Field Medic",
+    "description": "+1 medkit charge; medkits can be used at range 1 (adjacent including diagonals).",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive",
+    "parameters": {
+      "charges": 1,
+      "range": 1
+    }
+  },
+  {
+    "id": "smoke_screen",
+    "name": "Smoke Screen",
+    "description": "+1 smoke grenade, and its radius is +1.",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive",
+    "parameters": {
+      "charges": 1,
+      "radius": 1
+    }
+  },
+  {
+    "id": "revive",
+    "name": "Revive",
+    "description": "Medkits heal 2 extra HP and instantly revive a bleeding-out soldier to 1 HP.",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive",
+    "parameters": {
+      "heal": 2,
+      "reviveHp": 1
+    }
+  },
+  {
+    "id": "hack",
+    "name": "Hack",
+    "description": "Stun a robot within 6 tiles for 1 turn. Hack% = 50 + 5 x rankIndex - 15 x robotTier.",
+    "apCost": 1,
+    "endsTurn": false,
+    "targeting": "Enemy",
+    "cooldown": 3,
+    "parameters": {
+      "range": 6,
+      "stunTurns": 1,
+      "baseChance": 50,
+      "perRank": 5,
+      "perTier": -15
+    }
+  },
+  {
+    "id": "sprinter",
+    "name": "Sprinter",
+    "description": "+3 mobility.",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive",
+    "parameters": {
+      "mobility": 3
+    }
+  },
+  {
+    "id": "savior",
+    "name": "Savior",
+    "description": "Medkits heal +4.",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive",
+    "parameters": {
+      "heal": 4
+    }
+  },
+  {
+    "id": "overclock",
+    "name": "Overclock",
+    "description": "Give an ally +1 AP this turn.",
+    "apCost": 1,
+    "endsTurn": false,
+    "targeting": "Ally",
+    "cooldown": 4,
+    "parameters": {
+      "grantAp": 1
+    }
+  },
+  {
+    "id": "proxy_overclock",
+    "name": "Overclock",
+    "description": "+1 AP to an adjacent robot.",
+    "apCost": 1,
+    "endsTurn": false,
+    "targeting": "Ally",
+    "cooldown": 3,
+    "parameters": {
+      "grantAp": 1,
+      "range": 1
+    }
+  },
+  {
+    "id": "double_shot",
+    "name": "Double Shot",
+    "description": "Takes 2 shots per turn; firing doesn't end the turn.",
+    "apCost": 0,
+    "endsTurn": false,
+    "targeting": "Passive",
+    "parameters": {
+      "shots": 2
+    }
+  }
+]

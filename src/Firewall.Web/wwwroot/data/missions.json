@@ -1,0 +1,55 @@
+[
+  {
+    "id": "purge",
+    "name": "Purge",
+    "goal": "Kill all hostiles.",
+    "fail": "Squad wiped or retreats."
+  },
+  {
+    "id": "rescue",
+    "name": "Rescue",
+    "goal": "Evacuate at least N of M civilians.",
+    "fail": "Too few saved."
+  },
+  {
+    "id": "sabotage",
+    "name": "Sabotage",
+    "goal": "Destroy the Relay Node within T turns, then evac or kill all.",
+    "fail": "Timer expires.",
+    "parameters": {
+      "relayHp": 12,
+      "convergenceReward": -1
+    }
+  },
+  {
+    "id": "capture",
+    "name": "Capture",
+    "goal": "Stun a Proxy with the Arc Stunner and carry it to evac.",
+    "fail": "Proxy dies: lose the bonus, not the mission.",
+    "requiresItem": "arc_stunner"
+  },
+  {
+    "id": "quiet_night",
+    "name": "Quiet Night",
+    "goal": "Rescue civilians from a tram station.",
+    "fail": "Squad wiped.",
+    "story": true
+  },
+  {
+    "id": "relay_hunt",
+    "name": "Relay Hunt",
+    "goal": "Destroy the relay and recover its Relay Core.",
+    "fail": "Squad wiped or retreats.",
+    "story": true,
+    "parameters": {
+      "convergenceReward": -3
+    }
+  },
+  {
+    "id": "hard_shutdown",
+    "name": "Hard Shutdown",
+    "goal": "Fight through the Spire and kill the Cradle Guardian while the killcode uploads.",
+    "fail": "Squad wiped or retreats.",
+    "story": true
+  }
+]
