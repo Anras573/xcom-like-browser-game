@@ -18,6 +18,7 @@ dotnet tool restore && dotnet csharpier format .   # format (CI runs `dotnet csh
 
 - `src/Firewall.Rules`: pure C# rules library. No package or project references.
 - `src/Firewall.Web/wwwroot/data/*.json`: game content (weapons, enemies, research, ...). Loaded into `GameData` at boot and linked into the rules tests; `GameData.Validate()` must return no errors. Records in `Firewall.Rules.Data` use `init` properties: source generation overwrites unset `init` props with `default`, so optional collections go through null-normalising backing fields and non-zero scalars are `[JsonRequired]`.
+- Maps are text files in `wwwroot/data/maps/*.json` (rows top first; `GridPos` is +Y up). `MapParser` is the only parser, tile properties come from `data/tiles.json`, and each map must be listed in `GameDataFiles.Maps`. `MapTilemaps` renders a `TacticalMap` with Yaeger `Tilemap`s; the "Map Viewer" debug scene shows it.
 - `src/Firewall.Web`: Blazor WASM host and all presentation, built on Yaeger.
 - `tests/Firewall.Rules.Tests`: xUnit tests.
 - `external/Yaeger`: engine, a git submodule (excluded from csharpier via `.csharpierignore`).

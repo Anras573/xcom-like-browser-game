@@ -7,6 +7,9 @@ using Yaeger.Platform;
 
 namespace Firewall.Web.Scenes;
 
+/// <summary>A map file's id and its raw JSON.</summary>
+public readonly record struct MapSource(string Id, string Json);
+
 /// <summary>Audio service stub; wired to <c>IAudioOutput</c> later.</summary>
 public sealed class AudioService
 {
@@ -61,6 +64,9 @@ public sealed class SceneContext(
     public SaveService Saves { get; } = new();
     public SeedSource Seeds { get; set; } = new(0);
     public GameData Data { get; private set; } = GameData.Empty;
+
+    /// <summary>The shipped map files, as loaded by the boot scene; parse with <c>Data.LoadMap</c>.</summary>
+    public IReadOnlyList<MapSource> MapSources { get; set; } = [];
 
     public AssetRegistry Assets =>
         _assets ?? throw new InvalidOperationException("Not loaded yet.");
