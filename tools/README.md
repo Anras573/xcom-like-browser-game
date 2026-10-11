@@ -82,9 +82,9 @@ The orange and tan wall styles use the same layout one block over and can be add
 
 `tiles.png` has no spacing between tiles, so the default `TextureSampling.Default` (Linear + Clamp) bleeds neighbouring
 cells at fractional camera positions. A checkerboard `Tilemap` of grass and water (cells that are not adjacent in the
-texture) showed 1 px seams at 1× and 2× when panned to sub-pixel positions, and none with `Pixelated`. The debug scene
+texture) showed 1 px seams at 1× and 2× when panned to sub-pixel positions, and none with `Pixelated`. The sheet gallery (Debug Menu → Sheet gallery)
 cannot show this, because it draws sheets in their source layout, so a bleed there samples a matching colour.
 
-**Decision:** `assets/tiles.png` uses `TextureSampling.Pixelated`, set in `Game.razor` before preload. The other sheets keep
+**Decision:** `assets/tiles.png` uses `TextureSampling.Pixelated`, set in `Scenes/BootSteps.cs` before preload. The other sheets keep
 the default: their cells are drawn as sprites with transparent padding. #16 should re-check the real map, and if
 `Pixelated` looks too blocky at some zoom, ask Yaeger for margin/spacing support on `SpriteSheet`/`Tileset`.

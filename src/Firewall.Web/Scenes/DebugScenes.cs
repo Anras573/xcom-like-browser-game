@@ -31,6 +31,7 @@ public static class DebugScenes
     public static void RegisterBuiltIn()
     {
         Register("Sprite gallery", () => new SpriteGalleryScene());
+        Register("Sheet gallery", () => new SheetGalleryScene());
         Register("UI gallery", () => new UiGalleryDebugScene());
         Register("Text test", () => new TextTestScene());
         Register("Picking test", () => new PickingTestScene());
