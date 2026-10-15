@@ -11,6 +11,7 @@ public enum TacticalPhase
 {
     Player,
     Enemy,
+    Environment,
 }
 
 /// <summary>Stable identity of a unit within one <see cref="TacticalState"/>.</summary>

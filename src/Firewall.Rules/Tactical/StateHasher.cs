@@ -21,6 +21,7 @@ internal static class StateHasher
 
         Add(ref h, state.TurnNumber);
         Add(ref h, (int)state.Phase);
+        Add(ref h, state.Result is { } r ? (int)r : -1);
         Add(ref h, state.Objective.MissionId);
         Add(ref h, state.Objective.Progress);
         Add(ref h, state.Objective.Target);
