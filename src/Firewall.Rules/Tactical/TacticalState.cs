@@ -28,6 +28,9 @@ public sealed class TacticalState(TacticalMap map, IRandom rng, string missionId
     public int TurnNumber { get; set; } = 1;
     public TacticalPhase Phase { get; set; } = TacticalPhase.Player;
 
+    /// <summary>Null while the mission is running.</summary>
+    public MissionResult? Result { get; set; }
+
     /// <summary>Every unit, living or dead, in the order they were added.</summary>
     public IReadOnlyList<TacticalUnit> Units => _units;
 

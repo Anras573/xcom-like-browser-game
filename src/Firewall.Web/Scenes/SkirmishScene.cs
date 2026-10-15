@@ -30,6 +30,10 @@ public sealed class SkirmishScene : SceneBase
     private readonly Dictionary<UnitId, UnitView> _views = [];
     private TacticalCameraController _controller = null!;
     private TacticalState _state = null!;
+    private TacticalEngine _engine = null!;
+    private readonly Queue<PhaseStarted> _banners = new();
+    private float _bannerTime;
+    private float _exhaustedTimer = -1f;
     private MapTilemaps? _tilemaps;
     private UnitId? _selected;
     private TacticalUnit? _hover;
@@ -52,6 +56,7 @@ public sealed class SkirmishScene : SceneBase
         _state = new TacticalState(map, rng);
         SquadDeployer.Deploy(_state, DebugSquad.Create(_state, Ctx.Data, rng.Fork("squad")));
         PodSpawner.Spawn(_state, Ctx.Data, Pods, rng.Fork("pods"));
+        _engine = new TacticalEngine(_state, Ctx.Data);
 
         _tilemaps = MapTilemaps.Build(World, map, Ctx.Assets);
         foreach (var unit in _state.Units)
@@ -99,7 +104,18 @@ public sealed class SkirmishScene : SceneBase
         var tile = Ctx.Ui.PointerOverUi ? null : PickTile(canvas);
         _hover = tile is { } t ? _state.UnitAt(t) : null;
 
+        if (Ctx.Input.WasKeyPressed(Keys.F9))
+            Console.WriteLine(_engine.Log.ToJson());
+        UpdateBanner(dt);
+
         var soldiers = Soldiers();
+        if (
+            Ctx.Bindings.WasPressed(GameAction.EndTurn)
+            && _engine.Validate(new EndTurnCommand()).IsValid
+        )
+            Play(_engine.EndPlayerPhase());
+        else if (_exhaustedTimer >= 0f && (_exhaustedTimer -= dt) < 0f)
+            Play(_engine.EndPlayerPhase());
         if (soldiers.Count > 0)
         {
             if (Ctx.Bindings.WasPressed(GameAction.NextUnit))
@@ -112,6 +128,19 @@ public sealed class SkirmishScene : SceneBase
                 && Ctx.Clicks.ConsumeClick()
             )
                 Select(clicked);
+            else if (
+                tile is { } dest
+                && _hover is null
+                && MoveAttempt(dest) is { } move
+                && !Ctx.Ui.PointerOverUi
+                && Ctx.Clicks.ConsumeClick()
+            )
+            {
+                if (_engine.Validate(move) is { IsValid: false } bad)
+                    Ctx.Ui.Toast(bad.Reason);
+                else
+                    Play(_engine.Execute(move));
+            }
         }
 
         foreach (var (id, view) in _views)
@@ -126,6 +155,43 @@ public sealed class SkirmishScene : SceneBase
             view.Sync(selected: id == _selected, showOverlay: ShowOverlay(unit), time: _time);
         }
     }
+
+    private MoveCommand? MoveAttempt(GridPos dest) =>
+        Selected is { } unit ? new MoveCommand(unit.Id, dest) : null;
+
+    // Temporary: events are applied straight away (views read the state, so units jump). The
+    // event player (#28) animates from a view model instead and must not read the state.
+    private void Play(IReadOnlyList<GameEvent> events)
+    {
+        foreach (var e in events)
+        {
+            if (e is PhaseStarted p)
+                _banners.Enqueue(p);
+            if (e is UnitMoved moved && moved.Unit == _selected)
+                _controller.FocusOn(
+                    TacticalCamera.TileCenter(moved.Path[^1].X, moved.Path[^1].Y),
+                    0.25f
+                );
+        }
+        // "All soldiers exhausted": end the turn after a short beat.
+        _exhaustedTimer = events.Any(e => e is AllSoldiersExhausted) ? 0.8f : -1f;
+        if (_selected is { } id && !_state.Unit(id).IsAlive && Soldiers() is [var first, ..])
+            Select(first);
+    }
+
+    private void UpdateBanner(float dt)
+    {
+        if (_banners.Count == 0)
+            return;
+        _bannerTime += dt;
+        if (_bannerTime >= BannerSeconds)
+        {
+            _bannerTime = 0f;
+            _banners.Dequeue();
+        }
+    }
+
+    private const float BannerSeconds = 0.9f;
 
     // Soldiers always; enemies once fog of war can say they're visible (until then, all are).
     private static bool ShowOverlay(TacticalUnit unit) => unit.IsAlive;
@@ -167,8 +233,90 @@ public sealed class SkirmishScene : SceneBase
         if (Selected is { } sel)
             canvas.Text($"Selected: {sel.DisplayName}", new Vector2(16, 70), TextStyles.Body);
 
+        canvas.Text(
+            $"Turn {_state.TurnNumber}   {_state.Phase} phase   Backspace: end turn   F9: copy command log",
+            new Vector2(16, 92),
+            TextStyles.Small
+        );
+        DrawSoldierAp(canvas);
+
+        var endTurn = _engine.Validate(new EndTurnCommand());
+        var buttonRect = new UiRect(
+            UiSpace.LogicalWidth - 196,
+            UiSpace.LogicalHeight - 64,
+            180,
+            48
+        );
+        if (
+            ui.Button(
+                buttonRect,
+                "End Turn",
+                ButtonStyle.Primary,
+                enabled: endTurn.IsValid,
+                tooltip: endTurn.IsValid ? null : endTurn.Reason
+            )
+        )
+            Play(_engine.EndPlayerPhase());
+
         if (_hover is { } unit)
             DrawTooltip(canvas, ui, unit);
+        else if (!ui.PointerOverUi)
+            DrawMoveReason(canvas, ui);
+
+        DrawBanner(canvas, ui);
+    }
+
+    private void DrawSoldierAp(ScreenCanvas canvas)
+    {
+        var y = 116f;
+        foreach (var s in _state.Units.Where(u => u.Faction == Faction.Firewall && u.IsAlive))
+        {
+            canvas.Text(
+                $"{s.DisplayName}: {s.ActionPoints} AP",
+                new Vector2(16, y),
+                TextStyles.Small
+            );
+            y += 18f;
+        }
+    }
+
+    // Why a move to the hovered tile is not allowed, next to the cursor.
+    private void DrawMoveReason(ScreenCanvas canvas, UiContext ui)
+    {
+        var tile = PickTile(Ctx.Render.CanvasSize);
+        if (tile is not { } dest || MoveAttempt(dest) is not { } move)
+            return;
+        var result = _engine.Validate(move);
+        if (result.IsValid)
+            return;
+        canvas.Text(result.Reason, ui.Mouse + new Vector2(18f, 18f), TextStyles.Tooltip);
+    }
+
+    private void DrawBanner(ScreenCanvas canvas, UiContext ui)
+    {
+        if (_banners.Count == 0 && _state.Result is null)
+            return;
+        var text =
+            _banners.Count > 0
+                ? _banners.Peek() switch
+                {
+                    { Phase: TacticalPhase.Player } p => $"PLAYER PHASE  -  TURN {p.Turn}",
+                    { Phase: TacticalPhase.Enemy } => "ENEMY PHASE",
+                    _ => "ENVIRONMENT PHASE",
+                }
+                : $"MISSION {_state.Result!.Value.ToString().ToUpperInvariant()}";
+        var rect = ui.Space.CanvasRect;
+        var band = new Vector2(rect.W, 64f);
+        var pos = new Vector2(rect.X, rect.Y + rect.H / 2f - 32f);
+        canvas.FillRect(pos, band, new Vector4(0.02f, 0.03f, 0.05f, 0.8f));
+        canvas.Text(
+            text,
+            new Vector2(
+                UiSpace.LogicalWidth / 2f - canvas.Measure(text, TextStyles.Heading) / 2f,
+                pos.Y + 18f
+            ),
+            TextStyles.Heading
+        );
     }
 
     private void DrawTooltip(ScreenCanvas canvas, UiContext ui, TacticalUnit unit)
