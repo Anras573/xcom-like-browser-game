@@ -36,5 +36,6 @@ public static class DebugScenes
         Register("Text test", () => new TextTestScene());
         Register("Picking test", () => new PickingTestScene());
         Register("Map Viewer", () => new MapViewerScene());
+        Register("Skirmish", () => new SkirmishScene());
     }
 }
