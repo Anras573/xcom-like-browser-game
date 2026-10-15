@@ -38,7 +38,7 @@ public class TacticalEngineTests
             .First(p => p.DistanceTo(u.Position) >= distance && IsPlannable(e, u, p));
 
     private static bool IsPlannable(TacticalEngine e, TacticalUnit u, GridPos p) =>
-        MovePlanner.Plan(e.State, u, p) is not null;
+        Pathfinder.Reachable(e.State, u, 4 * u.Mobility).Contains(p);
 
     [Fact]
     public void MoveWithinMobilityCostsOneAp()
@@ -60,9 +60,10 @@ public class TacticalEngineTests
         var e = NewEngine();
         var unit = Soldier(e);
         unit.Mobility = 3;
+        var reach = Pathfinder.Reachable(e.State, unit, 12);
         var dest = e
             .State.NearestFreeTiles(unit.Position)
-            .First(p => MovePlanner.Plan(e.State, unit, p) is { Cost: > 6 and <= 12 });
+            .First(p => reach.CostTo(p) is > 6 and <= 12);
         var events = e.Execute(new MoveCommand(unit.Id, dest));
 
         Assert.Equal(0, unit.ActionPoints);
@@ -76,9 +77,10 @@ public class TacticalEngineTests
         var unit = Soldier(e);
         unit.Mobility = 3;
         unit.ActionPoints = 1;
+        var reach = Pathfinder.Reachable(e.State, unit, 12);
         var far = e
             .State.NearestFreeTiles(unit.Position)
-            .First(p => MovePlanner.Plan(e.State, unit, p) is { Cost: > 6 and <= 12 });
+            .First(p => reach.CostTo(p) is > 6 and <= 12);
 
         var result = e.Validate(new MoveCommand(unit.Id, far));
         Assert.False(result.IsValid);
@@ -162,7 +164,7 @@ public class TacticalEngineTests
         var e = NewEngine();
         var unit = Soldier(e);
         var dest = Free(e, unit, 5);
-        var path = MovePlanner.Plan(e.State, unit, dest)!.Path;
+        var path = Pathfinder.Reachable(e.State, unit, 40).PathTo(dest)!;
         var deathTile = path[2];
         e.StepHooks.Add(new KillAtTile(deathTile));
 
@@ -191,7 +193,7 @@ public class TacticalEngineTests
         var e = NewEngine();
         var unit = Soldier(e);
         var dest = Free(e, unit, 5);
-        var path = MovePlanner.Plan(e.State, unit, dest)!.Path;
+        var path = Pathfinder.Reachable(e.State, unit, 40).PathTo(dest)!;
         e.StepHooks.Add(new ReactionAtTile(path[1], unit.Id));
 
         var events = e.Execute(new MoveCommand(unit.Id, dest));
