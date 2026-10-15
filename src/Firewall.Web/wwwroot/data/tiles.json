@@ -1,0 +1,54 @@
+[
+  { "type": "Floor", "glyph": ".", "walkable": true },
+  { "type": "Road", "glyph": ",", "walkable": true },
+  {
+    "type": "Wall",
+    "glyph": "#",
+    "walkable": false,
+    "cover": "Full",
+    "blocksLos": true
+  },
+  {
+    "type": "Window",
+    "glyph": "w",
+    "walkable": false,
+    "cover": "Half",
+    "destructibleInto": "Floor",
+    "hitsToDestroy": 1
+  },
+  {
+    "type": "SmallCrate",
+    "glyph": "c",
+    "walkable": false,
+    "cover": "Half",
+    "destructibleInto": "Floor",
+    "hitsToDestroy": 1
+  },
+  {
+    "type": "BigCrate",
+    "glyph": "C",
+    "walkable": false,
+    "cover": "Full",
+    "blocksLos": true,
+    "destructibleInto": "SmallCrate",
+    "hitsToDestroy": 2
+  },
+  {
+    "type": "Tree",
+    "glyph": "T",
+    "walkable": false,
+    "cover": "Full",
+    "blocksLos": true
+  },
+  {
+    "type": "Bush",
+    "glyph": "b",
+    "walkable": false,
+    "cover": "Half",
+    "destructibleInto": "Floor",
+    "hitsToDestroy": 1
+  },
+  { "type": "Water", "glyph": "~", "walkable": false },
+  { "type": "Doorway", "glyph": "d", "walkable": true },
+  { "type": "Objective", "glyph": "O", "walkable": false, "cover": "Full" }
+]

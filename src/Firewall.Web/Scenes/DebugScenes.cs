@@ -35,5 +35,6 @@ public static class DebugScenes
         Register("UI gallery", () => new UiGalleryDebugScene());
         Register("Text test", () => new TextTestScene());
         Register("Picking test", () => new PickingTestScene());
+        Register("Map Viewer", () => new MapViewerScene());
     }
 }

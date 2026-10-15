@@ -266,6 +266,32 @@ internal static class GameDataValidator
             if (m.RequiresItem is not null && !d.Items.Contains(m.RequiresItem))
                 Err($"mission type '{m.Id}': requires unknown item '{m.RequiresItem}'");
 
+        foreach (var type in Enum.GetValues<Tactical.TileType>())
+            if (d.Tiles.Count(t => t.Type == type) != 1)
+                Err($"tile type {type} needs exactly one entry in tiles.json");
+        var glyphs = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var t in d.Tiles)
+        {
+            var p = $"tile '{t.Id}'";
+            if (t.Glyph.Length != 1 || char.IsWhiteSpace(t.Glyph[0]))
+                Err($"{p}: glyph '{t.Glyph}' must be a single visible character");
+            else if (Tactical.MapParser.IsSpawnGlyph(t.Glyph[0]))
+                Err($"{p}: glyph '{t.Glyph}' is reserved for spawn markers");
+            else if (!glyphs.Add(t.Glyph))
+                Err($"{p}: glyph '{t.Glyph}' is used twice");
+            if (t.HitsToDestroy < 0)
+                Err($"{p}: negative hitsToDestroy {t.HitsToDestroy}");
+            if (t.DestructibleInto is { } into)
+            {
+                if (into == t.Type)
+                    Err($"{p}: destructibleInto itself");
+                if (t.HitsToDestroy < 1)
+                    Err($"{p}: destructible tiles need hitsToDestroy of at least 1");
+            }
+            else if (t.HitsToDestroy != 0)
+                Err($"{p}: hitsToDestroy {t.HitsToDestroy} without destructibleInto");
+        }
+
         if (d.Names.FirstNames.Count == 0 || d.Names.LastNames.Count == 0)
             Err("names: first and last name lists must not be empty");
 

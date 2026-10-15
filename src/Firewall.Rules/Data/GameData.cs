@@ -52,6 +52,7 @@ public static class GameDataFiles
     public const string Missions = "missions.json";
     public const string Districts = "districts.json";
     public const string Names = "names.json";
+    public const string Tiles = "tiles.json";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -69,7 +70,11 @@ public static class GameDataFiles
         Missions,
         Districts,
         Names,
+        Tiles,
     ];
+
+    /// <summary>Map files under <c>data/maps/</c>, as paths relative to <c>data/</c>.</summary>
+    public static IReadOnlyList<string> Maps { get; } = ["maps/test-yard.json"];
 }
 
 /// <summary>Every content definition, loaded from JSON, with id lookup and validation.</summary>
@@ -106,7 +111,8 @@ public sealed class GameData
             FirstNames = [],
             LastNames = [],
             Nicknames = [],
-        }
+        },
+        []
     );
 
     public GameData(
@@ -123,7 +129,8 @@ public sealed class GameData
         IEnumerable<WorkshopItemDef> workshop,
         IEnumerable<MissionTypeDef> missions,
         IEnumerable<DistrictDef> districts,
-        NameLists names
+        NameLists names,
+        IEnumerable<TileDef> tiles
     )
     {
         Weapons = new(weapons);
@@ -140,6 +147,7 @@ public sealed class GameData
         Missions = new(missions);
         Districts = new(districts);
         Names = names;
+        Tiles = new(tiles);
     }
 
     public DefTable<WeaponDef> Weapons { get; }
@@ -156,10 +164,19 @@ public sealed class GameData
     public DefTable<MissionTypeDef> Missions { get; }
     public DefTable<DistrictDef> Districts { get; }
     public NameLists Names { get; }
+    public DefTable<TileDef> Tiles { get; }
 
     /// <summary>The weapon of a class at a tier (1 = Ballistic, 2 = Coil, 3 = Arc).</summary>
     public WeaponDef Weapon(WeaponClass weaponClass, int tier) =>
         Weapons.First(w => w.Class == weaponClass && w.Tier == tier);
+
+    /// <summary>Parses a map file (see <see cref="GameDataFiles.Maps"/>) against the tile data.</summary>
+    public Tactical.TacticalMap LoadMap(string json) =>
+        Tactical.MapParser.Parse(
+            JsonSerializer.Deserialize(json, RulesJsonContext.Default.MapFile)
+                ?? throw new InvalidDataException("map file is empty"),
+            Tiles
+        );
 
     /// <summary>
     /// Parses every data file. <paramref name="readFile"/> maps a file name from
@@ -182,7 +199,8 @@ public sealed class GameData
             Read(readFile, GameDataFiles.Workshop, ctx.ListWorkshopItemDef),
             Read(readFile, GameDataFiles.Missions, ctx.ListMissionTypeDef),
             Read(readFile, GameDataFiles.Districts, ctx.ListDistrictDef),
-            Read(readFile, GameDataFiles.Names, ctx.NameLists)
+            Read(readFile, GameDataFiles.Names, ctx.NameLists),
+            Read(readFile, GameDataFiles.Tiles, ctx.ListTileDef)
         );
     }
 

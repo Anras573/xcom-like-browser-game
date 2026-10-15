@@ -47,6 +47,14 @@ public static class BootSteps
                         throw new InvalidDataException(
                             "Game data is invalid:\n" + string.Join('\n', errors)
                         );
+                    var maps = new List<MapSource>();
+                    foreach (var file in GameDataFiles.Maps)
+                    {
+                        var json = await http.GetStringAsync($"data/{file}");
+                        // Parse now so a broken map fails the boot with its line and column.
+                        maps.Add(new MapSource(data.LoadMap(json).Id, json));
+                    }
+                    ctx.MapSources = maps;
                     ctx.Install(registry!, data);
                 }
             ),

@@ -17,6 +17,9 @@ public static class RenderLayers
     /// <summary>Props <see cref="Tilemap"/>: walls, crates, trees.</summary>
     public const int Props = 20;
 
+    /// <summary>Details on top of props (window glass).</summary>
+    public const int PropsDetail = 21;
+
     public const int Units = 30;
 
     /// <summary>Move-range and similar tile highlights; above props, below units and world text, so they tint neither.</summary>
@@ -40,6 +43,7 @@ public static class RenderLayers
         Ground,
         GroundDecal,
         Props,
+        PropsDetail,
         Highlights,
         Units,
         UnitOverlay,

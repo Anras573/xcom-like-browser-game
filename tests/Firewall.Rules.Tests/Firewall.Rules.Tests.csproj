@@ -19,6 +19,11 @@
       Link="data\%(Filename)%(Extension)"
       CopyToOutputDirectory="PreserveNewest"
     />
+    <Content
+      Include="..\..\src\Firewall.Web\wwwroot\data\maps\*.json"
+      Link="data\maps\%(Filename)%(Extension)"
+      CopyToOutputDirectory="PreserveNewest"
+    />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Firewall.Rules\Firewall.Rules.csproj" />

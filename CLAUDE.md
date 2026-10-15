@@ -18,6 +18,7 @@ dotnet tool restore && dotnet csharpier format .   # format (CI runs `dotnet csh
 
 - `src/Firewall.Rules`: pure C# rules library. No package or project references.
 - `src/Firewall.Web/wwwroot/data/*.json`: game content (weapons, enemies, research, ...). Loaded into `GameData` at boot and linked into the rules tests; `GameData.Validate()` must return no errors. Records in `Firewall.Rules.Data` use `init` properties: source generation overwrites unset `init` props with `default`, so optional collections go through null-normalising backing fields and non-zero scalars are `[JsonRequired]`.
+- Maps are text files in `wwwroot/data/maps/*.json` (rows top first; `GridPos` is +Y up). `MapParser` is the only parser, tile properties come from `data/tiles.json`, and each map must be listed in `GameDataFiles.Maps`. `MapTilemaps` renders a `TacticalMap` with Yaeger `Tilemap`s; the "Map Viewer" debug scene shows it.
 - `src/Firewall.Web`: Blazor WASM host and all presentation, built on Yaeger.
 - `tests/Firewall.Rules.Tests`: xUnit tests.
 - `external/Yaeger`: engine, a git submodule (excluded from csharpier via `.csharpierignore`).
@@ -66,4 +67,4 @@ cd ../.. && dotnet build && dotnet test
 git add external/Yaeger && git commit -m "Bump Yaeger to <commit>"
 ```
 
-The pin must be `8d33292` or later (browser parity, the half-texel UV inset, Yaeger #315/#317, `IInputState.IsMouseInside`, Yaeger #319, and the game loop owning the input frame so edges survive into the screen pass, Yaeger #321).
+The pin must be `217a137` or later (browser parity, the half-texel UV inset, Yaeger #315/#317, `IInputState.IsMouseInside`, Yaeger #319, the game loop owning the input frame so edges survive into the screen pass, Yaeger #321, and `centroid` UVs so atlas neighbours don't bleed at minified tile edges, Yaeger #322/#323).
