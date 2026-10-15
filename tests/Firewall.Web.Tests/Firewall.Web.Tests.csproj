@@ -13,6 +13,14 @@
     <Using Include="Xunit" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The real content, so tests exercise the same files the browser loads. -->
+    <Content
+      Include="..\..\src\Firewall.Web\wwwroot\data\*.json"
+      Link="data\%(Filename)%(Extension)"
+      CopyToOutputDirectory="PreserveNewest"
+    />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Firewall.Web\Firewall.Web.csproj" />
   </ItemGroup>
 </Project>

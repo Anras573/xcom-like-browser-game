@@ -55,7 +55,7 @@ public sealed class TitleScene : SceneBase
             tooltip: "Coming soon"
         );
         if (ui.Button(new UiRect(x, y + 64, w, 48), "Skirmish (debug)"))
-            Ctx.Scenes.Push(new PickingTestScene());
+            Ctx.Scenes.Push(new SkirmishScene());
         if (ui.Button(new UiRect(x, y + 128, w, 48), "Debug Menu"))
             Ctx.Scenes.Push(new DebugMenuScene());
     }
