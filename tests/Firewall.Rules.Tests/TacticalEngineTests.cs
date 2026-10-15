@@ -238,6 +238,90 @@ public class TacticalEngineTests
         Assert.Contains(events, ev => ev is StatusAdded);
     }
 
+    private sealed class RollingHandler(List<int> rolls) : IAbilityHandler
+    {
+        public ValidationResult Validate(AbilityContext ctx)
+        {
+            ctx.Rng.Next(0, 1_000_000); // must not advance the real stream
+            return ValidationResult.Ok;
+        }
+
+        public void Execute(AbilityContext ctx) => rolls.Add(ctx.Rng.Next(0, 1_000_000));
+    }
+
+    [Fact]
+    public void EachAbilityUseGetsDifferentRollsAndReplayMatches()
+    {
+        var abilityId = "hunker_down";
+        var registry = new AbilityRegistry();
+        var rolls = new List<int>();
+        registry.Register(abilityId, new RollingHandler(rolls));
+        var def = Data.Abilities[abilityId];
+
+        TacticalEngine Make(ulong seed)
+        {
+            var e = new TacticalEngine(Skirmish(seed), Data, abilities: registry);
+            foreach (var u in e.State.Units.Where(u => u.Faction == Faction.Firewall))
+                u.Abilities.Add(abilityId);
+            return e;
+        }
+
+        var engine = Make(5);
+        var before = engine.State.StateHash();
+        foreach (var u in engine.State.Units.Where(u => u.Faction == Faction.Firewall).ToList())
+        {
+            // Validating alone leaves the state untouched.
+            Assert.True(
+                engine.Validate(new UseAbilityCommand(u.Id, abilityId, Target.None)).IsValid
+            );
+            Assert.Equal(before, engine.State.StateHash());
+            engine.Execute(new UseAbilityCommand(u.Id, abilityId, Target.None));
+            before = engine.State.StateHash();
+        }
+        Assert.Equal(4, rolls.Count);
+        Assert.Equal(4, rolls.Distinct().Count());
+        Assert.True(def.ApCost <= 2);
+
+        rolls.Clear();
+        var replayed = TacticalEngine.Replay(
+            engine.Log.Seed,
+            engine.Log.Commands,
+            seed =>
+            {
+                var s = Skirmish(seed);
+                foreach (var u in s.Units.Where(u => u.Faction == Faction.Firewall))
+                    u.Abilities.Add(abilityId);
+                return s;
+            },
+            Data,
+            abilities: registry
+        );
+        Assert.Equal(engine.State.StateHash(), replayed.State.StateHash());
+    }
+
+    private sealed class WipeSquadAi : IAiController
+    {
+        public void TakeTurn(TacticalUnit unit, AiContext ctx)
+        {
+            foreach (var s in ctx.State.Units.Where(u => u.Faction == Faction.Firewall))
+                s.IsAlive = false;
+        }
+    }
+
+    [Fact]
+    public void MissionEndedIsTheLastEvent()
+    {
+        var e = new TacticalEngine(Skirmish(1), Data, new WipeSquadAi());
+        foreach (var u in e.State.Units.Where(u => u.Faction == Faction.Meridian))
+            u.IsActive = true;
+        var events = e.EndPlayerPhase();
+        Assert.IsType<MissionEnded>(events[^1]);
+        Assert.DoesNotContain(
+            events,
+            ev => ev is PhaseStarted { Phase: TacticalPhase.Environment }
+        );
+    }
+
     [Fact]
     public void UnregisteredAbilityFailsValidation()
     {

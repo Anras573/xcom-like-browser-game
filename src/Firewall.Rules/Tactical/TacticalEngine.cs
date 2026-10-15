@@ -14,7 +14,6 @@ public sealed class TacticalEngine
     private readonly GameData _data;
     private readonly IAiController _ai;
     private readonly AbilityRegistry _abilities;
-    private readonly IRandom _rng;
 
     public TacticalEngine(
         TacticalState state,
@@ -27,7 +26,6 @@ public sealed class TacticalEngine
         _data = data;
         _ai = ai ?? new NullAiController();
         _abilities = abilities ?? new AbilityRegistry();
-        _rng = state.Rng.Fork("engine");
         Log = new CommandLog(state.Rng is Pcg32Random pcg ? pcg.GetState().Seed : 0UL);
     }
 
@@ -212,7 +210,8 @@ public sealed class TacticalEngine
             return shape;
         if (!_abilities.TryGet(def.Id, out var handler))
             return ValidationResult.Fail($"{def.Name} is not implemented yet.");
-        return handler.Validate(MakeContext(unit, cmd.Target, def, []));
+        // A throwaway stream: validation runs every frame for UI reasons and must not advance the RNG.
+        return handler.Validate(MakeContext(unit, cmd.Target, def, State.Rng.Fork("validate"), []));
     }
 
     private ValidationResult ValidateTargetShape(AbilityDef def, Target target, TacticalUnit user)
@@ -249,8 +248,9 @@ public sealed class TacticalEngine
         TacticalUnit unit,
         Target target,
         AbilityDef def,
+        IRandom rng,
         List<GameEvent> events
-    ) => new(State, unit, target, _data, def, _rng.Fork("ability:" + def.Id), events);
+    ) => new(State, unit, target, _data, def, rng, events);
 
     // ------------------------------------------------------------------ execution
 
@@ -264,7 +264,8 @@ public sealed class TacticalEngine
         if (def.Cooldown > 0)
             unit.Cooldowns[def.Id] = def.Cooldown;
         events.Add(new AbilityUsed(unit.Id, def.Id, cmd.Target));
-        handler.Execute(MakeContext(unit, cmd.Target, def, events));
+        // The state's own stream, so every use rolls differently and the state hash covers it.
+        handler.Execute(MakeContext(unit, cmd.Target, def, State.Rng, events));
     }
 
     private static void SpendAp(TacticalUnit unit, int amount, List<GameEvent> events)
@@ -323,13 +324,17 @@ public sealed class TacticalEngine
         events.Add(new PhaseStarted(TacticalPhase.Enemy, State.TurnNumber));
         foreach (var unit in State.Units.Where(IsEnemyActor).ToList())
         {
-            BeginUnitTurn(unit, events);
             if (State.Result is not null)
                 break;
+            BeginUnitTurn(unit, events);
             if (unit.IsAlive && !unit.Statuses.Stunned)
                 _ai.TakeTurn(unit, new AiContext(this, events));
             CheckMissionEnd(events);
         }
+
+        // MissionEnded is always the last event.
+        if (State.Result is not null)
+            return;
 
         // Environment phase: bleed-outs tick down (relay spawns and timers join with #24 / #33).
         State.Phase = TacticalPhase.Environment;

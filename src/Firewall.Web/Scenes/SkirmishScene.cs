@@ -289,7 +289,9 @@ public sealed class SkirmishScene : SceneBase
         var result = _engine.Validate(move);
         if (result.IsValid)
             return;
-        canvas.Text(result.Reason, ui.Mouse + new Vector2(18f, 18f), TextStyles.Tooltip);
+        var width = canvas.Measure(result.Reason, TextStyles.Tooltip);
+        var x = MathF.Min(ui.Mouse.X + 18f, ui.Space.CanvasRect.Right - width - 4f);
+        canvas.Text(result.Reason, new Vector2(x, ui.Mouse.Y + 18f), TextStyles.Tooltip);
     }
 
     private void DrawBanner(ScreenCanvas canvas, UiContext ui)
