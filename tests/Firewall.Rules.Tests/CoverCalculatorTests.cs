@@ -159,12 +159,11 @@ public class CoverCalculatorTests
     }
 
     [Fact]
-    public void IsFlankedByAnyIgnoresDeadInactiveFriendlyNeutralAndHiddenUnits()
+    public void IsFlankedByAnyIgnoresDeadFriendlyNeutralAndHiddenUnitsButCountsInactivePods()
     {
         var state = State(".....", ".....", ".....", ".c...", ".....");
         var tile = new GridPos(0, 1);
         Add(state, Faction.Meridian, 0, 4, alive: false);
-        Add(state, Faction.Meridian, 0, 3, active: false);
         Add(state, Faction.Firewall, 0, 2);
         Add(state, Faction.Neutral, 0, 4);
         var hidden = Add(state, Faction.Meridian, 0, 4);
@@ -172,5 +171,13 @@ public class CoverCalculatorTests
             CoverCalculator.IsFlankedByAny(state, tile, Faction.Firewall, u => u != hidden)
         );
         Assert.True(CoverCalculator.IsFlankedByAny(state, tile, Faction.Firewall));
+    }
+
+    [Fact]
+    public void InactivePodMembersStillFlank()
+    {
+        var state = State(".....", ".....", ".....", ".c...", ".....");
+        Add(state, Faction.Meridian, 0, 4, active: false);
+        Assert.True(CoverCalculator.IsFlankedByAny(state, new GridPos(0, 1), Faction.Firewall));
     }
 }

@@ -114,6 +114,8 @@ public sealed class SkirmishScene : SceneBase
         _hover = tile is { } t ? _state.UnitAt(t) : null;
         UpdateMoveAnimation(dt);
 
+        if (Ctx.Input.WasKeyPressed(Keys.F8))
+            DebugTeleportEnemy(tile);
         if (Ctx.Input.WasKeyPressed(Keys.F9))
             Console.WriteLine(_engine.Log.ToJson());
         UpdateBanner(dt);
@@ -175,6 +177,21 @@ public sealed class SkirmishScene : SceneBase
                 cover: id == _selected ? StandingCover(unit) : null
             );
         }
+    }
+
+    // Debug (F8): moves the nearest enemy to the hovered free tile, to check the flank shields.
+    private void DebugTeleportEnemy(GridPos? tile)
+    {
+        if (tile is not { } to || !_state.Map.IsWalkable(to) || _state.IsOccupied(to))
+            return;
+        var enemy = _state
+            .Units.Where(u => u.Faction == Faction.Meridian && u.IsAlive)
+            .OrderBy(u => u.Position.DistanceTo(to))
+            .FirstOrDefault();
+        if (enemy is null)
+            return;
+        enemy.Position = to;
+        InvalidateRange();
     }
 
     // Shields on the hovered destination; red when a visible enemy would flank it.
@@ -331,7 +348,7 @@ public sealed class SkirmishScene : SceneBase
             canvas.Text($"Selected: {sel.DisplayName}", new Vector2(16, 70), TextStyles.Body);
 
         canvas.Text(
-            $"Turn {_state.TurnNumber}   {_state.Phase} phase   Backspace: end turn   F9: copy command log",
+            $"Turn {_state.TurnNumber}   {_state.Phase} phase   Backspace: end turn   F8: move nearest enemy here   F9: copy command log",
             new Vector2(16, 92),
             TextStyles.Small
         );
@@ -387,9 +404,11 @@ public sealed class SkirmishScene : SceneBase
             return false;
         var dest = preview.Path[^1];
         var text = MoveRangeOverlay.Label(preview.Ap);
+        var northCover =
+            CoverCalculator.GetProfile(_state.Map, dest).North != CoverLevel.None ? 0.3f : 0f;
         var size = Ctx.Render.CanvasSize;
         var ndc = Vector2.Transform(
-            TacticalCamera.TileCenter(dest.X, dest.Y) + new Vector2(0f, 0.75f),
+            TacticalCamera.TileCenter(dest.X, dest.Y) + new Vector2(0f, 0.75f + northCover),
             _camera.ToCamera2D().ViewProjection(size.X / MathF.Max(size.Y, 1f))
         );
         var at = ui.Space.FromCanvasPixels(Picking.NdcToCanvas(ndc, size));

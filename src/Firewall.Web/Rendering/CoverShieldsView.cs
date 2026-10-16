@@ -13,8 +13,8 @@ namespace Firewall.Web.Rendering;
 /// </summary>
 public sealed class CoverShieldsView
 {
-    private const float Inset = 0.36f; // icon centre, from the tile centre
-    private const float IconSize = 0.34f;
+    private const float Inset = 0.34f; // icon centre, from the tile centre
+    private const float IconSize = 0.44f;
 
     public static readonly Color Normal = new(255, 255, 255, 235);
     public static readonly Color Flanked = new(255, 70, 60, 255);

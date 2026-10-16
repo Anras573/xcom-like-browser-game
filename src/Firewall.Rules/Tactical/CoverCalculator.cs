@@ -77,7 +77,7 @@ public static class CoverCalculator
         cover > best && dot >= Threshold - Epsilon ? cover : best;
 
     /// <summary>
-    /// True when at least one living, active hostile unit that <paramref name="isVisible"/> accepts
+    /// True when at least one living hostile unit (pod members count before their pod activates: the player plans cover against what they see) that <paramref name="isVisible"/> accepts
     /// would flank <paramref name="tile"/>. Neutrals are never hostile. Until fog of war (#21) lands
     /// the default counts every hostile unit as visible.
     /// </summary>
@@ -105,7 +105,6 @@ public static class CoverCalculator
         {
             if (
                 !unit.IsAlive
-                || !unit.IsActive
                 || !IsHostile(faction, unit.Faction)
                 || (isVisible is not null && !isVisible(unit))
             )
