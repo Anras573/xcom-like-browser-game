@@ -35,6 +35,7 @@ public sealed class SkirmishScene : SceneBase
     private float _bannerTime;
     private float _exhaustedTimer = -1f;
     private MapTilemaps? _tilemaps;
+    private CoverShieldsView _shields = null!;
     private UnitId? _selected;
     private MoveRangeOverlay? _range;
     private GridPos? _hoverTile;
@@ -64,6 +65,7 @@ public sealed class SkirmishScene : SceneBase
 
         map.TileChanged += _ => InvalidateRange();
         _tilemaps = MapTilemaps.Build(World, map, Ctx.Assets);
+        _shields = new CoverShieldsView(World, Ctx.Assets);
         foreach (var unit in _state.Units)
             _views[unit.Id] = new UnitView(
                 World,
@@ -112,6 +114,8 @@ public sealed class SkirmishScene : SceneBase
         _hover = tile is { } t ? _state.UnitAt(t) : null;
         UpdateMoveAnimation(dt);
 
+        if (Ctx.Input.WasKeyPressed(Keys.F8))
+            DebugTeleportEnemy(tile);
         if (Ctx.Input.WasKeyPressed(Keys.F9))
             Console.WriteLine(_engine.Log.ToJson());
         UpdateBanner(dt);
@@ -154,6 +158,7 @@ public sealed class SkirmishScene : SceneBase
             }
         }
 
+        SyncShields();
         foreach (var (id, view) in _views)
         {
             var unit = _state.Unit(id);
@@ -165,9 +170,54 @@ public sealed class SkirmishScene : SceneBase
             }
             view.VisualCenter =
                 _moving is { } m && m.Unit == id ? m.Tween.Position(m.Elapsed, out _) : null;
-            view.Sync(selected: id == _selected, showOverlay: ShowOverlay(unit), time: _time);
+            view.Sync(
+                selected: id == _selected,
+                showOverlay: ShowOverlay(unit),
+                time: _time,
+                cover: id == _selected ? StandingCover(unit) : null
+            );
         }
     }
+
+    // Debug (F8): moves the nearest enemy to the hovered free tile, to check the flank shields.
+    private void DebugTeleportEnemy(GridPos? tile)
+    {
+        if (tile is not { } to || !_state.Map.IsWalkable(to) || _state.IsOccupied(to))
+            return;
+        var enemy = _state
+            .Units.Where(u => u.Faction == Faction.Meridian && u.IsAlive)
+            .OrderBy(u => u.Position.DistanceTo(to))
+            .FirstOrDefault();
+        if (enemy is null)
+            return;
+        enemy.Position = to;
+        InvalidateRange();
+    }
+
+    // Shields on the hovered destination; red when a visible enemy would flank it.
+    private void SyncShields()
+    {
+        var dest =
+            !IsMoving && _hover is null && Range() is { } range
+                ? range.PreviewTo(_hoverTile) is { } p
+                    ? p.Path[^1]
+                    : (GridPos?)null
+                : null;
+        _shields.Sync(
+            _state.Map,
+            dest,
+            dest is { } d && CoverCalculator.IsFlankedByAny(_state, d, Faction.Firewall, IsVisible)
+        );
+    }
+
+    // Cover against the most threatening visible enemy; null when none is in view.
+    private CoverResult? StandingCover(TacticalUnit unit) =>
+        unit.Faction == Faction.Firewall && unit.IsAlive
+            ? CoverCalculator.MostThreatening(_state, unit.Position, unit.Faction, IsVisible)
+            : null;
+
+    // Until fog of war (#21) every living enemy counts as visible.
+    private static bool IsVisible(TacticalUnit unit) => true;
 
     private MoveCommand? MoveAttempt(GridPos dest) =>
         Selected is { } unit ? new MoveCommand(unit.Id, dest) : null;
@@ -298,7 +348,7 @@ public sealed class SkirmishScene : SceneBase
             canvas.Text($"Selected: {sel.DisplayName}", new Vector2(16, 70), TextStyles.Body);
 
         canvas.Text(
-            $"Turn {_state.TurnNumber}   {_state.Phase} phase   Backspace: end turn   F9: copy command log",
+            $"Turn {_state.TurnNumber}   {_state.Phase} phase   Backspace: end turn   F8: move nearest enemy here   F9: copy command log",
             new Vector2(16, 92),
             TextStyles.Small
         );
@@ -354,9 +404,11 @@ public sealed class SkirmishScene : SceneBase
             return false;
         var dest = preview.Path[^1];
         var text = MoveRangeOverlay.Label(preview.Ap);
+        var northCover =
+            CoverCalculator.GetProfile(_state.Map, dest).North != CoverLevel.None ? 0.3f : 0f;
         var size = Ctx.Render.CanvasSize;
         var ndc = Vector2.Transform(
-            TacticalCamera.TileCenter(dest.X, dest.Y) + new Vector2(0f, 0.75f),
+            TacticalCamera.TileCenter(dest.X, dest.Y) + new Vector2(0f, 0.75f + northCover),
             _camera.ToCamera2D().ViewProjection(size.X / MathF.Max(size.Y, 1f))
         );
         var at = ui.Space.FromCanvasPixels(Picking.NdcToCanvas(ndc, size));

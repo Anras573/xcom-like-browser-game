@@ -61,7 +61,7 @@ public sealed class MoveRangeOverlay
             overlay.FillRect(r.Min, r.Size, YellowLine);
     }
 
-    /// <summary>Path segments and dots, a destination marker and cover shields.</summary>
+    /// <summary>Path segments and dots, and a destination marker (cover shields: <see cref="CoverShieldsView"/>).</summary>
     public static void DrawPreview(WorldOverlay overlay, IReadOnlyList<GridPos> path, int ap)
     {
         var color = ap == 1 ? BlueLine : YellowLine;
@@ -74,14 +74,10 @@ public sealed class MoveRangeOverlay
         var dest = path[^1];
         overlay.OutlineTile(dest.X, dest.Y, 0.06f, color);
         DrawDot(overlay, Center(dest), 0.28f, color with { W = 0.85f });
-        DrawCoverShields(overlay, dest);
     }
 
     /// <summary>"1 AP" or "2 AP (Dash)".</summary>
     public static string Label(int ap) => ap == 1 ? "1 AP" : "2 AP (Dash)";
-
-    // Stub: the cover system (#20) draws the shields for the tile's neighbours here.
-    private static void DrawCoverShields(WorldOverlay overlay, GridPos dest) { }
 
     private static Vector2 Center(GridPos p) => new(p.X + 0.5f, p.Y + 0.5f);
 

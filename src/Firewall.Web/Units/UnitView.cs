@@ -62,7 +62,7 @@ public sealed class UnitView
         world.AddComponent(_ring, new AnimationState(ring.FrameIndex));
         world.AddComponent(_ring, RenderLayers.Of(RenderLayers.Highlights));
 
-        _icons = new Entity[3];
+        _icons = new Entity[4];
         for (var i = 0; i < _icons.Length; i++)
         {
             _icons[i] = world.CreateEntity();
@@ -86,7 +86,8 @@ public sealed class UnitView
     /// <param name="selected">Draw the pulsing selection ring.</param>
     /// <param name="showOverlay">Draw HP pips and status icons (soldiers always, enemies when seen).</param>
     /// <param name="time">Scene time in seconds, for the ring pulse.</param>
-    public void Sync(bool selected, bool showOverlay, float time)
+    /// <param name="cover">Cover against the most threatening visible enemy; draws a shield for half or full cover.</param>
+    public void Sync(bool selected, bool showOverlay, float time, CoverResult? cover = null)
     {
         var unit = Unit;
         var center = VisualCenter ?? TacticalCamera.TileCenter(unit.Position.X, unit.Position.Y);
@@ -112,7 +113,7 @@ public sealed class UnitView
 
         var top = center.Y + 0.5f * _scale + 0.08f;
         SyncPips(center.X, top, showOverlay);
-        SyncIcons(center.X, top + PipRows() * (PipHeight + PipGap) + 0.05f, showOverlay);
+        SyncIcons(center.X, top + PipRows() * (PipHeight + PipGap) + 0.05f, showOverlay, cover);
     }
 
     private int PipRows() => Math.Max(1, (Unit.MaxHp + Unit.Armor + PipsPerRow - 1) / PipsPerRow);
@@ -155,9 +156,12 @@ public sealed class UnitView
         }
     }
 
-    private void SyncIcons(float centerX, float bottom, bool show)
+    private void SyncIcons(float centerX, float bottom, bool show, CoverResult? cover)
     {
-        var names = UnitPresentation.StatusIcons(Unit.Statuses);
+        var names = new List<string>();
+        if (cover is { } c && CoverShieldsView.FrameName(c.Level) is { } shield)
+            names.Add(shield);
+        names.AddRange(UnitPresentation.StatusIcons(Unit.Statuses));
         for (var i = 0; i < _icons.Length; i++)
         {
             if (!show || i >= names.Count)
