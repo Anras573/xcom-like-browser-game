@@ -36,6 +36,8 @@ public sealed class SkirmishScene : SceneBase
     private float _exhaustedTimer = -1f;
     private MapTilemaps? _tilemaps;
     private CoverShieldsView _shields = null!;
+    private FogView _fog = null!;
+    private bool _fogEnabled = true;
     private UnitId? _selected;
     private MoveRangeOverlay? _range;
     private GridPos? _hoverTile;
@@ -66,6 +68,7 @@ public sealed class SkirmishScene : SceneBase
         map.TileChanged += _ => InvalidateRange();
         _tilemaps = MapTilemaps.Build(World, map, Ctx.Assets);
         _shields = new CoverShieldsView(World, Ctx.Assets);
+        _fog = new FogView(World, map.Width, map.Height);
         foreach (var unit in _state.Units)
             _views[unit.Id] = new UnitView(
                 World,
@@ -111,9 +114,12 @@ public sealed class SkirmishScene : SceneBase
         _controller.Update(dt, canvas, Ctx.Ui.PointerOverUi);
         var tile = Ctx.Ui.PointerOverUi ? null : PickTile(canvas);
         _hoverTile = tile;
-        _hover = tile is { } t ? _state.UnitAt(t) : null;
+        _hover =
+            tile is { } t && _state.UnitAt(t) is { } hovered && IsVisible(hovered) ? hovered : null;
         UpdateMoveAnimation(dt);
 
+        if (Ctx.Input.WasKeyPressed(Keys.F2))
+            _fogEnabled = !_fogEnabled;
         if (Ctx.Input.WasKeyPressed(Keys.F8))
             DebugTeleportEnemy(tile);
         if (Ctx.Input.WasKeyPressed(Keys.F9))
@@ -159,6 +165,7 @@ public sealed class SkirmishScene : SceneBase
         }
 
         SyncShields();
+        _fog.Sync(_fogEnabled ? _state.PlayerVision : null);
         foreach (var (id, view) in _views)
         {
             var unit = _state.Unit(id);
@@ -174,7 +181,8 @@ public sealed class SkirmishScene : SceneBase
                 selected: id == _selected,
                 showOverlay: ShowOverlay(unit),
                 time: _time,
-                cover: id == _selected ? StandingCover(unit) : null
+                cover: id == _selected ? StandingCover(unit) : null,
+                visible: IsVisible(unit)
             );
         }
     }
@@ -191,6 +199,7 @@ public sealed class SkirmishScene : SceneBase
         if (enemy is null)
             return;
         enemy.Position = to;
+        _state.RefreshVision();
         InvalidateRange();
     }
 
@@ -216,8 +225,9 @@ public sealed class SkirmishScene : SceneBase
             ? CoverCalculator.MostThreatening(_state, unit.Position, unit.Faction, IsVisible)
             : null;
 
-    // Until fog of war (#21) every living enemy counts as visible.
-    private static bool IsVisible(TacticalUnit unit) => true;
+    // Hostiles on tiles the squad cannot see are not drawn, hovered or targeted (F2 turns fog off).
+    private bool IsVisible(TacticalUnit unit) =>
+        !_fogEnabled || _state.PlayerVision.IsUnitVisible(unit);
 
     private MoveCommand? MoveAttempt(GridPos dest) =>
         Selected is { } unit ? new MoveCommand(unit.Id, dest) : null;
@@ -298,8 +308,8 @@ public sealed class SkirmishScene : SceneBase
 
     private const float BannerSeconds = 0.9f;
 
-    // Soldiers always; enemies once fog of war can say they're visible (until then, all are).
-    private static bool ShowOverlay(TacticalUnit unit) => unit.IsAlive;
+    // Soldiers always; enemies while visible.
+    private bool ShowOverlay(TacticalUnit unit) => unit.IsAlive && IsVisible(unit);
 
     private void CycleSelection(List<TacticalUnit> soldiers, int step)
     {
@@ -348,7 +358,7 @@ public sealed class SkirmishScene : SceneBase
             canvas.Text($"Selected: {sel.DisplayName}", new Vector2(16, 70), TextStyles.Body);
 
         canvas.Text(
-            $"Turn {_state.TurnNumber}   {_state.Phase} phase   Backspace: end turn   F8: move nearest enemy here   F9: copy command log",
+            $"Turn {_state.TurnNumber}   {_state.Phase} phase   Backspace: end turn   F2: fog   F8: move nearest enemy here   F9: copy command log",
             new Vector2(16, 92),
             TextStyles.Small
         );

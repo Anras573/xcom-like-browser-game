@@ -22,6 +22,9 @@ public static class RenderLayers
 
     public const int Units = 30;
 
+    /// <summary>Fog of war: above units, below HP pips and other world UI.</summary>
+    public const int Fog = 35;
+
     /// <summary>Move-range and similar tile highlights; above props, below units and world text, so they tint neither.</summary>
     public const int Highlights = 25;
 
@@ -46,6 +49,7 @@ public static class RenderLayers
         PropsDetail,
         Highlights,
         Units,
+        Fog,
         UnitOverlay,
         Fx,
         WorldTextShadow,

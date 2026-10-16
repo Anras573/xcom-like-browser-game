@@ -1,4 +1,5 @@
 using Firewall.Rules.Rng;
+using Firewall.Rules.Tactical.Vision;
 
 namespace Firewall.Rules.Tactical;
 
@@ -12,8 +13,8 @@ public sealed class ObjectiveState(string missionId)
 }
 
 /// <summary>
-/// Everything a tactical mission is made of: map, units, turn, RNG and objective. Visibility
-/// (fog of war) joins it with the line-of-sight work.
+/// Everything a tactical mission is made of: map, units, turn, RNG, objective and what each side
+/// sees. Visibility is derived from the rest, so it is not part of <see cref="StateHash"/>.
 /// </summary>
 public sealed class TacticalState(TacticalMap map, IRandom rng, string missionId = "purge")
 {
@@ -21,6 +22,8 @@ public sealed class TacticalState(TacticalMap map, IRandom rng, string missionId
     private readonly List<Pod> _pods = [];
     private int _nextUnitId = 1;
     private int _nextPodId = 1;
+    private VisibilityMap? _playerVision;
+    private VisibilityMap? _enemyVision;
 
     public TacticalMap Map { get; } = map;
     public IRandom Rng { get; } = rng;
@@ -35,6 +38,23 @@ public sealed class TacticalState(TacticalMap map, IRandom rng, string missionId
     public IReadOnlyList<TacticalUnit> Units => _units;
 
     public IReadOnlyList<Pod> Pods => _pods;
+
+    /// <summary>What the squad sees (fog of war).</summary>
+    public VisibilityMap PlayerVision =>
+        _playerVision ??= new VisibilityMap(this, Faction.Firewall);
+
+    /// <summary>What Meridian sees; with its last-known soldier positions, the AI's knowledge.</summary>
+    public VisibilityMap EnemyVision => _enemyVision ??= new VisibilityMap(this, Faction.Meridian);
+
+    /// <summary>
+    /// Recomputes both sides' vision. Returns the squad's <see cref="VisibilityChanged"/> when the
+    /// set of visible enemies changed.
+    /// </summary>
+    public VisibilityChanged? RefreshVision()
+    {
+        EnemyVision.Recompute();
+        return PlayerVision.Recompute();
+    }
 
     public UnitId NextUnitId() => new(_nextUnitId++);
 

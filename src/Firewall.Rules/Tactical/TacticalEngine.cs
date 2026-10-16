@@ -27,6 +27,7 @@ public sealed class TacticalEngine
         _ai = ai ?? new NullAiController();
         _abilities = abilities ?? new AbilityRegistry();
         Log = new CommandLog(state.Rng is Pcg32Random pcg ? pcg.GetState().Seed : 0UL);
+        State.RefreshVision();
     }
 
     public TacticalState State { get; }
@@ -114,6 +115,9 @@ public sealed class TacticalEngine
                 ExecuteAbility(a, sink);
                 break;
         }
+        // Tile changes and ability effects can alter what is seen; steps already refreshed.
+        if (State.Result is null && State.RefreshVision() is { } vision)
+            sink.Add(vision);
         CheckMissionEnd(sink);
         if (!wasExhausted && AllSoldiersExhausted)
             sink.Add(new AllSoldiersExhausted());
@@ -291,6 +295,9 @@ public sealed class TacticalEngine
             segment.Add(step);
 
             var stepEvents = new List<GameEvent>();
+            // Before the hooks, so they (reaction fire, pod activation) see the new view.
+            if (State.RefreshVision() is { } vision)
+                stepEvents.Add(vision);
             var ctx = new StepContext(State, unit, from, step, stepEvents);
             var interrupted = false;
             foreach (var hook in StepHooks)

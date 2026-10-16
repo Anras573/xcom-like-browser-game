@@ -13,6 +13,7 @@ public sealed class TacticalMap
 {
     private readonly TileType[] _tiles; // index = y * Width + x
     private readonly TileDef[] _defs; // indexed by (int)TileType
+    private readonly bool[] _blocksLos; // same index as _tiles; line-of-sight traces read it a lot
 
     public TacticalMap(
         string id,
@@ -39,6 +40,9 @@ public sealed class TacticalMap
         _defs = new TileDef[Enum.GetValues<TileType>().Length];
         foreach (var def in defs)
             _defs[(int)def.Type] = def;
+        _blocksLos = new bool[tiles.Length];
+        for (var i = 0; i < tiles.Length; i++)
+            _blocksLos[i] = _defs[(int)tiles[i]].BlocksLos;
         PlayerSpawns = playerSpawns;
         EnemySpawns = enemySpawns;
         EvacTiles = evacTiles;
@@ -84,7 +88,11 @@ public sealed class TacticalMap
         InBounds(pos) ? Def(this[pos]).Cover : CoverLevel.None;
 
     /// <summary>True outside the map, so rays stop at its edge.</summary>
-    public bool BlocksLos(GridPos pos) => !InBounds(pos) || Def(this[pos]).BlocksLos;
+    public bool BlocksLos(GridPos pos) => !InBounds(pos) || _blocksLos[pos.Y * Width + pos.X];
+
+    /// <summary><see cref="BlocksLos(GridPos)"/> without building a <see cref="GridPos"/>; the hot path of line-of-sight traces.</summary>
+    internal bool BlocksLos(int x, int y) =>
+        x < 0 || y < 0 || x >= Width || y >= Height || _blocksLos[y * Width + x];
 
     /// <summary>Replaces a tile and raises <see cref="TileChanged"/> if it differs.</summary>
     public void SetTile(GridPos pos, TileType type)
@@ -93,6 +101,7 @@ public sealed class TacticalMap
         if (old == type)
             return;
         _tiles[pos.Y * Width + pos.X] = type;
+        _blocksLos[pos.Y * Width + pos.X] = Def(type).BlocksLos;
         TileChanged?.Invoke(new TileChange(pos, old, type));
     }
 }
