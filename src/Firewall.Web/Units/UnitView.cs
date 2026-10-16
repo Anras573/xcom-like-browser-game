@@ -75,6 +75,9 @@ public sealed class UnitView
     /// <summary>Body rotation in radians; sprites face +X at 0.</summary>
     public float Rotation { get; set; }
 
+    /// <summary>Where to draw the unit instead of its tile, e.g. mid-move tween; null draws it on its tile.</summary>
+    public Vector2? VisualCenter { get; set; }
+
     /// <summary>True for the frame(s) the unit plays its reload pose.</summary>
     public bool Reloading { get; set; }
 
@@ -86,7 +89,7 @@ public sealed class UnitView
     public void Sync(bool selected, bool showOverlay, float time)
     {
         var unit = Unit;
-        var center = TacticalCamera.TileCenter(unit.Position.X, unit.Position.Y);
+        var center = VisualCenter ?? TacticalCamera.TileCenter(unit.Position.X, unit.Position.Y);
 
         var frameName = UnitPresentation.BodyFrame(unit, _enemy, Reloading);
         var frame = _assets.Frame(frameName);

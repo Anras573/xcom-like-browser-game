@@ -36,6 +36,10 @@ public sealed class SkirmishScene : SceneBase
     private float _exhaustedTimer = -1f;
     private MapTilemaps? _tilemaps;
     private UnitId? _selected;
+    private MoveRangeOverlay? _range;
+    private GridPos? _hoverTile;
+    private readonly Queue<(UnitId Unit, MoveTween Tween)> _moves = new();
+    private (UnitId Unit, MoveTween Tween, float Elapsed)? _moving;
     private TacticalUnit? _hover;
     private float _time;
 
@@ -58,6 +62,7 @@ public sealed class SkirmishScene : SceneBase
         PodSpawner.Spawn(_state, Ctx.Data, Pods, rng.Fork("pods"));
         _engine = new TacticalEngine(_state, Ctx.Data);
 
+        map.TileChanged += _ => InvalidateRange();
         _tilemaps = MapTilemaps.Build(World, map, Ctx.Assets);
         foreach (var unit in _state.Units)
             _views[unit.Id] = new UnitView(
@@ -84,6 +89,7 @@ public sealed class SkirmishScene : SceneBase
     private void Select(TacticalUnit unit, bool instant = false)
     {
         _selected = unit.Id;
+        InvalidateRange();
         _controller.FocusOn(
             TacticalCamera.TileCenter(unit.Position.X, unit.Position.Y),
             instant ? 0f : 0.35f
@@ -102,7 +108,9 @@ public sealed class SkirmishScene : SceneBase
         var canvas = Ctx.Render.CanvasSize;
         _controller.Update(dt, canvas, Ctx.Ui.PointerOverUi);
         var tile = Ctx.Ui.PointerOverUi ? null : PickTile(canvas);
+        _hoverTile = tile;
         _hover = tile is { } t ? _state.UnitAt(t) : null;
+        UpdateMoveAnimation(dt);
 
         if (Ctx.Input.WasKeyPressed(Keys.F9))
             Console.WriteLine(_engine.Log.ToJson());
@@ -116,7 +124,7 @@ public sealed class SkirmishScene : SceneBase
             Play(_engine.EndPlayerPhase());
         else if (_exhaustedTimer >= 0f && (_exhaustedTimer -= dt) < 0f)
             Play(_engine.EndPlayerPhase());
-        if (soldiers.Count > 0)
+        if (soldiers.Count > 0 && !IsMoving)
         {
             if (Ctx.Bindings.WasPressed(GameAction.NextUnit))
                 CycleSelection(soldiers, Ctx.Input.IsKeyPressed(Keys.Shift) ? -1 : 1);
@@ -131,11 +139,14 @@ public sealed class SkirmishScene : SceneBase
             else if (
                 tile is { } dest
                 && _hover is null
-                && MoveAttempt(dest) is { } move
+                && Selected is { } mover
+                && Range()?.Zones.ApCostTo(dest) is not null
                 && !Ctx.Ui.PointerOverUi
                 && Ctx.Clicks.ConsumeClick()
             )
             {
+                // Outside the range nothing happens; inside it the engine has the final say.
+                var move = new MoveCommand(mover.Id, dest);
                 if (_engine.Validate(move) is { IsValid: false } bad)
                     Ctx.Ui.Toast(bad.Reason);
                 else
@@ -152,6 +163,8 @@ public sealed class SkirmishScene : SceneBase
                 _views.Remove(id);
                 continue;
             }
+            view.VisualCenter =
+                _moving is { } m && m.Unit == id ? m.Tween.Position(m.Elapsed, out _) : null;
             view.Sync(selected: id == _selected, showOverlay: ShowOverlay(unit), time: _time);
         }
     }
@@ -159,19 +172,61 @@ public sealed class SkirmishScene : SceneBase
     private MoveCommand? MoveAttempt(GridPos dest) =>
         Selected is { } unit ? new MoveCommand(unit.Id, dest) : null;
 
+    /// <summary>A move is playing back; input is locked until it ends.</summary>
+    private bool IsMoving => _moving is not null || _moves.Count > 0;
+
+    private void InvalidateRange() => _range = null;
+
+    // Computed on demand and kept until the selection, the state or the map changes.
+    private MoveRangeOverlay? Range()
+    {
+        if (_range is not null)
+            return _range;
+        if (
+            Selected is not { IsAlive: true } unit
+            || unit.Faction != Faction.Firewall
+            || _state.Phase != TacticalPhase.Player
+            || _state.Result is not null
+            || unit.Statuses.Stunned
+        )
+            return null;
+        return _range = new MoveRangeOverlay(Pathfinder.MoveRange(_state, unit));
+    }
+
+    private void UpdateMoveAnimation(float dt)
+    {
+        if (_moving is null && _moves.Count > 0)
+        {
+            var (unit, tween) = _moves.Dequeue();
+            _moving = (unit, tween, 0f);
+        }
+        if (_moving is not { } m)
+            return;
+        var elapsed = m.Elapsed + dt;
+        if (_views.TryGetValue(m.Unit, out var view))
+        {
+            var pos = m.Tween.Position(elapsed, out var dir);
+            view.FaceToward(dir);
+            // Gentle follow: re-aim a short ease at the walker every frame.
+            if (m.Unit == _selected)
+                _controller.FocusOn(pos, 0.2f);
+        }
+        _moving = m.Tween.IsDone(elapsed) ? null : m with { Elapsed = elapsed };
+        if (_moving is null)
+            InvalidateRange();
+    }
+
     // Temporary: events are applied straight away (views read the state, so units jump). The
     // event player (#28) animates from a view model instead and must not read the state.
     private void Play(IReadOnlyList<GameEvent> events)
     {
+        InvalidateRange();
         foreach (var e in events)
         {
             if (e is PhaseStarted p)
                 _banners.Enqueue(p);
-            if (e is UnitMoved moved && moved.Unit == _selected)
-                _controller.FocusOn(
-                    TacticalCamera.TileCenter(moved.Path[^1].X, moved.Path[^1].Y),
-                    0.25f
-                );
+            if (e is UnitMoved moved)
+                _moves.Enqueue((moved.Unit, new MoveTween(moved.Path)));
         }
         // "All soldiers exhausted": end the turn after a short beat.
         _exhaustedTimer = events.Any(e => e is AllSoldiersExhausted) ? 0.8f : -1f;
@@ -222,6 +277,15 @@ public sealed class SkirmishScene : SceneBase
         return _state.Map.InBounds(pos) ? pos : null;
     }
 
+    protected override void DrawWorld(WorldOverlay overlay)
+    {
+        if (IsMoving || Range() is not { } range)
+            return;
+        range.Draw(overlay);
+        if (_hover is null && range.PreviewTo(_hoverTile) is { } preview)
+            MoveRangeOverlay.DrawPreview(overlay, preview.Path, preview.Ap);
+    }
+
     protected override void DrawScreen(ScreenCanvas canvas, UiContext ui)
     {
         canvas.Text("Skirmish (debug)", new Vector2(16, 12), TextStyles.Heading);
@@ -260,8 +324,11 @@ public sealed class SkirmishScene : SceneBase
 
         if (_hover is { } unit)
             DrawTooltip(canvas, ui, unit);
-        else if (!ui.PointerOverUi)
-            DrawMoveReason(canvas, ui);
+        else if (!ui.PointerOverUi && !IsMoving)
+        {
+            if (!DrawPreviewLabel(canvas, ui))
+                DrawMoveReason(canvas, ui);
+        }
 
         DrawBanner(canvas, ui);
     }
@@ -278,6 +345,24 @@ public sealed class SkirmishScene : SceneBase
             );
             y += 18f;
         }
+    }
+
+    // "1 AP" / "2 AP (Dash)" above the hovered destination; false if there is no preview.
+    private bool DrawPreviewLabel(ScreenCanvas canvas, UiContext ui)
+    {
+        if (Range() is not { } range || range.PreviewTo(_hoverTile) is not { } preview)
+            return false;
+        var dest = preview.Path[^1];
+        var text = MoveRangeOverlay.Label(preview.Ap);
+        var size = Ctx.Render.CanvasSize;
+        var ndc = Vector2.Transform(
+            TacticalCamera.TileCenter(dest.X, dest.Y) + new Vector2(0f, 0.75f),
+            _camera.ToCamera2D().ViewProjection(size.X / MathF.Max(size.Y, 1f))
+        );
+        var at = ui.Space.FromCanvasPixels(Picking.NdcToCanvas(ndc, size));
+        var width = canvas.Measure(text, TextStyles.Tooltip);
+        canvas.Text(text, at - new Vector2(width / 2f, 8f), TextStyles.Tooltip);
+        return true;
     }
 
     // Why a move to the hovered tile is not allowed, next to the cursor.

@@ -174,20 +174,14 @@ public sealed class TacticalEngine
             return ValidationResult.Fail("That tile cannot be walked on.");
         if (State.IsOccupied(cmd.Dest))
             return ValidationResult.Fail("That tile is occupied.");
-        var plan = MovePlanner.Plan(State, unit, cmd.Dest);
-        if (plan is null)
-            return ValidationResult.Fail("There is no path to that tile.");
-        var cost = ApCostOf(unit, plan);
-        if (cost is null)
+        var reachable = Pathfinder.Reachable(State, unit, unit.Mobility * 4);
+        if (
+            reachable.CostTo(cmd.Dest) is not { } pathCost
+            || Pathfinder.ApCost(unit.Mobility, pathCost) is not { } cost
+        )
             return ValidationResult.Fail("That tile is out of range.");
-        return CheckAp(unit, cost.Value);
+        return CheckAp(unit, cost);
     }
-
-    /// <summary>1 AP within mobility, 2 AP (a dash) within twice that, null beyond.</summary>
-    private static int? ApCostOf(TacticalUnit unit, MovePlan plan) =>
-        plan.Cost <= unit.Mobility * 2 ? 1
-        : plan.Cost <= unit.Mobility * 4 ? 2
-        : null;
 
     private ValidationResult ValidateAbility(UseAbilityCommand cmd)
     {
@@ -279,8 +273,9 @@ public sealed class TacticalEngine
     private void ExecuteMove(MoveCommand cmd, List<GameEvent> events)
     {
         var unit = State.Unit(cmd.UnitId);
-        var plan = MovePlanner.Plan(State, unit, cmd.Dest)!;
-        var cost = ApCostOf(unit, plan)!.Value;
+        var reachable = Pathfinder.Reachable(State, unit, unit.Mobility * 4);
+        var path = reachable.PathTo(cmd.Dest)!;
+        var cost = Pathfinder.ApCost(unit.Mobility, reachable.CostTo(cmd.Dest)!.Value)!.Value;
         var dashed = cost == 2;
         SpendAp(unit, cost, events);
         unit.MovedThisTurn = true;
@@ -288,10 +283,10 @@ public sealed class TacticalEngine
         // The move is cut into segments wherever a hook added events, so playback can show the
         // mover at the right tile when (say) a reaction shot goes off.
         var segment = new List<GridPos> { unit.Position };
-        for (var i = 1; i < plan.Path.Count; i++)
+        for (var i = 1; i < path.Count; i++)
         {
             var from = unit.Position;
-            var step = plan.Path[i];
+            var step = path[i];
             unit.Position = step;
             segment.Add(step);
 
@@ -304,7 +299,7 @@ public sealed class TacticalEngine
             if (!unit.IsAlive || unit.Statuses.Stunned)
                 interrupted = true;
 
-            if (stepEvents.Count > 0 || interrupted || i == plan.Path.Count - 1)
+            if (stepEvents.Count > 0 || interrupted || i == path.Count - 1)
             {
                 events.Add(new UnitMoved(unit.Id, segment, dashed));
                 events.AddRange(stepEvents);
