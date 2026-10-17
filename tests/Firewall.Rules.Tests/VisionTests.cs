@@ -27,9 +27,9 @@ public class VisionTests
             Data.Tiles
         );
 
-    private static TacticalState State(params string[] rows) => new(Map(rows), new Pcg32Random(1));
+    internal static TacticalState State(params string[] rows) => new(Map(rows), new Pcg32Random(1));
 
-    private static TacticalUnit Add(
+    internal static TacticalUnit Add(
         TacticalState state,
         int x,
         int y,
@@ -245,31 +245,6 @@ public class VisionTests
         );
     }
 
-    [Fact]
-    public void AFullSquadRecomputeOn40By40IsFast()
-    {
-        var rows = Enumerable.Range(0, 40).Select(_ => new string('.', 40)).ToArray();
-        var state = State(rows);
-        var rng = new Pcg32Random(7);
-        for (var i = 0; i < 160; i++)
-            state.Map.SetTile(new GridPos(rng.Next(0, 40), rng.Next(0, 40)), TileType.Wall);
-        for (var i = 0; i < 6; i++)
-            Add(state, 5 + i * 5, 5 + (i % 3) * 12);
-        var vision = state.PlayerVision;
-        vision.Recompute(); // warm the JIT
-
-        var times = new List<double>();
-        for (var run = 0; run < 15; run++)
-        {
-            state.Map.SetTile(new GridPos(0, 0), run % 2 == 0 ? TileType.Wall : TileType.Floor); // drops the cache
-            var sw = Stopwatch.StartNew();
-            vision.Recompute();
-            times.Add(sw.Elapsed.TotalMilliseconds);
-        }
-        times.Sort();
-        Assert.True(times[times.Count / 2] <= 3.0, $"median {times[times.Count / 2]:F2} ms");
-    }
-
     // A one-wide corridor; the soldier only sees 2 tiles, so the enemy at (3,1) is hidden.
     private static TacticalState Corridor(ulong seed = 1)
     {
@@ -361,5 +336,38 @@ public class VisionTests
         var replayed = TacticalEngine.Replay(engine.Log.Seed, engine.Log.Commands, Corridor, Data);
         Assert.Equal(engine.State.StateHash(), replayed.State.StateHash());
         Assert.Equal(new GridPos(2, 1), replayed.State.Units[0].Position);
+    }
+}
+
+/// <summary>Wall-clock timings, run alone so other test classes do not compete for the CPU.</summary>
+[CollectionDefinition(nameof(TimingTests), DisableParallelization = true)]
+public sealed class TimingCollection;
+
+[Collection(nameof(TimingTests))]
+public class TimingTests
+{
+    [Fact]
+    public void AFullSquadRecomputeOn40By40IsFast()
+    {
+        var rows = Enumerable.Range(0, 40).Select(_ => new string('.', 40)).ToArray();
+        var state = VisionTests.State(rows);
+        var rng = new Pcg32Random(7);
+        for (var i = 0; i < 160; i++)
+            state.Map.SetTile(new GridPos(rng.Next(0, 40), rng.Next(0, 40)), TileType.Wall);
+        for (var i = 0; i < 6; i++)
+            VisionTests.Add(state, 5 + i * 5, 5 + (i % 3) * 12);
+        var vision = state.PlayerVision;
+        vision.Recompute(); // warm the JIT
+
+        var times = new List<double>();
+        for (var run = 0; run < 15; run++)
+        {
+            state.Map.SetTile(new GridPos(0, 0), run % 2 == 0 ? TileType.Wall : TileType.Floor); // drops the cache
+            var sw = Stopwatch.StartNew();
+            vision.Recompute();
+            times.Add(sw.Elapsed.TotalMilliseconds);
+        }
+        times.Sort();
+        Assert.True(times[times.Count / 2] <= 3.0, $"median {times[times.Count / 2]:F2} ms");
     }
 }

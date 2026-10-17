@@ -29,7 +29,19 @@ public interface IAbilityHandler
 /// <summary>Ability handlers by ability id.</summary>
 public sealed class AbilityRegistry
 {
+    public const string Shoot = "shoot";
+    public const string Melee = "melee_attack";
+
     private readonly Dictionary<string, IAbilityHandler> _handlers = new(StringComparer.Ordinal);
+
+    /// <summary>The handlers implemented so far: Shoot and Melee.</summary>
+    public static AbilityRegistry CreateDefault()
+    {
+        var registry = new AbilityRegistry();
+        registry.Register(Shoot, new ShootAbility());
+        registry.Register(Melee, new ShootAbility(RangeType.Melee));
+        return registry;
+    }
 
     public void Register(string abilityId, IAbilityHandler handler) =>
         _handlers[abilityId] = handler;
