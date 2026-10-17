@@ -25,7 +25,7 @@ public sealed class TacticalEngine
         State = state;
         _data = data;
         _ai = ai ?? new NullAiController();
-        _abilities = abilities ?? new AbilityRegistry();
+        _abilities = abilities ?? AbilityRegistry.CreateDefault();
         Log = new CommandLog(state.Rng is Pcg32Random pcg ? pcg.GetState().Seed : 0UL);
         State.RefreshVision();
     }
@@ -102,6 +102,25 @@ public sealed class TacticalEngine
     }
 
     public IReadOnlyList<GameEvent> EndPlayerPhase() => Execute(new EndTurnCommand());
+
+    /// <summary>
+    /// The odds of <paramref name="attacker"/> using <paramref name="abilityId"/> on
+    /// <paramref name="target"/>, or null when that ability is not a shot. <see cref="ShotPreview.CanFire"/>
+    /// covers the shot itself; <see cref="Validate"/> still has the final say (AP, phase, cooldown).
+    /// </summary>
+    public ShotPreview? PreviewShot(
+        TacticalUnit attacker,
+        TacticalUnit target,
+        string abilityId = AbilityRegistry.Shoot
+    ) =>
+        _abilities.TryGet(abilityId, out var handler)
+        && handler is ShootAbility shoot
+        && _data.Abilities.TryGet(abilityId, out var def)
+            ? shoot.Preview(
+                MakeContext(attacker, Target.Unit(target.Id), def, State.Rng.Fork("validate"), []),
+                target
+            )
+            : null;
 
     internal IReadOnlyList<GameEvent> ExecuteInternal(
         ICommand cmd,

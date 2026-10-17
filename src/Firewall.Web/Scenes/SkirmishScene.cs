@@ -13,7 +13,8 @@ namespace Firewall.Web.Scenes;
 
 /// <summary>
 /// "Skirmish (debug)": the test yard with a debug squad of four and three enemy pods. Click a
-/// soldier or press Tab / Shift+Tab to select, F re-centres, Esc goes back.
+/// soldier or press Tab / Shift+Tab to select, F re-centres, 1 or the Shoot button aims, Esc goes
+/// back.
 /// </summary>
 public sealed class SkirmishScene : SceneBase
 {
@@ -44,6 +45,8 @@ public sealed class SkirmishScene : SceneBase
     private readonly Queue<(UnitId Unit, MoveTween Tween)> _moves = new();
     private (UnitId Unit, MoveTween Tween, float Elapsed)? _moving;
     private TacticalUnit? _hover;
+    private TargetingMode? _targeting;
+    private TargetReticleView _reticle = null!;
     private float _time;
 
     public override string Name => "Skirmish";
@@ -69,6 +72,7 @@ public sealed class SkirmishScene : SceneBase
         _tilemaps = MapTilemaps.Build(World, map, Ctx.Assets);
         _shields = new CoverShieldsView(World, Ctx.Assets);
         _fog = new FogView(World, map.Width, map.Height);
+        _reticle = new TargetReticleView(World, Ctx.Assets);
         foreach (var unit in _state.Units)
             _views[unit.Id] = new UnitView(
                 World,
@@ -94,6 +98,7 @@ public sealed class SkirmishScene : SceneBase
     private void Select(TacticalUnit unit, bool instant = false)
     {
         _selected = unit.Id;
+        _targeting = null;
         InvalidateRange();
         _controller.FocusOn(
             TacticalCamera.TileCenter(unit.Position.X, unit.Position.Y),
@@ -106,12 +111,19 @@ public sealed class SkirmishScene : SceneBase
         _time += dt;
         if (Ctx.Bindings.WasPressed(GameAction.Cancel))
         {
-            Ctx.Scenes.Pop();
-            return;
+            if (_targeting is not null)
+                ExitTargeting();
+            else
+            {
+                Ctx.Scenes.Pop();
+                return;
+            }
         }
 
         var canvas = Ctx.Render.CanvasSize;
         _controller.Update(dt, canvas, Ctx.Ui.PointerOverUi);
+        if (_controller.RightClicked && _targeting is not null)
+            ExitTargeting();
         var tile = Ctx.Ui.PointerOverUi ? null : PickTile(canvas);
         _hoverTile = tile;
         _hover =
@@ -134,9 +146,13 @@ public sealed class SkirmishScene : SceneBase
             Play(_engine.EndPlayerPhase());
         else if (_exhaustedTimer >= 0f && (_exhaustedTimer -= dt) < 0f)
             Play(_engine.EndPlayerPhase());
-        if (soldiers.Count > 0 && !IsMoving)
+        if (_targeting is not null && !IsMoving)
+            UpdateTargeting();
+        else if (soldiers.Count > 0 && !IsMoving)
         {
-            if (Ctx.Bindings.WasPressed(GameAction.NextUnit))
+            if (Ctx.Bindings.WasPressed(GameAction.Ability1))
+                BeginTargeting();
+            else if (Ctx.Bindings.WasPressed(GameAction.NextUnit))
                 CycleSelection(soldiers, Ctx.Input.IsKeyPressed(Keys.Shift) ? -1 : 1);
             else if (Ctx.Bindings.WasPressed(GameAction.CenterCamera) && Selected is { } sel)
                 Select(sel);
@@ -165,6 +181,7 @@ public sealed class SkirmishScene : SceneBase
         }
 
         SyncShields();
+        _reticle.Sync(_targeting?.Current.Unit.Position, _time);
         _fog.Sync(_fogEnabled ? _state.PlayerVision : null);
         foreach (var (id, view) in _views)
         {
@@ -185,6 +202,85 @@ public sealed class SkirmishScene : SceneBase
                 visible: IsVisible(unit)
             );
         }
+    }
+
+    // ------------------------------------------------------------------ targeting
+
+    private TargetingMode? TryBeginTargeting(out string reason)
+    {
+        if (Selected is not { } shooter || IsMoving)
+        {
+            reason = "Select a soldier.";
+            return null;
+        }
+        return TargetingMode.TryBegin(_engine, shooter, IsVisible, out reason);
+    }
+
+    private void BeginTargeting()
+    {
+        if (TryBeginTargeting(out var reason) is not { } mode)
+        {
+            Ctx.Ui.Toast(reason);
+            return;
+        }
+        _targeting = mode;
+        FrameTarget();
+    }
+
+    private void ExitTargeting()
+    {
+        _targeting = null;
+        if (Selected is { } sel)
+            _controller.FocusOn(TacticalCamera.TileCenter(sel.Position.X, sel.Position.Y), 0.35f);
+    }
+
+    // Eases the camera to frame the shooter and the current target.
+    private void FrameTarget()
+    {
+        if (_targeting is not { } mode)
+            return;
+        var a = _state.Unit(mode.Shooter).Position;
+        var b = mode.Current.Unit.Position;
+        _controller.FocusOn(
+            (TacticalCamera.TileCenter(a.X, a.Y) + TacticalCamera.TileCenter(b.X, b.Y)) / 2f,
+            0.35f
+        );
+    }
+
+    private void UpdateTargeting()
+    {
+        var mode = _targeting!;
+        if (Ctx.Bindings.WasPressed(GameAction.NextUnit))
+        {
+            mode.Cycle(Ctx.Input.IsKeyPressed(Keys.Shift) ? -1 : 1);
+            FrameTarget();
+        }
+        else if (Ctx.Bindings.WasPressed(GameAction.Confirm))
+            Fire();
+        else if (
+            _hover is { } clicked
+            && clicked.Faction != Faction.Firewall
+            && !Ctx.Ui.PointerOverUi
+            && Ctx.Clicks.ConsumeClick()
+        )
+        {
+            if (clicked.Id == mode.Current.Unit.Id)
+                Fire();
+            else if (mode.Select(clicked.Id))
+                FrameTarget();
+        }
+    }
+
+    private void Fire()
+    {
+        if (_targeting is not { } mode)
+            return;
+        var cmd = mode.Command;
+        _targeting = null;
+        if (_engine.Validate(cmd) is { IsValid: false } bad)
+            Ctx.Ui.Toast(bad.Reason);
+        else
+            Play(_engine.Execute(cmd));
     }
 
     // Debug (F8): moves the nearest enemy to the hovered free tile, to check the flank shields.
@@ -240,6 +336,8 @@ public sealed class SkirmishScene : SceneBase
     // Computed on demand and kept until the selection, the state or the map changes.
     private MoveRangeOverlay? Range()
     {
+        if (_targeting is not null)
+            return null;
         if (_range is not null)
             return _range;
         if (
@@ -281,8 +379,16 @@ public sealed class SkirmishScene : SceneBase
     private void Play(IReadOnlyList<GameEvent> events)
     {
         InvalidateRange();
+        _targeting = null;
         foreach (var e in events)
         {
+            if (e is UnitFacing facing && _views.TryGetValue(facing.Unit, out var turning))
+            {
+                var from = _state.Unit(facing.Unit).Position;
+                turning.FaceToward(new Vector2(facing.LookAt.X - from.X, facing.LookAt.Y - from.Y));
+            }
+            if (e is ShotResolved shot)
+                Ctx.Ui.Toast(ShotText(shot));
             if (e is PhaseStarted p)
                 _banners.Enqueue(p);
             if (e is MoveBlocked)
@@ -294,6 +400,18 @@ public sealed class SkirmishScene : SceneBase
         _exhaustedTimer = events.Any(e => e is AllSoldiersExhausted) ? 0.8f : -1f;
         if (_selected is { } id && !_state.Unit(id).IsAlive && Soldiers() is [var first, ..])
             Select(first);
+    }
+
+    // Temporary feedback until the event player (#28) shows floating numbers.
+    private string ShotText(ShotResolved shot)
+    {
+        var target = _state.Unit(shot.Target).DisplayName;
+        if (!shot.Hit)
+            return $"Missed {target} ({shot.HitChance}%).";
+        var kill = _state.Unit(shot.Target).IsAlive ? "" : " Killed!";
+        return shot.Crit
+            ? $"Critical! {shot.Damage} damage to {target}.{kill}"
+            : $"Hit {target} for {shot.Damage}.{kill}";
     }
 
     private void UpdateBanner(float dt)
@@ -341,6 +459,11 @@ public sealed class SkirmishScene : SceneBase
 
     protected override void DrawWorld(WorldOverlay overlay)
     {
+        if (_targeting is { } mode)
+        {
+            DrawAimLine(overlay, mode);
+            return;
+        }
         if (IsMoving || Range() is not { } range)
             return;
         range.Draw(overlay);
@@ -348,11 +471,35 @@ public sealed class SkirmishScene : SceneBase
             MoveRangeOverlay.DrawPreview(overlay, preview.Path, preview.Ap);
     }
 
+    // A dashed line from the shooter to the target.
+    private void DrawAimLine(WorldOverlay overlay, TargetingMode mode)
+    {
+        var a = _state.Unit(mode.Shooter).Position;
+        var b = mode.Current.Unit.Position;
+        var from = TacticalCamera.TileCenter(a.X, a.Y);
+        var to = TacticalCamera.TileCenter(b.X, b.Y);
+        var length = Vector2.Distance(from, to);
+        if (length < 0.01f)
+            return;
+        var dir = (to - from) / length;
+        const float dash = 0.3f;
+        const float gap = 0.2f;
+        var color = new Vector4(1f, 0.35f, 0.27f, 0.85f);
+        // Start and stop clear of the unit sprites.
+        for (var t = 0.4f; t < length - 0.5f; t += dash + gap)
+            overlay.Line(
+                from + dir * t,
+                from + dir * MathF.Min(t + dash, length - 0.5f),
+                0.05f,
+                color
+            );
+    }
+
     protected override void DrawScreen(ScreenCanvas canvas, UiContext ui)
     {
         canvas.Text("Skirmish (debug)", new Vector2(16, 12), TextStyles.Heading);
         canvas.Text(
-            "Click / Tab: select soldier   F: centre   Esc: back",
+            "Click / Tab: select soldier   1: shoot   F: centre   Esc: back",
             new Vector2(16, 48),
             TextStyles.Small
         );
@@ -383,10 +530,20 @@ public sealed class SkirmishScene : SceneBase
             )
         )
             Play(_engine.EndPlayerPhase());
+        DrawShootButton(ui, buttonRect);
+
+        if (_targeting is { } mode)
+            ShotPanel.Draw(
+                canvas,
+                ui,
+                mode.Current,
+                _state.Unit(mode.Shooter).Weapon,
+                mode.Candidates.Count
+            );
 
         if (_hover is { } unit)
             DrawTooltip(canvas, ui, unit);
-        else if (!ui.PointerOverUi && !IsMoving)
+        else if (_targeting is null && !ui.PointerOverUi && !IsMoving)
         {
             if (!DrawPreviewLabel(canvas, ui))
                 DrawMoveReason(canvas, ui);
@@ -395,13 +552,38 @@ public sealed class SkirmishScene : SceneBase
         DrawBanner(canvas, ui);
     }
 
+    // Left of End Turn; disabled with the reason in its tooltip (no AP, out of ammo, no target, ...).
+    private void DrawShootButton(UiContext ui, UiRect endTurn)
+    {
+        var rect = new UiRect(endTurn.X - 156f, endTurn.Y, 140f, endTurn.H);
+        var aiming = _targeting is not null;
+        var reason = "";
+        var canShoot = aiming || TryBeginTargeting(out reason) is not null;
+        if (
+            ui.Button(
+                rect,
+                aiming ? "Cancel" : "Shoot [1]",
+                aiming ? ButtonStyle.Normal : ButtonStyle.Primary,
+                enabled: canShoot,
+                tooltip: canShoot ? null : reason
+            )
+        )
+        {
+            if (aiming)
+                ExitTargeting();
+            else
+                BeginTargeting();
+        }
+    }
+
     private void DrawSoldierAp(ScreenCanvas canvas)
     {
         var y = 116f;
         foreach (var s in _state.Units.Where(u => u.Faction == Faction.Firewall && u.IsAlive))
         {
+            var ammo = s.Weapon is { } w ? $"   ammo {w.Ammo}/{w.Def.Clip}" : "";
             canvas.Text(
-                $"{s.DisplayName}: {s.ActionPoints} AP",
+                $"{s.DisplayName}: {s.ActionPoints} AP{ammo}",
                 new Vector2(16, y),
                 TextStyles.Small
             );

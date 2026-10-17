@@ -1,0 +1,245 @@
+using Firewall.Rules.Data;
+using Firewall.Rules.Rng;
+using Firewall.Rules.Tactical.Vision;
+
+namespace Firewall.Rules.Tactical;
+
+public enum RangeType
+{
+    Ranged,
+
+    /// <summary>Needs an adjacent target (8-neighbour) and ignores cover and range.</summary>
+    Melee,
+}
+
+/// <summary>How a shot is taken: everything the attacker and target do not say themselves.</summary>
+public sealed record ShotContext
+{
+    public static ShotContext Default { get; } = new();
+
+    public RangeType RangeType { get; init; } = RangeType.Ranged;
+
+    /// <summary>An overwatch shot: the hit chance is multiplied by 0.7 last and it cannot crit.</summary>
+    public bool Reaction { get; init; }
+
+    /// <summary>Replaces the attacker's Aim (the Arc Stunner's 70 % base hit); null keeps it.</summary>
+    public int? BaseAim { get; init; }
+
+    /// <summary>Damage range for attackers without a weapon (enemies use their <see cref="EnemyDef"/>).</summary>
+    public int DamageMin { get; init; }
+    public int DamageMax { get; init; }
+
+    /// <summary>Crit chance for attackers without a weapon.</summary>
+    public int BaseCrit { get; init; }
+
+    /// <summary>Rounds the shot uses (Suppression uses 2). Attackers without a weapon use none.</summary>
+    public int AmmoCost { get; init; } = 1;
+
+    private readonly IReadOnlyList<(string Label, int Value)>? _aimMods;
+
+    /// <summary>Additive hit modifiers from abilities and items, applied before overwatch.</summary>
+    public IReadOnlyList<(string Label, int Value)> AimMods
+    {
+        get => _aimMods ?? [];
+        init => _aimMods = value;
+    }
+
+    private readonly IReadOnlyList<(string Label, int Value)>? _critMods;
+
+    /// <summary>Additive crit modifiers from abilities and items.</summary>
+    public IReadOnlyList<(string Label, int Value)> CritMods
+    {
+        get => _critMods ?? [];
+        init => _critMods = value;
+    }
+
+    /// <summary>
+    /// The context for <paramref name="attacker"/>'s plain attack: its weapon when it has one,
+    /// otherwise its enemy definition's damage.
+    /// </summary>
+    public static ShotContext For(
+        GameData data,
+        TacticalUnit attacker,
+        RangeType rangeType = RangeType.Ranged
+    ) =>
+        attacker.Weapon is null && data.Enemies.TryGet(attacker.DefId, out var enemy)
+            ? new ShotContext
+            {
+                RangeType = rangeType,
+                DamageMin = enemy.DmgMin,
+                DamageMax = enemy.DmgMax,
+            }
+            : new ShotContext { RangeType = rangeType };
+}
+
+/// <summary>The odds of one shot, as shown in the shot panel.</summary>
+/// <param name="Breakdown">The hit modifiers; they add up to the hit chance before clamping.</param>
+/// <param name="CritBreakdown">The crit modifiers; they add up to the crit chance before clamping.</param>
+public sealed record ShotPreview(
+    int HitChance,
+    int CritChance,
+    int DamageMin,
+    int DamageMax,
+    IReadOnlyList<(string Label, int Value)> Breakdown,
+    IReadOnlyList<(string Label, int Value)> CritBreakdown,
+    bool Flanked,
+    bool CanFire,
+    string? Reason
+)
+{
+    /// <summary>The breakdown's sum: the hit chance before clamping.</summary>
+    public int RawHitChance => Breakdown.Sum(b => b.Value);
+}
+
+/// <summary>The rolled result of one shot, before damage hooks.</summary>
+/// <param name="Damage">After the crit multiplier and armor; 0 on a miss.</param>
+public readonly record struct ShotOutcome(bool Hit, bool Crit, int Rolled, int Damage);
+
+/// <summary>Hit, crit and damage (GDD §4.5). Pure: the preview never touches the RNG.</summary>
+public static class HitCalculator
+{
+    public const int FlankedCrit = 50;
+    public const int SuppressedAim = -30;
+
+    /// <summary>Overwatch multiplies the hit chance by 70 %, as an integer to avoid 0.7's binary error.</summary>
+    public const int ReactionAimPercent = 70;
+
+    public const int HunkerCoverMultiplier = 2;
+
+    public static ShotPreview Preview(
+        TacticalState state,
+        TacticalUnit attacker,
+        TacticalUnit target,
+        ShotContext ctx
+    )
+    {
+        var melee = ctx.RangeType == RangeType.Melee;
+        var weapon = attacker.Weapon;
+        var breakdown = new List<(string, int)> { ("Aim", ctx.BaseAim ?? attacker.Aim) };
+        if (!melee && weapon is not null)
+            breakdown.Add(
+                ("Range", weapon.Def.RangeMod(attacker.Position.DistanceTo(target.Position)))
+            );
+        AddIfNonZero(breakdown, "Target Defense", -target.Defense);
+
+        var flanked = false;
+        if (!melee)
+        {
+            var cover = CoverCalculator.Evaluate(state.Map, target.Position, attacker.Position);
+            flanked = cover.Flanked;
+            if (cover.Level != CoverLevel.None)
+            {
+                breakdown.Add(
+                    (
+                        cover.Level == CoverLevel.Full ? "Full Cover" : "Half Cover",
+                        -cover.DefenseBonus
+                    )
+                );
+                if (target.Statuses.Hunkered)
+                    breakdown.Add(("Hunkered", -cover.DefenseBonus * (HunkerCoverMultiplier - 1)));
+            }
+        }
+        if (attacker.Statuses.Suppressed)
+            breakdown.Add(("Suppressed", SuppressedAim));
+        foreach (var (label, value) in ctx.AimMods)
+            AddIfNonZero(breakdown, label, value);
+        if (ctx.Reaction)
+        {
+            var sum = breakdown.Sum(b => b.Item2);
+            breakdown.Add(("Overwatch x0.7", RoundPercent(sum, ReactionAimPercent) - sum));
+        }
+        var hit = Math.Clamp(breakdown.Sum(b => b.Item2), 0, 100);
+
+        var critBreakdown = new List<(string, int)>();
+        if (!ctx.Reaction)
+        {
+            AddIfNonZero(critBreakdown, "Weapon", weapon?.Def.Crit ?? ctx.BaseCrit);
+            if (flanked)
+                critBreakdown.Add(("Flanked", FlankedCrit));
+            foreach (var (label, value) in ctx.CritMods)
+                AddIfNonZero(critBreakdown, label, value);
+        }
+        var crit = Math.Clamp(critBreakdown.Sum(b => b.Item2), 0, 100);
+
+        var reason = WhyNot(state, attacker, target, ctx);
+        return new ShotPreview(
+            hit,
+            crit,
+            weapon?.Def.DmgMin ?? ctx.DamageMin,
+            weapon?.Def.DmgMax ?? ctx.DamageMax,
+            breakdown,
+            critBreakdown,
+            flanked,
+            reason is null,
+            reason
+        );
+    }
+
+    /// <summary>
+    /// Rolls a previewed shot in the fixed order: hit, then crit (only on a hit), then damage
+    /// (only on a hit). Replays depend on this order.
+    /// </summary>
+    public static ShotOutcome Roll(ShotPreview preview, int targetArmor, IRandom rng)
+    {
+        if (!rng.Roll(preview.HitChance))
+            return new ShotOutcome(false, false, 0, 0);
+        var crit = rng.Roll(preview.CritChance);
+        var rolled = rng.Next(preview.DamageMin, preview.DamageMax + 1);
+        return new ShotOutcome(true, crit, rolled, Damage(rolled, crit, targetArmor));
+    }
+
+    /// <summary>Damage of a hit: a crit gives ceil(× 1.5), then armor is subtracted, minimum 1.</summary>
+    public static int Damage(int rolled, bool crit, int armor)
+    {
+        var damage = crit ? (rolled * 3 + 1) / 2 : rolled;
+        return Math.Max(1, damage - armor);
+    }
+
+    /// <summary><paramref name="value"/> × <paramref name="percent"/> / 100, rounded half away from zero.</summary>
+    public static int RoundPercent(int value, int percent)
+    {
+        var scaled = value * percent;
+        var rounded = (Math.Abs(scaled) + 50) / 100;
+        return scaled < 0 ? -rounded : rounded;
+    }
+
+    private static string? WhyNot(
+        TacticalState state,
+        TacticalUnit attacker,
+        TacticalUnit target,
+        ShotContext ctx
+    )
+    {
+        if (!attacker.IsAlive)
+            return $"{attacker.DisplayName} is dead.";
+        if (attacker.Statuses.Stunned)
+            return $"{attacker.DisplayName} is stunned.";
+        if (!target.IsAlive)
+            return "That target is not valid.";
+        if (ctx.RangeType == RangeType.Melee)
+        {
+            if (!IsAdjacent(attacker.Position, target.Position))
+                return "The target is not adjacent.";
+            return null;
+        }
+        if (attacker.Weapon is { } weapon)
+        {
+            if (weapon.Ammo < ctx.AmmoCost)
+                return weapon.Ammo == 0 ? "Out of ammo." : "Not enough ammo.";
+            if (weapon.Def.Flags.Contains(WeaponFlag.NoFireAfterMove) && attacker.MovedThisTurn)
+                return "Sniper rifles can't fire after moving";
+        }
+        if (!LosTracer.CanSee(state, attacker, target))
+            return "No line of sight to the target.";
+        return null;
+    }
+
+    private static bool IsAdjacent(GridPos a, GridPos b) =>
+        a != b && Math.Abs(a.X - b.X) <= 1 && Math.Abs(a.Y - b.Y) <= 1;
+
+    private static void AddIfNonZero(List<(string, int)> list, string label, int value)
+    {
+        if (value != 0)
+            list.Add((label, value));
+    }
+}
