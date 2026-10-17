@@ -80,7 +80,8 @@ public sealed class MoveZones
 }
 
 /// <summary>
-/// 8-directional Dijkstra over walkable tiles. Any living unit blocks its tile, and a diagonal step
+/// 8-directional Dijkstra over walkable tiles. Living units block their tiles (the engine plans with
+/// only the units the mover's side can see), and a diagonal step
 /// needs both orthogonal neighbours walkable and unoccupied, so units cannot cut corners.
 /// Deterministic: a fixed neighbour order, ties in the queue broken by tile index, and a parent
 /// is only replaced by a strictly cheaper route.
@@ -99,9 +100,16 @@ public static class Pathfinder
 
     /// <summary>
     /// Costs and parents of every tile within <paramref name="maxCost"/> (half-tiles) of the unit.
-    /// The unit's own tile is the origin and never blocks.
+    /// The unit's own tile is the origin and never blocks. <paramref name="blocks"/> picks which
+    /// other living units are obstacles (all of them by default); the UI passes the ones the squad
+    /// can see, so the range does not give away hidden enemies.
     /// </summary>
-    public static ReachableTiles Reachable(TacticalState state, TacticalUnit unit, int maxCost)
+    public static ReachableTiles Reachable(
+        TacticalState state,
+        TacticalUnit unit,
+        int maxCost,
+        Func<TacticalUnit, bool>? blocks = null
+    )
     {
         var map = state.Map;
         var width = map.Width;
@@ -118,7 +126,12 @@ public static class Pathfinder
         for (var x = 0; x < width; x++)
             open[y * width + x] = map.IsWalkable(new GridPos(x, y));
         foreach (var other in state.Units)
-            if (other.IsAlive && other.Id != unit.Id && map.InBounds(other.Position))
+            if (
+                other.IsAlive
+                && other.Id != unit.Id
+                && map.InBounds(other.Position)
+                && (blocks is null || blocks(other))
+            )
                 open[other.Position.Y * width + other.Position.X] = false;
 
         var origin = unit.Position;
@@ -169,14 +182,18 @@ public static class Pathfinder
     /// The unit's blue (cost ≤ Mobility) and yellow (≤ 2 × Mobility) tiles. Yellow needs 2 AP and
     /// nothing is reachable without AP.
     /// </summary>
-    public static MoveZones MoveRange(TacticalState state, TacticalUnit unit)
+    public static MoveZones MoveRange(
+        TacticalState state,
+        TacticalUnit unit,
+        Func<TacticalUnit, bool>? blocks = null
+    )
     {
         var aps = unit.ActionPoints;
         var limit =
             aps >= 2 ? unit.Mobility * 4
             : aps == 1 ? unit.Mobility * 2
             : 0;
-        var reachable = Reachable(state, unit, limit);
+        var reachable = Reachable(state, unit, limit, blocks);
         var blue = new List<GridPos>();
         var yellow = new List<GridPos>();
         foreach (var tile in reachable.Tiles())

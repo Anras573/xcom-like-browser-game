@@ -231,4 +231,17 @@ public class PathfinderTests
         var perCall = watch.Elapsed.TotalMilliseconds / runs;
         Assert.True(perCall < 2.0, $"Reachable took {perCall:0.00} ms per call.");
     }
+
+    [Fact]
+    public void UnitsTheBlockPredicateRejectsDoNotBlock()
+    {
+        var state = Open(5, 1);
+        var unit = Add(state, 0, 0);
+        var hidden = Add(state, 2, 0, faction: Faction.Meridian);
+
+        Assert.False(Pathfinder.Reachable(state, unit, 100).Contains(new GridPos(3, 0)));
+        var ignoring = Pathfinder.Reachable(state, unit, 100, u => u != hidden);
+        Assert.True(ignoring.Contains(new GridPos(2, 0)));
+        Assert.True(ignoring.Contains(new GridPos(3, 0)));
+    }
 }

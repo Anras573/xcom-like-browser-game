@@ -29,6 +29,12 @@ public sealed record AllSoldiersExhausted : GameEvent;
 // Movement
 public sealed record UnitMoved(UnitId Unit, IReadOnlyList<GridPos> Path, bool Dashed) : GameEvent;
 
+/// <summary>
+/// A move ended early because the next tile held a unit the mover could not see when it planned the
+/// route. The mover stays at <paramref name="At"/>; the AP is spent as planned.
+/// </summary>
+public sealed record MoveBlocked(UnitId Mover, GridPos At, UnitId Blocker) : GameEvent;
+
 public sealed record UnitFacing(UnitId Unit, GridPos LookAt) : GameEvent;
 
 // Combat

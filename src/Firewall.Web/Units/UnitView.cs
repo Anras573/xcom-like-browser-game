@@ -36,6 +36,7 @@ public sealed class UnitView
     private readonly List<Entity> _pips = [];
     private readonly Entity[] _icons;
     private string _frameName = "";
+    private bool _bodyVisible = true;
 
     public UnitView(
         World world,
@@ -86,18 +87,30 @@ public sealed class UnitView
     /// <param name="selected">Draw the pulsing selection ring.</param>
     /// <param name="showOverlay">Draw HP pips and status icons (soldiers always, enemies when seen).</param>
     /// <param name="time">Scene time in seconds, for the ring pulse.</param>
+    /// <param name="visible">False hides the whole unit (a hostile on a tile the squad cannot see).</param>
     /// <param name="cover">Cover against the most threatening visible enemy; draws a shield for half or full cover.</param>
-    public void Sync(bool selected, bool showOverlay, float time, CoverResult? cover = null)
+    public void Sync(
+        bool selected,
+        bool showOverlay,
+        float time,
+        CoverResult? cover = null,
+        bool visible = true
+    )
     {
         var unit = Unit;
         var center = VisualCenter ?? TacticalCamera.TileCenter(unit.Position.X, unit.Position.Y);
 
         var frameName = UnitPresentation.BodyFrame(unit, _enemy, Reloading);
         var frame = _assets.Frame(frameName);
+        if (visible != _bodyVisible)
+        {
+            _bodyVisible = visible;
+            _frameName = ""; // re-add the sprite below, hidden or tinted
+        }
         if (frameName != _frameName)
         {
             _frameName = frameName;
-            _world.AddComponent(_body, frame.ToSpriteSheet(_tint));
+            _world.AddComponent(_body, frame.ToSpriteSheet(visible ? _tint : Hidden));
             _world.AddComponent(_body, new AnimationState(frame.FrameIndex));
         }
         _world.AddComponent(_body, new Transform2D(center, Rotation, new Vector2(_scale, _scale)));
@@ -108,10 +121,11 @@ public sealed class UnitView
         var alpha = (byte)(255 * UnitPresentation.RingAlpha(time));
         _world.AddComponent(
             _ring,
-            ring.ToSpriteSheet(selected ? new Color(255, 255, 255, alpha) : Hidden)
+            ring.ToSpriteSheet(selected && visible ? new Color(255, 255, 255, alpha) : Hidden)
         );
 
         var top = center.Y + 0.5f * _scale + 0.08f;
+        showOverlay &= visible;
         SyncPips(center.X, top, showOverlay);
         SyncIcons(center.X, top + PipRows() * (PipHeight + PipGap) + 0.05f, showOverlay, cover);
     }

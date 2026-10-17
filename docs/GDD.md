@@ -144,6 +144,7 @@ Late-campaign **elite variants** reuse the same sprites with a tint (for example
 ### 4.4 Line of sight & vision
 - **Sight radius:** 12 tiles for soldiers, 11 for most enemies.
 - LOS is a supercover raycast from tile center to tile center. It is blocked by tiles marked "Blocks LOS"; units do **not** block it.
+  - **Corner rule:** when the line passes exactly through a corner shared by two tiles, LOS is blocked only if *both* block it; if just one does, LOS passes. LOS between two tiles is symmetric.
 - **Step-out (peeking):** a unit standing next to a LOS-blocking tile also traces LOS from each walkable neighbour tile perpendicular to that blocker. This lets a soldier hugging a wall lean around its corner. The unit doesn't actually move.
 - **Fog of war:** visibility is shared by the whole squad. Each tile is unexplored, explored or visible.
 
