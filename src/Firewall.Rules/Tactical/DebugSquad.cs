@@ -41,9 +41,9 @@ public static class DebugSquad
                     ActionPoints = 2,
                     Weapon = new WeaponState(weapon, weapon.Clip),
                     AppearanceId = Pick(soldier.AppearanceSets, looks),
-                    Abilities = { AbilityRegistry.Shoot },
                 }
             );
+            squad[^1].Abilities.UnionWith(AbilityRegistry.StandardActions);
         }
         return squad;
     }

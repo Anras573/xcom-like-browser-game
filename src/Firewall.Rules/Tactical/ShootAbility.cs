@@ -1,3 +1,5 @@
+using Firewall.Rules.Rng;
+
 namespace Firewall.Rules.Tactical;
 
 /// <summary>What a damage hook sees after a hit's armor has been subtracted.</summary>
@@ -44,21 +46,36 @@ public sealed class ShootAbility(RangeType rangeType = RangeType.Ranged) : IAbil
 
     public void Execute(AbilityContext ctx)
     {
-        var attacker = ctx.User;
         var target = ctx.State.Unit(((UnitTarget)ctx.Target).Id);
-        var shot = ShotContext.For(ctx.Data, attacker, rangeType);
-        var preview = HitCalculator.Preview(ctx.State, attacker, target, shot);
-        ctx.Events.Add(new UnitFacing(attacker.Id, target.Position));
+        var shot = ShotContext.For(ctx.Data, ctx.User, rangeType);
+        Fire(ctx.State, ctx.User, target, shot, ctx.Rng, ctx.Events);
+    }
 
-        var outcome = HitCalculator.Roll(preview, target.Armor, ctx.Rng);
+    /// <summary>
+    /// Resolves one shot the caller has already validated, with this ability's damage hooks.
+    /// Reaction fire uses it too.
+    /// </summary>
+    public void Fire(
+        TacticalState state,
+        TacticalUnit attacker,
+        TacticalUnit target,
+        ShotContext shot,
+        IRandom rng,
+        List<GameEvent> events
+    )
+    {
+        var preview = HitCalculator.Preview(state, attacker, target, shot);
+        events.Add(new UnitFacing(attacker.Id, target.Position));
+
+        var outcome = HitCalculator.Roll(preview, target.Armor, rng);
         var damage = outcome.Damage;
         if (outcome.Hit)
         {
-            var hook = new DamageContext(ctx.State, attacker, target, outcome);
+            var hook = new DamageContext(state, attacker, target, outcome);
             foreach (var h in DamageHooks)
                 damage = Math.Max(1, h.Modify(hook, damage));
         }
-        ctx.Events.Add(
+        events.Add(
             new ShotResolved(
                 attacker.Id,
                 target.Id,
@@ -71,20 +88,20 @@ public sealed class ShootAbility(RangeType rangeType = RangeType.Ranged) : IAbil
         if (outcome.Hit)
         {
             target.Hp = Math.Max(0, target.Hp - damage);
-            ctx.Events.Add(new UnitDamaged(target.Id, damage, target.Hp, target.Armor));
+            events.Add(new UnitDamaged(target.Id, damage, target.Hp, target.Armor));
         }
 
-        if (rangeType == RangeType.Ranged && attacker.Weapon is { } weapon)
+        if (shot.RangeType == RangeType.Ranged && attacker.Weapon is { } weapon)
         {
             weapon.Ammo -= shot.AmmoCost;
-            ctx.Events.Add(new AmmoChanged(attacker.Id, weapon.Ammo));
+            events.Add(new AmmoChanged(attacker.Id, weapon.Ammo));
         }
 
         if (outcome.Hit && target.Hp == 0)
         {
             // Soldiers roll for bleed-out instead with #24.
             target.IsAlive = false;
-            ctx.Events.Add(new UnitKilled(target.Id));
+            events.Add(new UnitKilled(target.Id));
         }
     }
 }

@@ -202,6 +202,12 @@ public class UnitDeploymentTests
             ("cooldown", s => s.Units[0].Cooldowns["rally"] = 2),
             ("status", s => s.Units[0].Statuses.Set(StatusFlags.Overwatch)),
             ("bleed", s => s.Units[0].Statuses.BleedingOutTurnsLeft = 3),
+            (
+                "reaction",
+                s =>
+                    s.Units[0]
+                        .Reactions.Add(new ReactionTrigger("overwatch", StatusFlags.Overwatch))
+            ),
             ("alive", s => s.Units[0].IsAlive = false),
             ("active", s => s.Units[^1].IsActive = true),
             ("pod", s => s.Units[^1].Pod = new PodId(99)),

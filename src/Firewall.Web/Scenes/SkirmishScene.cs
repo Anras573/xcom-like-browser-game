@@ -13,8 +13,8 @@ namespace Firewall.Web.Scenes;
 
 /// <summary>
 /// "Skirmish (debug)": the test yard with a debug squad of four and three enemy pods. Click a
-/// soldier or press Tab / Shift+Tab to select, F re-centres, 1 or the Shoot button aims, Esc goes
-/// back.
+/// soldier or press Tab / Shift+Tab to select, F re-centres, 1 or the Shoot button aims, 2 / 3 / 4
+/// overwatch, reload and hunker down, Esc goes back.
 /// </summary>
 public sealed class SkirmishScene : SceneBase
 {
@@ -48,6 +48,25 @@ public sealed class SkirmishScene : SceneBase
     private TargetingMode? _targeting;
     private TargetReticleView _reticle = null!;
     private float _time;
+    private readonly Dictionary<UnitId, float> _reloading = [];
+    private readonly List<FloatingText> _floaters = [];
+
+    private const float ReloadPoseSeconds = 0.6f;
+    private const float FloaterSeconds = 1.4f;
+
+    // Temporary world-anchored text until the event player (#28).
+    private sealed record FloatingText(string Text, GridPos Tile)
+    {
+        public float Age { get; set; }
+    }
+
+    // The standard actions after Shoot, in ability-bar order (hotkeys 2, 3 and 4).
+    private static readonly (string AbilityId, string Label, GameAction Key)[] SelfActions =
+    [
+        (AbilityRegistry.Overwatch, "Overwatch [2]", GameAction.Ability2),
+        (AbilityRegistry.Reload, "Reload [3]", GameAction.Ability3),
+        (AbilityRegistry.HunkerDown, "Hunker [4]", GameAction.Ability4),
+    ];
 
     public override string Name => "Skirmish";
 
@@ -137,6 +156,7 @@ public sealed class SkirmishScene : SceneBase
         if (Ctx.Input.WasKeyPressed(Keys.F9))
             Console.WriteLine(_engine.Log.ToJson());
         UpdateBanner(dt);
+        UpdateFloaters(dt);
 
         var soldiers = Soldiers();
         if (
@@ -152,6 +172,11 @@ public sealed class SkirmishScene : SceneBase
         {
             if (Ctx.Bindings.WasPressed(GameAction.Ability1))
                 BeginTargeting();
+            else if (
+                SelfActions.FirstOrDefault(a => Ctx.Bindings.WasPressed(a.Key)) is
+                { AbilityId: { } abilityId }
+            )
+                UseSelfAbility(abilityId);
             else if (Ctx.Bindings.WasPressed(GameAction.NextUnit))
                 CycleSelection(soldiers, Ctx.Input.IsKeyPressed(Keys.Shift) ? -1 : 1);
             else if (Ctx.Bindings.WasPressed(GameAction.CenterCamera) && Selected is { } sel)
@@ -194,6 +219,7 @@ public sealed class SkirmishScene : SceneBase
             }
             view.VisualCenter =
                 _moving is { } m && m.Unit == id ? m.Tween.Position(m.Elapsed, out _) : null;
+            view.Reloading = _reloading.ContainsKey(id);
             view.Sync(
                 selected: id == _selected,
                 showOverlay: ShowOverlay(unit),
@@ -202,6 +228,26 @@ public sealed class SkirmishScene : SceneBase
                 visible: IsVisible(unit)
             );
         }
+    }
+
+    // ------------------------------------------------------------------ self abilities
+
+    private UseAbilityCommand? SelfCommand(string abilityId) =>
+        Selected is { } unit ? new UseAbilityCommand(unit.Id, abilityId, Target.None) : null;
+
+    // Why the selected soldier cannot use the ability right now; null when it can.
+    private string? SelfAbilityBlocked(string abilityId) =>
+        IsMoving ? "Wait for the move to finish."
+        : SelfCommand(abilityId) is not { } cmd ? "Select a soldier."
+        : _engine.Validate(cmd) is { IsValid: false } bad ? bad.Reason
+        : null;
+
+    private void UseSelfAbility(string abilityId)
+    {
+        if (SelfAbilityBlocked(abilityId) is { } reason)
+            Ctx.Ui.Toast(reason);
+        else
+            Play(_engine.Execute(SelfCommand(abilityId)!));
     }
 
     // ------------------------------------------------------------------ targeting
@@ -389,6 +435,14 @@ public sealed class SkirmishScene : SceneBase
             }
             if (e is ShotResolved shot)
                 Ctx.Ui.Toast(ShotText(shot));
+            if (e is ReactionShotTriggered reaction)
+                Float("REACTION FIRE", reaction.Shooter);
+            if (e is StatusAdded { Status: StatusFlags.Overwatch } overwatch)
+                Float("OVERWATCH", overwatch.Unit);
+            if (e is StatusAdded { Status: StatusFlags.Hunkered } hunker)
+                Float("HUNKERED", hunker.Unit);
+            if (e is AbilityUsed { AbilityId: AbilityRegistry.Reload } reload)
+                _reloading[reload.Unit] = ReloadPoseSeconds;
             if (e is PhaseStarted p)
                 _banners.Enqueue(p);
             if (e is MoveBlocked)
@@ -412,6 +466,23 @@ public sealed class SkirmishScene : SceneBase
         return shot.Crit
             ? $"Critical! {shot.Damage} damage to {target}.{kill}"
             : $"Hit {target} for {shot.Damage}.{kill}";
+    }
+
+    private void Float(string text, UnitId unit)
+    {
+        var u = _state.Unit(unit);
+        if (IsVisible(u))
+            _floaters.Add(new FloatingText(text, u.Position));
+    }
+
+    private void UpdateFloaters(float dt)
+    {
+        foreach (var f in _floaters)
+            f.Age += dt;
+        _floaters.RemoveAll(f => f.Age >= FloaterSeconds);
+        foreach (var id in _reloading.Keys.ToList())
+            if ((_reloading[id] -= dt) <= 0f)
+                _reloading.Remove(id);
     }
 
     private void UpdateBanner(float dt)
@@ -499,7 +570,7 @@ public sealed class SkirmishScene : SceneBase
     {
         canvas.Text("Skirmish (debug)", new Vector2(16, 12), TextStyles.Heading);
         canvas.Text(
-            "Click / Tab: select soldier   1: shoot   F: centre   Esc: back",
+            "Click / Tab: select soldier   1: shoot   2: overwatch   3: reload   4: hunker   F: centre   Esc: back",
             new Vector2(16, 48),
             TextStyles.Small
         );
@@ -530,7 +601,9 @@ public sealed class SkirmishScene : SceneBase
             )
         )
             Play(_engine.EndPlayerPhase());
-        DrawShootButton(ui, buttonRect);
+        var shootRect = DrawShootButton(ui, buttonRect);
+        if (_targeting is null)
+            DrawSelfAbilityButtons(ui, shootRect);
 
         if (_targeting is { } mode)
             ShotPanel.Draw(
@@ -549,11 +622,12 @@ public sealed class SkirmishScene : SceneBase
                 DrawMoveReason(canvas, ui);
         }
 
+        DrawFloaters(canvas, ui);
         DrawBanner(canvas, ui);
     }
 
     // Left of End Turn; disabled with the reason in its tooltip (no AP, out of ammo, no target, ...).
-    private void DrawShootButton(UiContext ui, UiRect endTurn)
+    private UiRect DrawShootButton(UiContext ui, UiRect endTurn)
     {
         var rect = new UiRect(endTurn.X - 156f, endTurn.Y, 140f, endTurn.H);
         var aiming = _targeting is not null;
@@ -573,6 +647,47 @@ public sealed class SkirmishScene : SceneBase
                 ExitTargeting();
             else
                 BeginTargeting();
+        }
+        return rect;
+    }
+
+    // Overwatch, Reload and Hunker left of Shoot; hidden while aiming (the shot panel is there).
+    private void DrawSelfAbilityButtons(UiContext ui, UiRect shoot)
+    {
+        var rect = shoot;
+        foreach (var (abilityId, label, _) in SelfActions)
+        {
+            rect = new UiRect(rect.X - 176f, rect.Y, 160f, rect.H);
+            var reason = SelfAbilityBlocked(abilityId);
+            if (
+                ui.Button(rect, label, ButtonStyle.Normal, enabled: reason is null, tooltip: reason)
+            )
+                UseSelfAbility(abilityId);
+        }
+    }
+
+    // "OVERWATCH" / "REACTION FIRE" rising above the unit's tile and fading out.
+    private void DrawFloaters(ScreenCanvas canvas, UiContext ui)
+    {
+        var size = Ctx.Render.CanvasSize;
+        var vp = _camera.ToCamera2D().ViewProjection(size.X / MathF.Max(size.Y, 1f));
+        foreach (var f in _floaters)
+        {
+            var t = f.Age / FloaterSeconds;
+            var ndc = Vector2.Transform(
+                TacticalCamera.TileCenter(f.Tile.X, f.Tile.Y) + new Vector2(0f, 0.9f + 0.5f * t),
+                vp
+            );
+            var at = ui.Space.FromCanvasPixels(Picking.NdcToCanvas(ndc, size));
+            var alpha = (byte)(255 * Math.Clamp(1.5f - 1.5f * t, 0f, 1f));
+            var style = new TextStyle(
+                TextStyles.Future,
+                20,
+                new Color(255, 214, 92, alpha),
+                Shadow: true
+            );
+            var width = canvas.Measure(f.Text, style);
+            canvas.Text(f.Text, at - new Vector2(width / 2f, 10f), style);
         }
     }
 
