@@ -157,8 +157,8 @@ public sealed class SkirmishScene : SceneBase
             {
                 // Outside the range nothing happens; inside it the engine has the final say.
                 var move = new MoveCommand(mover.Id, dest);
-                if (_engine.Validate(move) is { IsValid: false } bad)
-                    Ctx.Ui.Toast(bad.Reason);
+                if (MoveReason(move) is { } bad)
+                    Ctx.Ui.Toast(bad);
                 else
                     Play(_engine.Execute(move));
             }
@@ -232,6 +232,17 @@ public sealed class SkirmishScene : SceneBase
     private MoveCommand? MoveAttempt(GridPos dest) =>
         Selected is { } unit ? new MoveCommand(unit.Id, dest) : null;
 
+    // Why the engine refuses a move, or null if it allows it. A tile held by an enemy the squad
+    // cannot see gets a generic reason, so "occupied" does not give the enemy away.
+    private string? MoveReason(MoveCommand move)
+    {
+        if (_engine.Validate(move) is not { IsValid: false } bad)
+            return null;
+        return _state.UnitAt(move.Dest) is { } there && !IsVisible(there)
+            ? "That tile cannot be reached."
+            : bad.Reason;
+    }
+
     /// <summary>A move is playing back; input is locked until it ends.</summary>
     private bool IsMoving => _moving is not null || _moves.Count > 0;
 
@@ -250,7 +261,7 @@ public sealed class SkirmishScene : SceneBase
             || unit.Statuses.Stunned
         )
             return null;
-        return _range = new MoveRangeOverlay(Pathfinder.MoveRange(_state, unit));
+        return _range = new MoveRangeOverlay(Pathfinder.MoveRange(_state, unit, IsVisible));
     }
 
     private void UpdateMoveAnimation(float dt)
@@ -433,12 +444,11 @@ public sealed class SkirmishScene : SceneBase
         var tile = PickTile(Ctx.Render.CanvasSize);
         if (tile is not { } dest || MoveAttempt(dest) is not { } move)
             return;
-        var result = _engine.Validate(move);
-        if (result.IsValid)
+        if (MoveReason(move) is not { } reason)
             return;
-        var width = canvas.Measure(result.Reason, TextStyles.Tooltip);
+        var width = canvas.Measure(reason, TextStyles.Tooltip);
         var x = MathF.Min(ui.Mouse.X + 18f, ui.Space.CanvasRect.Right - width - 4f);
-        canvas.Text(result.Reason, new Vector2(x, ui.Mouse.Y + 18f), TextStyles.Tooltip);
+        canvas.Text(reason, new Vector2(x, ui.Mouse.Y + 18f), TextStyles.Tooltip);
     }
 
     private void DrawBanner(ScreenCanvas canvas, UiContext ui)
