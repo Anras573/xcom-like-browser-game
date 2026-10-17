@@ -22,6 +22,9 @@ public sealed record ShotContext
     /// <summary>An overwatch shot: the hit chance is multiplied by 0.7 last and it cannot crit.</summary>
     public bool Reaction { get; init; }
 
+    /// <summary>Sentinel: a reaction shot can crit after all.</summary>
+    public bool ReactionCrit { get; init; }
+
     /// <summary>Replaces the attacker's Aim (the Arc Stunner's 70 % base hit); null keeps it.</summary>
     public int? BaseAim { get; init; }
 
@@ -151,7 +154,7 @@ public static class HitCalculator
         var hit = Math.Clamp(breakdown.Sum(b => b.Item2), 0, 100);
 
         var critBreakdown = new List<(string, int)>();
-        if (!ctx.Reaction)
+        if (!ctx.Reaction || ctx.ReactionCrit)
         {
             AddIfNonZero(critBreakdown, "Weapon", weapon?.Def.Crit ?? ctx.BaseCrit);
             if (flanked)

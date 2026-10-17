@@ -31,15 +31,28 @@ public sealed class AbilityRegistry
 {
     public const string Shoot = "shoot";
     public const string Melee = "melee_attack";
+    public const string Overwatch = "overwatch";
+    public const string Reload = "reload";
+    public const string HunkerDown = "hunker_down";
+
+    /// <summary>Passive: reaction shots can crit.</summary>
+    public const string Sentinel = "sentinel";
+
+    /// <summary>The standard actions every soldier has, in ability-bar order (hotkeys 1 to 4).</summary>
+    public static IReadOnlyList<string> StandardActions { get; } =
+    [Shoot, Overwatch, Reload, HunkerDown];
 
     private readonly Dictionary<string, IAbilityHandler> _handlers = new(StringComparer.Ordinal);
 
-    /// <summary>The handlers implemented so far: Shoot and Melee.</summary>
+    /// <summary>The handlers implemented so far: Shoot, Melee, Overwatch, Reload and Hunker Down.</summary>
     public static AbilityRegistry CreateDefault()
     {
         var registry = new AbilityRegistry();
         registry.Register(Shoot, new ShootAbility());
         registry.Register(Melee, new ShootAbility(RangeType.Melee));
+        registry.Register(Overwatch, new OverwatchAbility());
+        registry.Register(Reload, new ReloadAbility());
+        registry.Register(HunkerDown, new HunkerDownAbility());
         return registry;
     }
 

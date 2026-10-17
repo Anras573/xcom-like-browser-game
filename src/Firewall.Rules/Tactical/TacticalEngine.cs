@@ -27,6 +27,13 @@ public sealed class TacticalEngine
         _ai = ai ?? new NullAiController();
         _abilities = abilities ?? AbilityRegistry.CreateDefault();
         Log = new CommandLog(state.Rng is Pcg32Random pcg ? pcg.GetState().Seed : 0UL);
+        // Reaction shots share Shoot's damage hooks, so a registry without Shoot gets plain shots.
+        var shoot =
+            _abilities.TryGet(AbilityRegistry.Shoot, out var handler)
+            && handler is ShootAbility registered
+                ? registered
+                : new ShootAbility();
+        StepHooks.Add(new ReactionFireHook(data, shoot));
         State.RefreshVision();
     }
 
@@ -34,7 +41,7 @@ public sealed class TacticalEngine
 
     public CommandLog Log { get; }
 
-    /// <summary>Hooks run after each step of a move, in order.</summary>
+    /// <summary>Hooks run after each step of a move, in order. Reaction fire is the first.</summary>
     public List<IStepHook> StepHooks { get; } = [];
 
     /// <summary>True when no soldier can act any more (the "all soldiers exhausted" signal).</summary>
@@ -410,7 +417,7 @@ public sealed class TacticalEngine
         u is { Faction: Faction.Meridian, IsAlive: true, IsActive: true }
         && _data.Enemies[u.DefId].Kind == EnemyKind.Unit;
 
-    /// <summary>Refills AP and expires overwatch, hunker and cooldowns; a stunned unit loses the turn and the stun.</summary>
+    /// <summary>Refills AP and expires overwatch (and other reaction triggers), hunker and cooldowns; a stunned unit loses the turn and the stun.</summary>
     private void BeginUnitTurn(TacticalUnit unit, List<GameEvent> events)
     {
         var stunned = unit.Statuses.Stunned;
@@ -418,6 +425,7 @@ public sealed class TacticalEngine
         unit.ActionPoints = stunned ? 0 : ApPerTurn;
         events.Add(new ApChanged(unit.Id, unit.ActionPoints));
 
+        unit.Reactions.Clear();
         ClearStatus(unit, StatusFlags.Overwatch, events);
         ClearStatus(unit, StatusFlags.Hunkered, events);
         if (stunned)

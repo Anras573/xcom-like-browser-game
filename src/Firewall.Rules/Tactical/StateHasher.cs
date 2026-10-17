@@ -80,6 +80,17 @@ internal static class StateHasher
             }
             Add(ref h, (int)u.Statuses.Flags);
             Add(ref h, u.Statuses.BleedingOutTurnsLeft);
+            Add(ref h, u.Reactions.Count);
+            foreach (var t in u.Reactions)
+            {
+                Add(ref h, t.Source);
+                Add(ref h, (int)t.Status);
+                Add(ref h, t.Only?.Value ?? -1);
+                Add(ref h, t.ShotsLeft);
+                Add(ref h, t.FiredAt.Count);
+                foreach (var id in t.FiredAt.Select(i => i.Value).Order())
+                    Add(ref h, id);
+            }
             Add(ref h, u.IsAlive);
             Add(ref h, u.IsActive);
             Add(ref h, u.Pod?.Value ?? -1);

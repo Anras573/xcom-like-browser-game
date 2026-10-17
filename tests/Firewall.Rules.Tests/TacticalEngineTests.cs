@@ -225,6 +225,7 @@ public class TacticalEngineTests
         registry.Register("overwatch", new SetOverwatch());
         var e = new TacticalEngine(state, Data, abilities: registry);
         var unit = Soldier(e);
+        unit.Abilities.Remove("overwatch");
 
         Assert.Contains(
             "does not have",
@@ -329,10 +330,11 @@ public class TacticalEngineTests
     {
         var e = NewEngine();
         var unit = Soldier(e);
-        unit.Abilities.Add("reload");
+        var enemy = e.State.Units.First(u => u.Faction == Faction.Meridian);
+        unit.Abilities.Add("hack");
         Assert.Contains(
             "not implemented",
-            e.Validate(new UseAbilityCommand(unit.Id, "reload", Target.None)).Reason
+            e.Validate(new UseAbilityCommand(unit.Id, "hack", Target.Unit(enemy.Id))).Reason
         );
     }
 
