@@ -80,7 +80,8 @@ public sealed class MoveZones
 }
 
 /// <summary>
-/// 8-directional Dijkstra over walkable tiles. Any living unit blocks its tile, and a diagonal step
+/// 8-directional Dijkstra over walkable tiles. Living units block their tiles (the engine plans with
+/// only the units the mover's side can see), and a diagonal step
 /// needs both orthogonal neighbours walkable and unoccupied, so units cannot cut corners.
 /// Deterministic: a fixed neighbour order, ties in the queue broken by tile index, and a parent
 /// is only replaced by a strictly cheaper route.

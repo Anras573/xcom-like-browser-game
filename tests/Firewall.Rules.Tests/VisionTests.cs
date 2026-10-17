@@ -269,4 +269,97 @@ public class VisionTests
         times.Sort();
         Assert.True(times[times.Count / 2] <= 3.0, $"median {times[times.Count / 2]:F2} ms");
     }
+
+    // A one-wide corridor; the soldier only sees 2 tiles, so the enemy at (3,1) is hidden.
+    private static TacticalState Corridor(ulong seed = 1)
+    {
+        var state = new TacticalState(Map("#######", ".......", "#######"), new Pcg32Random(seed));
+        var soldier = Add(state, 0, 1, sight: 2);
+        soldier.Mobility = 6;
+        soldier.ActionPoints = 2;
+        Add(state, 3, 1, Faction.Meridian, sight: 0);
+        return state;
+    }
+
+    [Fact]
+    public void AMoveThroughAHiddenEnemyIsAcceptedAndStopsShortOfIt()
+    {
+        var state = Corridor();
+        var soldier = state.Units[0];
+        var enemy = state.Units[1];
+        var engine = new TacticalEngine(state, Data);
+        var dest = new GridPos(5, 1);
+
+        // Planning ignores the unseen enemy, so the engine agrees with the range.
+        var planned = engine.MoveRange(soldier).Reachable.PathTo(dest)!;
+        Assert.Contains(new GridPos(3, 1), planned);
+        Assert.True(engine.Validate(new MoveCommand(soldier.Id, dest)).IsValid);
+
+        var events = engine.Execute(new MoveCommand(soldier.Id, dest));
+
+        Assert.Equal(new GridPos(2, 1), soldier.Position);
+        Assert.Equal(1, soldier.ActionPoints); // charged as planned
+        var blocked = Assert.Single(events.OfType<MoveBlocked>());
+        Assert.Equal(new MoveBlocked(soldier.Id, new GridPos(2, 1), enemy.Id), blocked);
+        Assert.Equal(new GridPos(2, 1), events.OfType<UnitMoved>().Last().Path[^1]);
+        Assert.Contains(events, e => e is VisibilityChanged);
+        Assert.Equal(
+            planned.Take(3),
+            events.OfType<UnitMoved>().SelectMany(m => m.Path).Distinct()
+        );
+    }
+
+    [Fact]
+    public void ADestinationOnAHiddenEnemyIsAcceptedAndStopsOnTheLastFreeTile()
+    {
+        var state = Corridor();
+        var soldier = state.Units[0];
+        var engine = new TacticalEngine(state, Data);
+
+        var events = engine.Execute(new MoveCommand(soldier.Id, new GridPos(3, 1)));
+
+        Assert.Equal(new GridPos(2, 1), soldier.Position);
+        Assert.Single(events.OfType<MoveBlocked>());
+    }
+
+    [Fact]
+    public void AVisibleEnemyStillMakesTheTileOccupied()
+    {
+        var state = Corridor();
+        state.Units[0].Sight = 12;
+        var engine = new TacticalEngine(state, Data);
+
+        var check = engine.Validate(new MoveCommand(state.Units[0].Id, new GridPos(3, 1)));
+        Assert.False(check.IsValid);
+        Assert.Equal("That tile is occupied.", check.Reason);
+        Assert.False(engine.MoveRange(state.Units[0]).Reachable.Contains(new GridPos(5, 1)));
+    }
+
+    [Fact]
+    public void EnemiesPlanAroundWhatMeridianSeesToo()
+    {
+        // A soldier Meridian cannot see does not block the enemy's route.
+        var state = Corridor();
+        state.Units[0].Position = new GridPos(5, 1);
+        var enemy = state.Units[1];
+        enemy.Sight = 1;
+        enemy.Mobility = 6;
+        enemy.ActionPoints = 2;
+        state.Phase = TacticalPhase.Enemy;
+        var engine = new TacticalEngine(state, Data);
+
+        Assert.True(engine.Validate(new MoveCommand(enemy.Id, new GridPos(6, 1))).IsValid);
+    }
+
+    [Fact]
+    public void ReplayingAMoveThatBumpedReproducesTheStateHash()
+    {
+        var engine = new TacticalEngine(Corridor(7), Data);
+        engine.Execute(new MoveCommand(engine.State.Units[0].Id, new GridPos(5, 1)));
+        engine.EndPlayerPhase();
+
+        var replayed = TacticalEngine.Replay(engine.Log.Seed, engine.Log.Commands, Corridor, Data);
+        Assert.Equal(engine.State.StateHash(), replayed.State.StateHash());
+        Assert.Equal(new GridPos(2, 1), replayed.State.Units[0].Position);
+    }
 }

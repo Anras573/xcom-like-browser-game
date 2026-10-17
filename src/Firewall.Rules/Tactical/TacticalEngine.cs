@@ -65,6 +65,20 @@ public sealed class TacticalEngine
         return engine;
     }
 
+    /// <summary>
+    /// Whether <paramref name="obstacle"/> blocks <paramref name="mover"/>'s route planning: units the
+    /// mover's side cannot see do not, so a route never gives them away. Execution bumps into them.
+    /// </summary>
+    private Func<TacticalUnit, bool> BlocksRoute(TacticalUnit mover)
+    {
+        var vision = State.VisionOf(mover.Faction);
+        return obstacle => vision is null || vision.IsUnitVisible(obstacle);
+    }
+
+    /// <summary>The unit's blue and yellow tiles, planned the way <see cref="Execute"/> will move it.</summary>
+    public MoveZones MoveRange(TacticalUnit unit) =>
+        Pathfinder.MoveRange(State, unit, BlocksRoute(unit));
+
     public ValidationResult Validate(ICommand cmd)
     {
         if (State.Result is not null)
@@ -176,9 +190,10 @@ public sealed class TacticalEngine
             return ValidationResult.Fail("The unit is already there.");
         if (!State.Map.InBounds(cmd.Dest) || !State.Map.IsWalkable(cmd.Dest))
             return ValidationResult.Fail("That tile cannot be walked on.");
-        if (State.IsOccupied(cmd.Dest))
+        var blocks = BlocksRoute(unit);
+        if (State.UnitAt(cmd.Dest) is { } there && blocks(there))
             return ValidationResult.Fail("That tile is occupied.");
-        var reachable = Pathfinder.Reachable(State, unit, unit.Mobility * 4);
+        var reachable = Pathfinder.Reachable(State, unit, unit.Mobility * 4, blocks);
         if (
             reachable.CostTo(cmd.Dest) is not { } pathCost
             || Pathfinder.ApCost(unit.Mobility, pathCost) is not { } cost
@@ -277,7 +292,7 @@ public sealed class TacticalEngine
     private void ExecuteMove(MoveCommand cmd, List<GameEvent> events)
     {
         var unit = State.Unit(cmd.UnitId);
-        var reachable = Pathfinder.Reachable(State, unit, unit.Mobility * 4);
+        var reachable = Pathfinder.Reachable(State, unit, unit.Mobility * 4, BlocksRoute(unit));
         var path = reachable.PathTo(cmd.Dest)!;
         var cost = Pathfinder.ApCost(unit.Mobility, reachable.CostTo(cmd.Dest)!.Value)!.Value;
         var dashed = cost == 2;
@@ -291,6 +306,14 @@ public sealed class TacticalEngine
         {
             var from = unit.Position;
             var step = path[i];
+            // A unit the mover could not see when planning: stop on this tile, AP already spent.
+            if (State.UnitAt(step) is { } blocker)
+            {
+                if (segment.Count > 1)
+                    events.Add(new UnitMoved(unit.Id, segment, dashed));
+                events.Add(new MoveBlocked(unit.Id, from, blocker.Id));
+                break;
+            }
             unit.Position = step;
             segment.Add(step);
 

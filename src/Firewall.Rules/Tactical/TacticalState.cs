@@ -46,6 +46,15 @@ public sealed class TacticalState(TacticalMap map, IRandom rng, string missionId
     /// <summary>What Meridian sees; with its last-known soldier positions, the AI's knowledge.</summary>
     public VisibilityMap EnemyVision => _enemyVision ??= new VisibilityMap(this, Faction.Meridian);
 
+    /// <summary>What <paramref name="faction"/> sees; null for neutrals, which see everything as it is.</summary>
+    public VisibilityMap? VisionOf(Faction faction) =>
+        faction switch
+        {
+            Faction.Firewall => PlayerVision,
+            Faction.Meridian => EnemyVision,
+            _ => null,
+        };
+
     /// <summary>
     /// Recomputes both sides' vision. Returns the squad's <see cref="VisibilityChanged"/> when the
     /// set of visible enemies changed.
