@@ -50,6 +50,9 @@ public sealed class TacticalUnit(UnitId id, Faction faction, string defId, strin
     public Dictionary<string, int> Cooldowns { get; } = new(StringComparer.Ordinal);
     public StatusSet Statuses { get; } = new();
 
+    /// <summary>Overwatch and the like: reaction shots waiting for a hostile to move (<see cref="ReactionFireHook"/>).</summary>
+    public List<ReactionTrigger> Reactions { get; } = [];
+
     public bool IsAlive { get; set; } = true;
 
     /// <summary>False for enemies in a pod that has not activated yet.</summary>
