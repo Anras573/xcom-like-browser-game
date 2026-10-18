@@ -52,6 +52,9 @@ public sealed class CommandLog(ulong seed)
                     case EndTurnCommand:
                         w.WriteString("type", "endTurn");
                         break;
+                    case AbortMissionCommand:
+                        w.WriteString("type", "abort");
+                        break;
                     default:
                         w.WriteString("type", cmd.GetType().Name);
                         break;

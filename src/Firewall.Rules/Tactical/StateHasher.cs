@@ -21,7 +21,7 @@ internal static class StateHasher
 
         Add(ref h, state.TurnNumber);
         Add(ref h, (int)state.Phase);
-        Add(ref h, state.Result is { } r ? (int)r : -1);
+        Add(ref h, state.Result is { } r ? (int)r.Outcome : -1);
         Add(ref h, state.Objective.MissionId);
         Add(ref h, state.Objective.Progress);
         Add(ref h, state.Objective.Target);
@@ -50,6 +50,7 @@ internal static class StateHasher
             Add(ref h, (int)u.Faction);
             Add(ref h, u.DefId);
             Add(ref h, u.DisplayName);
+            Add(ref h, (int)u.Rank);
             Add(ref h, u.Position.X);
             Add(ref h, u.Position.Y);
             Add(ref h, u.Hp);
@@ -91,7 +92,12 @@ internal static class StateHasher
                 foreach (var id in t.FiredAt.Select(i => i.Value).Order())
                     Add(ref h, id);
             }
+            Add(ref h, u.Stats.Kills);
+            Add(ref h, u.Stats.DamageDealt);
+            Add(ref h, u.Stats.ShotsFired);
+            Add(ref h, u.Stats.Hits);
             Add(ref h, u.IsAlive);
+            Add(ref h, u.Evacuated);
             Add(ref h, u.IsActive);
             Add(ref h, u.Pod?.Value ?? -1);
             Add(ref h, u.AppearanceId);

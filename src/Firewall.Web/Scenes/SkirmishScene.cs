@@ -14,7 +14,9 @@ namespace Firewall.Web.Scenes;
 /// <summary>
 /// "Skirmish (debug)": the test yard with a debug squad of four and three enemy pods. Click a
 /// soldier or press Tab / Shift+Tab to select, F re-centres, 1 or the Shoot button aims, 2 / 3 / 4
-/// overwatch, reload and hunker down, Esc goes back.
+/// overwatch, reload and hunker down, 5 evacuates from the evac zone, 6 stabilizes an adjacent
+/// bleeding-out squadmate (debug), Esc goes back. The mission ends on a Purge or a wipe (or Abort
+/// Mission) and moves on to the result screen.
 /// </summary>
 public sealed class SkirmishScene : SceneBase
 {
@@ -51,8 +53,12 @@ public sealed class SkirmishScene : SceneBase
     private readonly Dictionary<UnitId, float> _reloading = [];
     private readonly List<FloatingText> _floaters = [];
 
+    private bool _confirmAbort;
+    private float _resultTimer = -1f;
+
     private const float ReloadPoseSeconds = 0.6f;
     private const float FloaterSeconds = 1.4f;
+    private const float ResultDelaySeconds = 2f;
 
     // Temporary world-anchored text until the event player (#28).
     private sealed record FloatingText(string Text, GridPos Tile)
@@ -111,8 +117,9 @@ public sealed class SkirmishScene : SceneBase
 
     protected override void OnExit() => _tilemaps?.Dispose();
 
+    // The soldiers who can still be selected: on the map and not down.
     private List<TacticalUnit> Soldiers() =>
-        _state.Units.Where(u => u.Faction == Faction.Firewall && u.IsAlive).ToList();
+        _state.Units.Where(u => u.Faction == Faction.Firewall && u.IsStanding).ToList();
 
     private void Select(TacticalUnit unit, bool instant = false)
     {
@@ -128,6 +135,18 @@ public sealed class SkirmishScene : SceneBase
     protected override void OnUpdate(float dt)
     {
         _time += dt;
+        if (_resultTimer >= 0f && (_resultTimer -= dt) < 0f && _state.Result is { } result)
+        {
+            Ctx.Scenes.Replace(new MissionResultScene(result));
+            return;
+        }
+        // The Abort Mission dialog takes the input (its own Esc cancels it).
+        if (_confirmAbort)
+        {
+            UpdateFloaters(dt);
+            SyncViews();
+            return;
+        }
         if (Ctx.Bindings.WasPressed(GameAction.Cancel))
         {
             if (_targeting is not null)
@@ -177,12 +196,16 @@ public sealed class SkirmishScene : SceneBase
                 { AbilityId: { } abilityId }
             )
                 UseSelfAbility(abilityId);
+            else if (Ctx.Bindings.WasPressed(GameAction.Ability5))
+                UseSelfAbility(AbilityRegistry.Evac);
+            else if (Ctx.Bindings.WasPressed(GameAction.Ability6))
+                Stabilize();
             else if (Ctx.Bindings.WasPressed(GameAction.NextUnit))
                 CycleSelection(soldiers, Ctx.Input.IsKeyPressed(Keys.Shift) ? -1 : 1);
             else if (Ctx.Bindings.WasPressed(GameAction.CenterCamera) && Selected is { } sel)
                 Select(sel);
             else if (
-                _hover is { Faction: Faction.Firewall } clicked
+                _hover is { Faction: Faction.Firewall, IsStanding: true } clicked
                 && !Ctx.Ui.PointerOverUi
                 && Ctx.Clicks.ConsumeClick()
             )
@@ -208,10 +231,16 @@ public sealed class SkirmishScene : SceneBase
         SyncShields();
         _reticle.Sync(_targeting?.Current.Unit.Position, _time);
         _fog.Sync(_fogEnabled ? _state.PlayerVision : null);
+        SyncViews();
+    }
+
+    private void SyncViews()
+    {
         foreach (var (id, view) in _views)
         {
             var unit = _state.Unit(id);
-            if (!unit.IsAlive)
+            // Killed or evacuated: gone from the map.
+            if (!unit.IsOnMap)
             {
                 view.Destroy();
                 _views.Remove(id);
@@ -249,6 +278,44 @@ public sealed class SkirmishScene : SceneBase
         else
             Play(_engine.Execute(SelfCommand(abilityId)!));
     }
+
+    // An adjacent bleeding-out squadmate of the selected soldier, if any.
+    private TacticalUnit? StabilizeTarget() =>
+        Selected is not { } medic
+            ? null
+            : _state.Units.FirstOrDefault(u =>
+                u.Faction == Faction.Firewall
+                && u.IsOnMap
+                && u.Statuses.IsBleedingOut
+                && Math.Max(
+                    Math.Abs(u.Position.X - medic.Position.X),
+                    Math.Abs(u.Position.Y - medic.Position.Y)
+                ) == 1
+            );
+
+    private UseAbilityCommand? StabilizeCommand() =>
+        Selected is { } medic && StabilizeTarget() is { } patient
+            ? new UseAbilityCommand(
+                medic.Id,
+                AbilityRegistry.DebugStabilize,
+                Target.Unit(patient.Id)
+            )
+            : null;
+
+    private void Stabilize()
+    {
+        if (IsMoving)
+            return;
+        if (StabilizeCommand() is not { } cmd)
+            Ctx.Ui.Toast("No bleeding-out squadmate next to this soldier.");
+        else if (_engine.Validate(cmd) is { IsValid: false } bad)
+            Ctx.Ui.Toast(bad.Reason);
+        else
+            Play(_engine.Execute(cmd));
+    }
+
+    // Evac is offered only while the selected soldier stands on an evac tile.
+    private bool OnEvacTile => Selected is { } s && _state.Map.EvacTiles.Contains(s.Position);
 
     // ------------------------------------------------------------------ targeting
 
@@ -392,6 +459,7 @@ public sealed class SkirmishScene : SceneBase
             || _state.Phase != TacticalPhase.Player
             || _state.Result is not null
             || unit.Statuses.Stunned
+            || !unit.IsStanding
         )
             return null;
         return _range = new MoveRangeOverlay(_engine.MoveRange(unit));
@@ -447,22 +515,46 @@ public sealed class SkirmishScene : SceneBase
                 _banners.Enqueue(p);
             if (e is MoveBlocked)
                 Ctx.Ui.Toast("Something is in the way.");
+            if (e is UnitBleedingOut { Turns: Casualties.BleedOutTurns } down)
+                OnBleedingOut(down.Unit);
+            if (e is UnitStabilized stabilized)
+                Float("STABILIZED", stabilized.Unit);
+            if (e is UnitEvacuated evacuated)
+                Ctx.Ui.Toast($"{_state.Unit(evacuated.Unit).DisplayName} evacuated.");
+            if (e is MissionEnded)
+                _resultTimer = ResultDelaySeconds;
             if (e is UnitMoved moved)
                 _moves.Enqueue((moved.Unit, new MoveTween(moved.Path)));
         }
         // "All soldiers exhausted": end the turn after a short beat.
         _exhaustedTimer = events.Any(e => e is AllSoldiersExhausted) ? 0.8f : -1f;
-        if (_selected is { } id && !_state.Unit(id).IsAlive && Soldiers() is [var first, ..])
+        if (_selected is { } id && !_state.Unit(id).IsStanding && Soldiers() is [var first, ..])
             Select(first);
+    }
+
+    // Someone just went down: say so and look at them.
+    private void OnBleedingOut(UnitId id)
+    {
+        var unit = _state.Unit(id);
+        Ctx.Ui.Toast(
+            $"{unit.DisplayName} is bleeding out! {Casualties.BleedOutTurns} turns to stabilize.",
+            4f
+        );
+        _controller.FocusOn(TacticalCamera.TileCenter(unit.Position.X, unit.Position.Y), 0.35f);
     }
 
     // Temporary feedback until the event player (#28) shows floating numbers.
     private string ShotText(ShotResolved shot)
     {
-        var target = _state.Unit(shot.Target).DisplayName;
+        var unit = _state.Unit(shot.Target);
+        var target = unit.DisplayName;
         if (!shot.Hit)
             return $"Missed {target} ({shot.HitChance}%).";
-        var kill = _state.Unit(shot.Target).IsAlive ? "" : " Killed!";
+        // Nobody shoots a downed unit, so one that is down now went down to this shot.
+        var kill =
+            !unit.IsAlive ? " Killed!"
+            : unit.Statuses.IsDown ? " Down!"
+            : "";
         return shot.Crit
             ? $"Critical! {shot.Damage} damage to {target}.{kill}"
             : $"Hit {target} for {shot.Damage}.{kill}";
@@ -500,7 +592,7 @@ public sealed class SkirmishScene : SceneBase
     private const float BannerSeconds = 0.9f;
 
     // Soldiers always; enemies while visible.
-    private bool ShowOverlay(TacticalUnit unit) => unit.IsAlive && IsVisible(unit);
+    private bool ShowOverlay(TacticalUnit unit) => unit.IsOnMap && IsVisible(unit);
 
     private void CycleSelection(List<TacticalUnit> soldiers, int step)
     {
@@ -530,6 +622,7 @@ public sealed class SkirmishScene : SceneBase
 
     protected override void DrawWorld(WorldOverlay overlay)
     {
+        DrawEvacZone(overlay);
         if (_targeting is { } mode)
         {
             DrawAimLine(overlay, mode);
@@ -540,6 +633,23 @@ public sealed class SkirmishScene : SceneBase
         range.Draw(overlay);
         if (_hover is null && range.PreviewTo(_hoverTile) is { } preview)
             MoveRangeOverlay.DrawPreview(overlay, preview.Path, preview.Ap);
+    }
+
+    // Evac tiles: a green wash, and a pulsing flare in the middle of each.
+    private void DrawEvacZone(WorldOverlay overlay)
+    {
+        var pulse = 0.5f + 0.5f * MathF.Sin(_time * 2f * MathF.PI / 1.2f);
+        foreach (var tile in _state.Map.EvacTiles)
+        {
+            overlay.FillTile(tile.X, tile.Y, new Vector4(0.25f, 0.9f, 0.4f, 0.16f));
+            var size = 0.12f + 0.08f * pulse;
+            var center = TacticalCamera.TileCenter(tile.X, tile.Y);
+            overlay.FillRect(
+                center - new Vector2(size / 2f),
+                new Vector2(size),
+                new Vector4(0.45f, 1f, 0.5f, 0.55f + 0.45f * pulse)
+            );
+        }
     }
 
     // A dashed line from the shooter to the target.
@@ -570,12 +680,19 @@ public sealed class SkirmishScene : SceneBase
     {
         canvas.Text("Skirmish (debug)", new Vector2(16, 12), TextStyles.Heading);
         canvas.Text(
-            "Click / Tab: select soldier   1: shoot   2: overwatch   3: reload   4: hunker   F: centre   Esc: back",
+            "Click / Tab: select soldier   1: shoot   2: overwatch   3: reload   4: hunker   5: evac   6: stabilize (debug)   F: centre   Esc: back",
             new Vector2(16, 48),
             TextStyles.Small
         );
         if (Selected is { } sel)
             canvas.Text($"Selected: {sel.DisplayName}", new Vector2(16, 70), TextStyles.Body);
+        var objective = _engine.Objective.Description;
+        var objectiveStyle = TextStyles.Body.With(new Color(140, 230, 150));
+        canvas.Text(
+            objective,
+            new Vector2(UiSpace.LogicalWidth - 16 - canvas.Measure(objective, objectiveStyle), 70),
+            objectiveStyle
+        );
 
         canvas.Text(
             $"Turn {_state.TurnNumber}   {_state.Phase} phase   Backspace: end turn   F2: fog   F8: move nearest enemy here   F9: copy command log",
@@ -604,6 +721,7 @@ public sealed class SkirmishScene : SceneBase
         var shootRect = DrawShootButton(ui, buttonRect);
         if (_targeting is null)
             DrawSelfAbilityButtons(ui, shootRect);
+        DrawAbortButton(ui);
 
         if (_targeting is { } mode)
             ShotPanel.Draw(
@@ -622,8 +740,70 @@ public sealed class SkirmishScene : SceneBase
                 DrawMoveReason(canvas, ui);
         }
 
+        DrawBleedOutCounters(canvas, ui);
         DrawFloaters(canvas, ui);
         DrawBanner(canvas, ui);
+        if (_confirmAbort)
+            DrawAbortDialog(ui);
+    }
+
+    // Top right; opens a confirmation listing who makes it out.
+    private void DrawAbortButton(UiContext ui)
+    {
+        var check = _engine.Validate(new AbortMissionCommand());
+        var enabled = check.IsValid && !IsMoving && _targeting is null;
+        if (
+            ui.Button(
+                new UiRect(UiSpace.LogicalWidth - 196, 16, 180, 40),
+                "Abort Mission",
+                ButtonStyle.Normal,
+                enabled: enabled,
+                tooltip: enabled ? null
+                    : check.IsValid ? "Wait for the move to finish."
+                    : check.Reason
+            )
+        )
+            _confirmAbort = true;
+    }
+
+    private void DrawAbortDialog(UiContext ui)
+    {
+        var onMap = _state.Units.Where(u => u.Faction == Faction.Firewall && u.IsOnMap).ToList();
+        var leaving = onMap
+            .Where(u => u.IsStanding && _state.Map.EvacTiles.Contains(u.Position))
+            .Select(u => u.DisplayName)
+            .ToList();
+        var left = onMap.Select(u => u.DisplayName).Except(leaving).ToList();
+        var body =
+            $"Soldiers in the evac zone leave: {(leaving.Count == 0 ? "nobody" : string.Join(", ", leaving))}.\n"
+            + $"Left behind (MIA): {(left.Count == 0 ? "nobody" : string.Join(", ", left))}.\n"
+            + "No loot is recovered.";
+        var choice = ui.Modal("Abort Mission?", body, ["Abort", "Cancel"], 1, 1);
+        if (choice == UiContext.ModalPending)
+            return;
+        _confirmAbort = false;
+        if (choice == 0 && _engine.Validate(new AbortMissionCommand()).IsValid)
+            Play(_engine.Execute(new AbortMissionCommand()));
+    }
+
+    // Turns left above each visible bleeding-out soldier, in red.
+    private void DrawBleedOutCounters(ScreenCanvas canvas, UiContext ui)
+    {
+        var size = Ctx.Render.CanvasSize;
+        var vp = _camera.ToCamera2D().ViewProjection(size.X / MathF.Max(size.Y, 1f));
+        var style = new TextStyle(TextStyles.Future, 18, new Color(255, 80, 70), Shadow: true);
+        foreach (var (id, view) in _views)
+        {
+            var unit = _state.Unit(id);
+            if (!unit.Statuses.IsBleedingOut || !IsVisible(unit))
+                continue;
+            var anchor = new Vector2(unit.Position.X + 0.5f, view.IconRowBottom + 0.45f);
+            var at = ui.Space.FromCanvasPixels(
+                Picking.NdcToCanvas(Vector2.Transform(anchor, vp), size)
+            );
+            var text = unit.Statuses.BleedingOutTurnsLeft.ToString();
+            canvas.Text(text, at - new Vector2(canvas.Measure(text, style) / 2f, 10f), style);
+        }
     }
 
     // Left of End Turn; disabled with the reason in its tooltip (no AP, out of ammo, no target, ...).
@@ -652,6 +832,7 @@ public sealed class SkirmishScene : SceneBase
     }
 
     // Overwatch, Reload and Hunker left of Shoot; hidden while aiming (the shot panel is there).
+    // Evac joins them on an evac tile, Stabilize (debug) next to a bleeding-out squadmate.
     private void DrawSelfAbilityButtons(UiContext ui, UiRect shoot)
     {
         var rect = shoot;
@@ -663,6 +844,39 @@ public sealed class SkirmishScene : SceneBase
                 ui.Button(rect, label, ButtonStyle.Normal, enabled: reason is null, tooltip: reason)
             )
                 UseSelfAbility(abilityId);
+        }
+        if (OnEvacTile)
+        {
+            rect = new UiRect(rect.X - 176f, rect.Y, 160f, rect.H);
+            var reason = SelfAbilityBlocked(AbilityRegistry.Evac);
+            if (
+                ui.Button(
+                    rect,
+                    "Evac [5]",
+                    ButtonStyle.Primary,
+                    enabled: reason is null,
+                    tooltip: reason
+                )
+            )
+                UseSelfAbility(AbilityRegistry.Evac);
+        }
+        if (StabilizeCommand() is { } stabilize)
+        {
+            var above = new UiRect(shoot.X - 176f, shoot.Y - shoot.H - 12f, 160f + 176f, shoot.H);
+            var check = IsMoving
+                ? ValidationResult.Fail("Wait for the move to finish.")
+                : _engine.Validate(stabilize);
+            var patient = _state.Unit(((UnitTarget)stabilize.Target).Id).DisplayName;
+            if (
+                ui.Button(
+                    above,
+                    $"Stabilize {patient} [6]",
+                    ButtonStyle.Normal,
+                    enabled: check.IsValid,
+                    tooltip: check.IsValid ? "Debug stand-in for the Medkit." : check.Reason
+                )
+            )
+                Stabilize();
         }
     }
 
@@ -694,14 +908,19 @@ public sealed class SkirmishScene : SceneBase
     private void DrawSoldierAp(ScreenCanvas canvas)
     {
         var y = 116f;
-        foreach (var s in _state.Units.Where(u => u.Faction == Faction.Firewall && u.IsAlive))
+        foreach (var s in _state.Units.Where(u => u.Faction == Faction.Firewall))
         {
             var ammo = s.Weapon is { } w ? $"   ammo {w.Ammo}/{w.Def.Clip}" : "";
-            canvas.Text(
-                $"{s.DisplayName}: {s.ActionPoints} AP{ammo}",
-                new Vector2(16, y),
-                TextStyles.Small
-            );
+            var line = s switch
+            {
+                { IsAlive: false } => $"{s.DisplayName}: KIA",
+                { Evacuated: true } => $"{s.DisplayName}: evacuated",
+                { Statuses.IsBleedingOut: true } =>
+                    $"{s.DisplayName}: BLEEDING OUT ({s.Statuses.BleedingOutTurnsLeft})",
+                { Statuses.Stabilized: true } => $"{s.DisplayName}: stabilized",
+                _ => $"{s.DisplayName}: {s.ActionPoints} AP{ammo}",
+            };
+            canvas.Text(line, new Vector2(16, y), TextStyles.Small);
             y += 18f;
         }
     }
@@ -752,7 +971,7 @@ public sealed class SkirmishScene : SceneBase
                     { Phase: TacticalPhase.Enemy } => "ENEMY PHASE",
                     _ => "ENVIRONMENT PHASE",
                 }
-                : $"MISSION {_state.Result!.Value.ToString().ToUpperInvariant()}";
+                : MissionResultText.Title(_state.Result!.Outcome);
         var rect = ui.Space.CanvasRect;
         var band = new Vector2(rect.W, 64f);
         var pos = new Vector2(rect.X, rect.Y + rect.H / 2f - 32f);

@@ -32,3 +32,9 @@ public sealed record MoveCommand(UnitId UnitId, GridPos Dest) : ICommand;
 public sealed record UseAbilityCommand(UnitId UnitId, string AbilityId, Target Target) : ICommand;
 
 public sealed record EndTurnCommand : ICommand;
+
+/// <summary>
+/// Abort Mission: every soldier who can act and stands on an evac tile leaves; everyone else on
+/// the map is left behind (MIA). The mission ends <see cref="MissionOutcome.Aborted"/>.
+/// </summary>
+public sealed record AbortMissionCommand : ICommand;

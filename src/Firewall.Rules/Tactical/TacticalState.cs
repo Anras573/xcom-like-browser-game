@@ -85,8 +85,8 @@ public sealed class TacticalState(TacticalMap map, IRandom rng, string missionId
         _units.Find(u => u.Id == id)
         ?? throw new KeyNotFoundException($"No unit {id} in the state.");
 
-    /// <summary>The living unit standing on <paramref name="pos"/>, if any.</summary>
-    public TacticalUnit? UnitAt(GridPos pos) => _units.Find(u => u.IsAlive && u.Position == pos);
+    /// <summary>The unit on the map at <paramref name="pos"/>, if any; downed soldiers still occupy their tile.</summary>
+    public TacticalUnit? UnitAt(GridPos pos) => _units.Find(u => u.IsOnMap && u.Position == pos);
 
     public bool IsOccupied(GridPos pos) => UnitAt(pos) is not null;
 

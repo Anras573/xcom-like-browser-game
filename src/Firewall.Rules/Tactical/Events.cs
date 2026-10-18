@@ -2,12 +2,6 @@ using Firewall.Rules.Data;
 
 namespace Firewall.Rules.Tactical;
 
-public enum MissionResult
-{
-    Victory,
-    Defeat,
-}
-
 /// <summary>
 /// What happened, in order. Every event carries enough data to animate without reading the
 /// state, which has already moved on by the time presentation plays it back.
@@ -21,6 +15,7 @@ public sealed record ApChanged(UnitId Unit, int Ap) : GameEvent;
 
 public sealed record AbilityUsed(UnitId Unit, string AbilityId, Target Target) : GameEvent;
 
+/// <summary>Always the last event of the mission; carries everything the result screen shows.</summary>
 public sealed record MissionEnded(MissionResult Result) : GameEvent;
 
 /// <summary>Every soldier is out of AP; presentation ends the turn after a short delay.</summary>
@@ -54,6 +49,9 @@ public sealed record UnitKilled(UnitId Unit) : GameEvent;
 public sealed record UnitBleedingOut(UnitId Unit, int Turns) : GameEvent;
 
 public sealed record UnitStabilized(UnitId Unit) : GameEvent;
+
+/// <summary>The unit left the map through the evac zone.</summary>
+public sealed record UnitEvacuated(UnitId Unit) : GameEvent;
 
 public sealed record ReactionShotTriggered(UnitId Shooter, UnitId Mover) : GameEvent;
 

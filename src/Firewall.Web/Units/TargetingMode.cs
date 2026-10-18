@@ -113,7 +113,8 @@ public sealed class TargetingMode
         Func<TacticalUnit, bool> isVisible
     ) =>
         engine.State.Units.Where(u =>
-            u.IsAlive
+            u.IsOnMap
+            && !u.Statuses.IsDown
             && u.Faction != shooter.Faction
             && u.Faction != Faction.Neutral
             && isVisible(u)

@@ -19,11 +19,13 @@ public sealed class TacticalEngine
         TacticalState state,
         GameData data,
         IAiController? ai = null,
-        AbilityRegistry? abilities = null
+        AbilityRegistry? abilities = null,
+        IMissionObjective? objective = null
     )
     {
         State = state;
         _data = data;
+        Objective = objective ?? new PurgeObjective(data);
         _ai = ai ?? new NullAiController();
         _abilities = abilities ?? AbilityRegistry.CreateDefault();
         Log = new CommandLog(state.Rng is Pcg32Random pcg ? pcg.GetState().Seed : 0UL);
@@ -38,6 +40,9 @@ public sealed class TacticalEngine
     }
 
     public TacticalState State { get; }
+
+    /// <summary>The mission's goal; Purge unless the mission says otherwise.</summary>
+    public IMissionObjective Objective { get; }
 
     public CommandLog Log { get; }
 
@@ -61,10 +66,11 @@ public sealed class TacticalEngine
         GameData data,
         IAiController? ai = null,
         AbilityRegistry? abilities = null,
-        IEnumerable<IStepHook>? hooks = null
+        IEnumerable<IStepHook>? hooks = null,
+        IMissionObjective? objective = null
     )
     {
-        var engine = new TacticalEngine(createState(seed), data, ai, abilities);
+        var engine = new TacticalEngine(createState(seed), data, ai, abilities, objective);
         if (hooks is not null)
             engine.StepHooks.AddRange(hooks);
         foreach (var cmd in commands)
@@ -92,7 +98,7 @@ public sealed class TacticalEngine
             return ValidationResult.Fail("The mission is over.");
         return cmd switch
         {
-            EndTurnCommand => State.Phase == TacticalPhase.Player
+            EndTurnCommand or AbortMissionCommand => State.Phase == TacticalPhase.Player
                 ? ValidationResult.Ok
                 : ValidationResult.Fail("It is not the player phase."),
             MoveCommand m => ValidateMove(m),
@@ -154,6 +160,9 @@ public sealed class TacticalEngine
             case UseAbilityCommand a:
                 ExecuteAbility(a, sink);
                 break;
+            case AbortMissionCommand:
+                ExecuteAbort(sink);
+                break;
         }
         // Tile changes and ability effects can alter what is seen; steps already refreshed.
         if (State.Result is null && State.RefreshVision() is { } vision)
@@ -167,7 +176,7 @@ public sealed class TacticalEngine
     // ------------------------------------------------------------------ validation
 
     private static bool IsOperationalSoldier(TacticalUnit u) =>
-        u.Faction == Faction.Firewall && u.IsAlive && !u.Statuses.IsBleedingOut;
+        u.Faction == Faction.Firewall && u.IsStanding;
 
     private ValidationResult ValidateActor(UnitId id, out TacticalUnit unit)
     {
@@ -178,6 +187,8 @@ public sealed class TacticalEngine
         unit = found;
         if (!unit.IsAlive)
             return ValidationResult.Fail($"{unit.DisplayName} is dead.");
+        if (unit.Evacuated)
+            return ValidationResult.Fail($"{unit.DisplayName} has left the map.");
         var phaseFaction = State.Phase switch
         {
             TacticalPhase.Player => Faction.Firewall,
@@ -190,6 +201,8 @@ public sealed class TacticalEngine
             return ValidationResult.Fail($"{unit.DisplayName} is inactive.");
         if (unit.Statuses.IsBleedingOut)
             return ValidationResult.Fail($"{unit.DisplayName} is bleeding out.");
+        if (unit.Statuses.Stabilized)
+            return ValidationResult.Fail($"{unit.DisplayName} is down.");
         if (unit.Statuses.Stunned)
             return ValidationResult.Fail($"{unit.DisplayName} is stunned.");
         return ValidationResult.Ok;
@@ -266,7 +279,7 @@ public sealed class TacticalEngine
                 if (target is not UnitTarget t)
                     return ValidationResult.Fail($"{def.Name} needs a unit target.");
                 var other = State.Units.FirstOrDefault(u => u.Id == t.Id);
-                if (other is null || !other.IsAlive)
+                if (other is null || !other.IsOnMap)
                     return ValidationResult.Fail("That target is not valid.");
                 var friendly = other.Faction == user.Faction;
                 if (def.Targeting == TargetingType.Enemy && friendly)
@@ -352,7 +365,7 @@ public sealed class TacticalEngine
             foreach (var hook in StepHooks)
                 if (hook.OnUnitStepped(ctx) == StepResult.Interrupt)
                     interrupted = true;
-            if (!unit.IsAlive || unit.Statuses.Stunned)
+            if (!unit.IsStanding || unit.Statuses.Stunned)
                 interrupted = true;
 
             if (stepEvents.Count > 0 || interrupted || i == path.Count - 1)
@@ -387,10 +400,10 @@ public sealed class TacticalEngine
         if (State.Result is not null)
             return;
 
-        // Environment phase: bleed-outs tick down (relay spawns and timers join with #24 / #33).
+        // Environment phase: bleed-outs tick down (relay spawns and timers join with #33).
         State.Phase = TacticalPhase.Environment;
         events.Add(new PhaseStarted(TacticalPhase.Environment, State.TurnNumber));
-        foreach (var unit in State.Units.Where(u => u.IsAlive && u.Statuses.IsBleedingOut))
+        foreach (var unit in State.Units.Where(u => u.IsOnMap && u.Statuses.IsBleedingOut))
         {
             unit.Statuses.BleedingOutTurnsLeft--;
             if (unit.Statuses.BleedingOutTurnsLeft > 0)
@@ -444,23 +457,37 @@ public sealed class TacticalEngine
         events.Add(new StatusRemoved(unit.Id, flag));
     }
 
+    // Abort Mission: soldiers who can act and stand in the evac zone leave, the rest stay behind.
+    private void ExecuteAbort(List<GameEvent> events)
+    {
+        foreach (var unit in State.Units.Where(IsOperationalSoldier).ToList())
+            if (State.Map.EvacTiles.Contains(unit.Position))
+                EvacAbility.Evacuate(unit, events);
+        EndMission(MissionOutcome.Aborted, events);
+    }
+
+    /// <summary>
+    /// The objective decides success or failure; otherwise the mission fails once no soldier who
+    /// can act is left on the map (wiped out, down, or retreated through evac).
+    /// </summary>
     private void CheckMissionEnd(List<GameEvent> events)
     {
         if (State.Result is not null)
             return;
-        var soldiersLeft = State.Units.Any(u => u.Faction == Faction.Firewall && u.IsAlive);
-        var hostilesLeft = State.Units.Any(u =>
-            u is { Faction: Faction.Meridian, IsAlive: true }
-            && _data.Enemies[u.DefId].Kind == EnemyKind.Unit
-        );
-        // Purge rules; other mission types join with #24.
-        MissionResult? result =
-            !soldiersLeft ? MissionResult.Defeat
-            : !hostilesLeft ? MissionResult.Victory
-            : null;
-        if (result is null)
-            return;
-        State.Result = result;
-        events.Add(new MissionEnded(result.Value));
+        MissionOutcome? outcome = Objective.Evaluate(State) switch
+        {
+            ObjectiveStatus.Success => MissionOutcome.Success,
+            ObjectiveStatus.Failure => MissionOutcome.Failure,
+            _ when !State.Units.Any(IsOperationalSoldier) => MissionOutcome.Failure,
+            _ => null,
+        };
+        if (outcome is { } o)
+            EndMission(o, events);
+    }
+
+    private void EndMission(MissionOutcome outcome, List<GameEvent> events)
+    {
+        State.Result = MissionResult.Build(State, _data, outcome);
+        events.Add(new MissionEnded(State.Result));
     }
 }

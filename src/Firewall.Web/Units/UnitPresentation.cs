@@ -23,12 +23,12 @@ public static class UnitPresentation
 
     /// <summary>
     /// GDD §3 sprite mapping. Soldiers: rifle, shotgun and LMG hold <c>machine</c>, the sniper rifle
-    /// <c>silencer</c>, a reload <c>reload</c>, unarmed <c>hold</c>. Stunned or stabilized (carried)
-    /// units <c>hold</c>. Enemies use their definition's pose.
+    /// <c>silencer</c>, a reload <c>reload</c>, unarmed <c>hold</c>. Stunned and downed (bleeding out
+    /// or stabilized) units <c>hold</c>. Enemies use their definition's pose.
     /// </summary>
     public static string PoseFor(TacticalUnit unit, EnemyDef? enemy, bool reloading)
     {
-        if (unit.Statuses.Stunned || unit.Statuses.Stabilized)
+        if (unit.Statuses.Stunned || unit.Statuses.IsDown)
             return "hold";
         if (enemy is not null)
             return enemy.Sprite.Pose;
@@ -68,7 +68,7 @@ public static class UnitPresentation
         var best = double.MaxValue;
         foreach (var other in state.Units)
         {
-            if (!other.IsAlive || !IsOpponent(unit.Faction, other.Faction))
+            if (!other.IsOnMap || !IsOpponent(unit.Faction, other.Faction))
                 continue;
             var d = unit.Position.DistanceTo(other.Position);
             if (d <= unit.Sight && d < best)
@@ -112,6 +112,10 @@ public static class UnitPresentation
             icons.Add("status.bleeding");
         return icons;
     }
+
+    /// <summary>The bleeding-out icon's red pulse: alpha between 0.35 and 1, about twice a second.</summary>
+    public static float BleedPulseAlpha(float seconds) =>
+        0.675f + 0.325f * MathF.Sin(seconds * 2f * MathF.PI / 0.6f);
 
     /// <summary>Selection-ring opacity: a slow sine between 0.45 and 1.</summary>
     public static float RingAlpha(float seconds) =>

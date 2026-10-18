@@ -46,6 +46,22 @@
     "targeting": "Enemy"
   },
   {
+    "id": "evac",
+    "name": "Evac",
+    "description": "Leave the map from an evac zone tile.",
+    "apCost": 1,
+    "endsTurn": true,
+    "targeting": "Self"
+  },
+  {
+    "id": "debug_stabilize",
+    "name": "Stabilize (debug)",
+    "description": "Debug stand-in for the Medkit: stabilize an adjacent bleeding-out ally.",
+    "apCost": 1,
+    "endsTurn": false,
+    "targeting": "Ally"
+  },
+  {
     "id": "run_and_gun",
     "name": "Run & Gun",
     "description": "May fire after a dash, once every 3 turns.",

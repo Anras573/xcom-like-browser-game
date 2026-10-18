@@ -66,3 +66,52 @@ public sealed class HunkerDownAbility : IAbilityHandler
         ctx.Events.Add(new StatusAdded(ctx.User.Id, StatusFlags.Hunkered));
     }
 }
+
+/// <summary>
+/// Evac (GDD §4.10): 1 AP, only on an evac (<c>E</c>) tile. The soldier leaves the map and is
+/// marked <see cref="TacticalUnit.Evacuated"/>. Emits <see cref="UnitEvacuated"/>.
+/// </summary>
+public sealed class EvacAbility : IAbilityHandler
+{
+    public ValidationResult Validate(AbilityContext ctx) =>
+        ctx.State.Map.EvacTiles.Contains(ctx.User.Position)
+            ? ValidationResult.Ok
+            : ValidationResult.Fail("Evac needs an evac zone tile.");
+
+    public void Execute(AbilityContext ctx) => Evacuate(ctx.User, ctx.Events);
+
+    /// <summary>Takes <paramref name="unit"/> off the map. Abort Mission uses it too.</summary>
+    public static void Evacuate(TacticalUnit unit, List<GameEvent> events)
+    {
+        // Carried units (a stabilized squadmate, a stunned Proxy) leave with their carrier in #31.
+        Casualties.StandDown(unit, events);
+        unit.Evacuated = true;
+        events.Add(new UnitEvacuated(unit.Id));
+    }
+}
+
+/// <summary>
+/// Debug stand-in for the Medkit (#31): 1 AP, stabilizes an adjacent bleeding-out ally. They stop
+/// bleeding out but stay down for the rest of the mission. Emits <see cref="UnitStabilized"/>.
+/// </summary>
+public sealed class DebugStabilizeAbility : IAbilityHandler
+{
+    public ValidationResult Validate(AbilityContext ctx)
+    {
+        var target = ctx.State.Unit(((UnitTarget)ctx.Target).Id);
+        if (!target.Statuses.IsBleedingOut)
+            return ValidationResult.Fail($"{target.DisplayName} is not bleeding out.");
+        var (a, b) = (target.Position, ctx.User.Position);
+        return Math.Max(Math.Abs(a.X - b.X), Math.Abs(a.Y - b.Y)) == 1
+            ? ValidationResult.Ok
+            : ValidationResult.Fail($"{target.DisplayName} is not adjacent.");
+    }
+
+    public void Execute(AbilityContext ctx)
+    {
+        var target = ctx.State.Unit(((UnitTarget)ctx.Target).Id);
+        target.Statuses.BleedingOutTurnsLeft = 0;
+        target.Statuses.Set(StatusFlags.Stabilized);
+        ctx.Events.Add(new UnitStabilized(target.Id));
+    }
+}

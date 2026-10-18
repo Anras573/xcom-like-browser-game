@@ -16,6 +16,17 @@ public sealed class ItemState(string itemId, int charges)
     public int Charges { get; set; } = charges;
 }
 
+/// <summary>What a unit did this mission, for <see cref="MissionResult"/>.</summary>
+public sealed class CombatStats
+{
+    public int Kills { get; set; }
+
+    /// <summary>HP taken off targets; overkill does not count.</summary>
+    public int DamageDealt { get; set; }
+    public int ShotsFired { get; set; }
+    public int Hits { get; set; }
+}
+
 /// <summary>
 /// A soldier, enemy or neutral on the tactical map. Plain rules state (not ECS): presentation
 /// reads it and never writes it.
@@ -29,6 +40,9 @@ public sealed class TacticalUnit(UnitId id, Faction faction, string defId, strin
     public string DefId { get; } = defId;
 
     public string DisplayName { get; set; } = displayName;
+
+    /// <summary>The soldier's rank (bleed-out chance); Rookie for enemies.</summary>
+    public Rank Rank { get; set; }
     public GridPos Position { get; set; }
 
     public int Hp { get; set; }
@@ -53,7 +67,18 @@ public sealed class TacticalUnit(UnitId id, Faction faction, string defId, strin
     /// <summary>Overwatch and the like: reaction shots waiting for a hostile to move (<see cref="ReactionFireHook"/>).</summary>
     public List<ReactionTrigger> Reactions { get; } = [];
 
+    public CombatStats Stats { get; } = new();
+
     public bool IsAlive { get; set; } = true;
+
+    /// <summary>Left the map through the evac zone; still alive, but no longer on the map.</summary>
+    public bool Evacuated { get; set; }
+
+    /// <summary>Alive and still on the map: it occupies its tile, can be seen and can be shot.</summary>
+    public bool IsOnMap => IsAlive && !Evacuated;
+
+    /// <summary>On the map and not down: still in the fight.</summary>
+    public bool IsStanding => IsOnMap && !Statuses.IsDown;
 
     /// <summary>False for enemies in a pod that has not activated yet.</summary>
     public bool IsActive { get; set; } = true;
