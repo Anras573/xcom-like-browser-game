@@ -24,7 +24,7 @@ public sealed class SkirmishScene : SceneBase
 
     private static readonly IReadOnlyList<PodSpec> Pods =
     [
-        new("Husk Pack", ["husk", "husk", "husk"]),
+        new("Husk Swarm", ["husk", "husk", "husk"]),
         new("Warden Patrol", ["warden", "warden"]),
         new("Mixed Patrol", ["warden", "husk", "husk", "husk"]),
     ];
@@ -44,8 +44,10 @@ public sealed class SkirmishScene : SceneBase
     private UnitId? _selected;
     private MoveRangeOverlay? _range;
     private GridPos? _hoverTile;
-    private readonly Queue<(UnitId Unit, MoveTween Tween)> _moves = new();
+    private readonly Queue<Playback> _moves = new();
     private (UnitId Unit, MoveTween Tween, float Elapsed)? _moving;
+    private (string Name, float Elapsed)? _reveal;
+    private bool _cameraReturn;
     private TacticalUnit? _hover;
     private TargetingMode? _targeting;
     private TargetReticleView _reticle = null!;
@@ -57,8 +59,12 @@ public sealed class SkirmishScene : SceneBase
     private float _resultTimer = -1f;
 
     private const float ReloadPoseSeconds = 0.6f;
+    private const float RevealSeconds = 1.2f;
     private const float FloaterSeconds = 1.4f;
     private const float ResultDelaySeconds = 2f;
+
+    // One beat of the playback: a unit walking, or the pod reveal (banner and camera) between walks.
+    private sealed record Playback(UnitId Unit, MoveTween? Tween, string? PodName, GridPos At);
 
     // Temporary world-anchored text until the event player (#28).
     private sealed record FloatingText(string Text, GridPos Tile)
@@ -442,7 +448,7 @@ public sealed class SkirmishScene : SceneBase
         Selected is { } unit ? new MoveCommand(unit.Id, dest) : null;
 
     /// <summary>A move is playing back; input is locked until it ends.</summary>
-    private bool IsMoving => _moving is not null || _moves.Count > 0;
+    private bool IsMoving => _moving is not null || _reveal is not null || _moves.Count > 0;
 
     private void InvalidateRange() => _range = null;
 
@@ -467,10 +473,38 @@ public sealed class SkirmishScene : SceneBase
 
     private void UpdateMoveAnimation(float dt)
     {
+        if (_reveal is { } reveal)
+        {
+            // The pod reveal holds everything else: the banner shows, then the scampers play.
+            _reveal =
+                reveal.Elapsed + dt >= RevealSeconds
+                    ? null
+                    : reveal with
+                    {
+                        Elapsed = reveal.Elapsed + dt,
+                    };
+            return;
+        }
         if (_moving is null && _moves.Count > 0)
         {
-            var (unit, tween) = _moves.Dequeue();
-            _moving = (unit, tween, 0f);
+            var next = _moves.Dequeue();
+            if (next.Tween is null)
+            {
+                _reveal = (next.PodName ?? "", 0f);
+                _cameraReturn = true;
+                _controller.FocusOn(TacticalCamera.TileCenter(next.At.X, next.At.Y), 0.35f);
+                return;
+            }
+            _moving = (next.Unit, next.Tween, 0f);
+        }
+        if (_moving is null && _cameraReturn && _moves.Count == 0)
+        {
+            _cameraReturn = false;
+            if (Selected is { } sel)
+                _controller.FocusOn(
+                    TacticalCamera.TileCenter(sel.Position.X, sel.Position.Y),
+                    0.35f
+                );
         }
         if (_moving is not { } m)
             return;
@@ -523,14 +557,27 @@ public sealed class SkirmishScene : SceneBase
                 Ctx.Ui.Toast($"{_state.Unit(evacuated.Unit).DisplayName} evacuated.");
             if (e is MissionEnded)
                 _resultTimer = ResultDelaySeconds;
-            if (e is UnitMoved moved)
-                _moves.Enqueue((moved.Unit, new MoveTween(moved.Path)));
+            if (e is UnitMoved moved && ShouldAnimate(moved.Unit, moved.Path))
+                _moves.Enqueue(new Playback(moved.Unit, new MoveTween(moved.Path), null, default));
+            if (e is UnitScampered scamper && ShouldAnimate(scamper.Unit, scamper.Path))
+                _moves.Enqueue(
+                    new Playback(scamper.Unit, new MoveTween(scamper.Path), null, default)
+                );
+            if (e is PodActivated pod)
+                _moves.Enqueue(new Playback(default, null, pod.Name.ToUpperInvariant(), pod.At));
         }
         // "All soldiers exhausted": end the turn after a short beat.
         _exhaustedTimer = events.Any(e => e is AllSoldiersExhausted) ? 0.8f : -1f;
         if (_selected is { } id && !_state.Unit(id).IsStanding && Soldiers() is [var first, ..])
             Select(first);
     }
+
+    // Soldiers always walk on screen; an enemy only if the squad can see where it starts or ends,
+    // so patrols in the fog play instantly and show nothing.
+    private bool ShouldAnimate(UnitId unit, IReadOnlyList<GridPos> path) =>
+        _state.Unit(unit).Faction != Faction.Meridian
+        || _state.PlayerVision.IsVisible(path[0])
+        || _state.PlayerVision.IsVisible(path[^1]);
 
     // Someone just went down: say so and look at them.
     private void OnBleedingOut(UnitId id)
@@ -743,6 +790,7 @@ public sealed class SkirmishScene : SceneBase
         DrawBleedOutCounters(canvas, ui);
         DrawFloaters(canvas, ui);
         DrawBanner(canvas, ui);
+        DrawPodBanner(canvas, ui);
         if (_confirmAbort)
             DrawAbortDialog(ui);
     }
@@ -984,6 +1032,17 @@ public sealed class SkirmishScene : SceneBase
             ),
             TextStyles.Heading
         );
+    }
+
+    // Top centre, for the length of the pod reveal beat.
+    private void DrawPodBanner(ScreenCanvas canvas, UiContext ui)
+    {
+        if (_reveal is not { } reveal)
+            return;
+        var width = canvas.Measure(reveal.Name, TextStyles.Heading) + 64f;
+        var pos = new Vector2(UiSpace.LogicalWidth / 2f - width / 2f, ui.Space.CanvasRect.Y + 56f);
+        canvas.FillRect(pos, new Vector2(width, 48f), new Vector4(0.45f, 0.06f, 0.06f, 0.85f));
+        canvas.Text(reveal.Name, new Vector2(pos.X + 32f, pos.Y + 10f), TextStyles.Heading);
     }
 
     private void DrawTooltip(ScreenCanvas canvas, UiContext ui, TacticalUnit unit)

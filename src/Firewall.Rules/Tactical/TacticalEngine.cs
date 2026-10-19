@@ -7,7 +7,7 @@ namespace Firewall.Rules.Tactical;
 /// The single entry point for tactical state changes: commands in, events out. Presentation and
 /// the AI both go through <see cref="Validate"/> and <see cref="Execute"/>.
 /// </summary>
-public sealed class TacticalEngine
+public sealed partial class TacticalEngine
 {
     public const int ApPerTurn = 2;
 
@@ -36,6 +36,7 @@ public sealed class TacticalEngine
                 ? registered
                 : new ShootAbility();
         StepHooks.Add(new ReactionFireHook(data, shoot));
+        StepHooks.Add(new PodActivationHook(this));
         State.RefreshVision();
     }
 
@@ -165,6 +166,8 @@ public sealed class TacticalEngine
                 break;
         }
         // Tile changes and ability effects can alter what is seen; steps already refreshed.
+        if (State.Result is null)
+            ActivatePodsThatSee(sink);
         if (State.Result is null && State.RefreshVision() is { } vision)
             sink.Add(vision);
         CheckMissionEnd(sink);
@@ -317,7 +320,9 @@ public sealed class TacticalEngine
             unit.Cooldowns[def.Id] = def.Cooldown;
         events.Add(new AbilityUsed(unit.Id, def.Id, cmd.Target));
         // The state's own stream, so every use rolls differently and the state hash covers it.
+        var first = events.Count;
         handler.Execute(MakeContext(unit, cmd.Target, def, State.Rng, events));
+        ActivatePodsFromEvents(events, first);
     }
 
     private static void SpendAp(TacticalUnit unit, int amount, List<GameEvent> events)
@@ -338,8 +343,22 @@ public sealed class TacticalEngine
         SpendAp(unit, cost, events);
         unit.MovedThisTurn = true;
 
-        // The move is cut into segments wherever a hook added events, so playback can show the
-        // mover at the right tile when (say) a reaction shot goes off.
+        Walk(unit, path, segment => new UnitMoved(unit.Id, segment, dashed), events);
+    }
+
+    /// <summary>
+    /// Walks <paramref name="unit"/> along <paramref name="path"/> one step at a time, running the
+    /// step hooks after each. The walk is cut into segments (<paramref name="segmentEvent"/>)
+    /// wherever a hook added events, so playback can show the walker at the right tile when (say)
+    /// a reaction shot goes off. Moves, patrols and scampers all walk this way.
+    /// </summary>
+    private void Walk(
+        TacticalUnit unit,
+        IReadOnlyList<GridPos> path,
+        Func<IReadOnlyList<GridPos>, GameEvent> segmentEvent,
+        List<GameEvent> events
+    )
+    {
         var segment = new List<GridPos> { unit.Position };
         for (var i = 1; i < path.Count; i++)
         {
@@ -349,7 +368,7 @@ public sealed class TacticalEngine
             if (State.UnitAt(step) is { } blocker)
             {
                 if (segment.Count > 1)
-                    events.Add(new UnitMoved(unit.Id, segment, dashed));
+                    events.Add(segmentEvent(segment));
                 events.Add(new MoveBlocked(unit.Id, from, blocker.Id));
                 break;
             }
@@ -370,7 +389,7 @@ public sealed class TacticalEngine
 
             if (stepEvents.Count > 0 || interrupted || i == path.Count - 1)
             {
-                events.Add(new UnitMoved(unit.Id, segment, dashed));
+                events.Add(segmentEvent(segment));
                 events.AddRange(stepEvents);
                 segment = [step];
             }
@@ -395,6 +414,11 @@ public sealed class TacticalEngine
                 _ai.TakeTurn(unit, new AiContext(this, events));
             CheckMissionEnd(events);
         }
+
+        // Pods that are still dormant wander, and may bump into the squad.
+        if (State.Result is null)
+            PatrolPods(events);
+        CheckMissionEnd(events);
 
         // MissionEnded is always the last event.
         if (State.Result is not null)

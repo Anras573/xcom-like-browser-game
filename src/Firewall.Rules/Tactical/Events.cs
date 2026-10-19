@@ -63,7 +63,12 @@ public sealed record StatusAdded(UnitId Unit, StatusFlags Status) : GameEvent;
 public sealed record StatusRemoved(UnitId Unit, StatusFlags Status) : GameEvent;
 
 // Pods and map
-public sealed record PodActivated(PodId Pod, IReadOnlyList<UnitId> Members) : GameEvent;
+/// <summary>
+/// A dormant pod woke up. <paramref name="At"/> is where its leader stood, for the camera; the
+/// scamper moves follow as <see cref="UnitScampered"/>.
+/// </summary>
+public sealed record PodActivated(PodId Pod, string Name, GridPos At, IReadOnlyList<UnitId> Members)
+    : GameEvent;
 
 public sealed record UnitScampered(UnitId Unit, IReadOnlyList<GridPos> Path) : GameEvent;
 

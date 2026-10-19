@@ -71,6 +71,7 @@ public static class PodSpawner
                 foreach (var ability in def.Abilities)
                     unit.Abilities.Add(ability);
                 state.AddUnit(unit);
+                created[^1].Members.Add(unit.Id);
             }
         }
         return created;

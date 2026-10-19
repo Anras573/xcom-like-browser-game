@@ -49,7 +49,8 @@ public class TacticalEngineTests
 
         Assert.Equal(1, unit.ActionPoints);
         Assert.Contains(events, ev => ev is ApChanged(var id, 1) && id == unit.Id);
-        var moved = Assert.IsType<UnitMoved>(Assert.Single(events, ev => ev is UnitMoved));
+        // A pod seeing the soldier part-way cuts the move in two; the last segment ends at the goal.
+        var moved = events.OfType<UnitMoved>().Last(m => m.Unit == unit.Id);
         Assert.False(moved.Dashed);
         Assert.Equal(unit.Position, moved.Path[^1]);
     }

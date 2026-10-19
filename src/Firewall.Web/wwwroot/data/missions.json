@@ -3,7 +3,10 @@
     "id": "purge",
     "name": "Purge",
     "goal": "Kill all hostiles.",
-    "fail": "Squad wiped or retreats."
+    "fail": "Squad wiped or retreats.",
+    "parameters": {
+      "podChainActivation": 0
+    }
   },
   {
     "id": "rescue",
