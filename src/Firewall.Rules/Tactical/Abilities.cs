@@ -34,17 +34,21 @@ public sealed class AbilityRegistry
     public const string Overwatch = "overwatch";
     public const string Reload = "reload";
     public const string HunkerDown = "hunker_down";
+    public const string Evac = "evac";
+
+    /// <summary>Debug stand-in for the Medkit (#31): stabilizes an adjacent bleeding-out ally.</summary>
+    public const string DebugStabilize = "debug_stabilize";
 
     /// <summary>Passive: reaction shots can crit.</summary>
     public const string Sentinel = "sentinel";
 
-    /// <summary>The standard actions every soldier has, in ability-bar order (hotkeys 1 to 4).</summary>
+    /// <summary>The standard actions every soldier has, in ability-bar order (hotkeys 1 to 5).</summary>
     public static IReadOnlyList<string> StandardActions { get; } =
-    [Shoot, Overwatch, Reload, HunkerDown];
+    [Shoot, Overwatch, Reload, HunkerDown, Evac];
 
     private readonly Dictionary<string, IAbilityHandler> _handlers = new(StringComparer.Ordinal);
 
-    /// <summary>The handlers implemented so far: Shoot, Melee, Overwatch, Reload and Hunker Down.</summary>
+    /// <summary>The handlers implemented so far: Shoot, Melee, Overwatch, Reload, Hunker Down, Evac and the debug Stabilize.</summary>
     public static AbilityRegistry CreateDefault()
     {
         var registry = new AbilityRegistry();
@@ -53,6 +57,8 @@ public sealed class AbilityRegistry
         registry.Register(Overwatch, new OverwatchAbility());
         registry.Register(Reload, new ReloadAbility());
         registry.Register(HunkerDown, new HunkerDownAbility());
+        registry.Register(Evac, new EvacAbility());
+        registry.Register(DebugStabilize, new DebugStabilizeAbility());
         return registry;
     }
 

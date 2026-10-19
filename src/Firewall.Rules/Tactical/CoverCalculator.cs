@@ -104,7 +104,8 @@ public static class CoverCalculator
         foreach (var unit in state.Units)
         {
             if (
-                !unit.IsAlive
+                !unit.IsOnMap
+                || unit.Statuses.IsDown
                 || !IsHostile(faction, unit.Faction)
                 || (isVisible is not null && !isVisible(unit))
             )

@@ -22,7 +22,7 @@ public interface IDamageHook
 /// <summary>
 /// Shoot and melee (GDD §4.5): 1 AP, ends the turn. Emits <see cref="UnitFacing"/>,
 /// <see cref="ShotResolved"/>, <see cref="UnitDamaged"/> on a hit, <see cref="AmmoChanged"/> and
-/// <see cref="UnitKilled"/> on a kill.
+/// <see cref="UnitKilled"/> or <see cref="UnitBleedingOut"/> at 0 HP (<see cref="Casualties"/>).
 /// </summary>
 public sealed class ShootAbility(RangeType rangeType = RangeType.Ranged) : IAbilityHandler
 {
@@ -85,9 +85,13 @@ public sealed class ShootAbility(RangeType rangeType = RangeType.Ranged) : IAbil
                 damage
             )
         );
+        attacker.Stats.ShotsFired++;
         if (outcome.Hit)
         {
+            var hpBefore = target.Hp;
             target.Hp = Math.Max(0, target.Hp - damage);
+            attacker.Stats.Hits++;
+            attacker.Stats.DamageDealt += hpBefore - target.Hp;
             events.Add(new UnitDamaged(target.Id, damage, target.Hp, target.Armor));
         }
 
@@ -97,11 +101,7 @@ public sealed class ShootAbility(RangeType rangeType = RangeType.Ranged) : IAbil
             events.Add(new AmmoChanged(attacker.Id, weapon.Ammo));
         }
 
-        if (outcome.Hit && target.Hp == 0)
-        {
-            // Soldiers roll for bleed-out instead with #24.
-            target.IsAlive = false;
-            events.Add(new UnitKilled(target.Id));
-        }
+        if (outcome.Hit && target.Hp == 0 && Casualties.Drop(target, rng, events))
+            attacker.Stats.Kills++;
     }
 }

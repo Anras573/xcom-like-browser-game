@@ -4,8 +4,8 @@ using Firewall.Rules.Rng;
 namespace Firewall.Rules.Tactical;
 
 /// <summary>
-/// Stand-in for the barracks roster: rookies with the starting rifle and random names. The real
-/// roster replaces it with the barracks work.
+/// Stand-in for the barracks roster: rookies with the starting rifle, random names and the debug
+/// Stabilize ability. The real roster replaces it with the barracks work.
 /// </summary>
 public static class DebugSquad
 {
@@ -44,6 +44,7 @@ public static class DebugSquad
                 }
             );
             squad[^1].Abilities.UnionWith(AbilityRegistry.StandardActions);
+            squad[^1].Abilities.Add(AbilityRegistry.DebugStabilize);
         }
         return squad;
     }

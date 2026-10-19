@@ -213,12 +213,15 @@ public static class HitCalculator
         ShotContext ctx
     )
     {
-        if (!attacker.IsAlive)
-            return $"{attacker.DisplayName} is dead.";
+        if (!attacker.IsOnMap)
+            return $"{attacker.DisplayName} is not on the map.";
         if (attacker.Statuses.Stunned)
             return $"{attacker.DisplayName} is stunned.";
-        if (!target.IsAlive)
+        if (!target.IsOnMap)
             return "That target is not valid.";
+        // Downed soldiers are out of the fight: nobody shoots at them on purpose.
+        if (target.Statuses.IsDown)
+            return $"{target.DisplayName} is down.";
         if (ctx.RangeType == RangeType.Melee)
         {
             if (!IsAdjacent(attacker.Position, target.Position))

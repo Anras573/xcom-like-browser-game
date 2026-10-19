@@ -43,7 +43,7 @@ public sealed class VisibilityMap
 
     /// <summary>Own and neutral units always count as seen; hostile ones need a visible tile.</summary>
     public bool IsUnitVisible(TacticalUnit unit) =>
-        !IsHostile(unit) || (unit.IsAlive && IsVisible(unit.Position));
+        !IsHostile(unit) || (unit.IsOnMap && IsVisible(unit.Position));
 
     /// <summary>Hostile living units in view right now.</summary>
     public IReadOnlyCollection<UnitId> VisibleEnemies => _visibleEnemies;
@@ -70,7 +70,7 @@ public sealed class VisibilityMap
 
         foreach (var viewer in _state.Units)
         {
-            if (viewer.Faction != Faction || !viewer.IsAlive || viewer.Statuses.IsBleedingOut)
+            if (viewer.Faction != Faction || !viewer.IsOnMap || viewer.Statuses.IsDown)
                 continue;
             foreach (var pos in VisibleFrom(viewer.Position, viewer.Sight))
                 _tiles[pos.Y * map.Width + pos.X] = TileVisibility.Visible;
@@ -81,7 +81,7 @@ public sealed class VisibilityMap
         {
             if (!IsHostile(unit))
                 continue;
-            if (!unit.IsAlive)
+            if (!unit.IsOnMap)
             {
                 _lastKnown.Remove(unit.Id);
                 continue;

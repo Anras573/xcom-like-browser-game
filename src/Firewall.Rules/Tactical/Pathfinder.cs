@@ -127,7 +127,7 @@ public static class Pathfinder
             open[y * width + x] = map.IsWalkable(new GridPos(x, y));
         foreach (var other in state.Units)
             if (
-                other.IsAlive
+                other.IsOnMap
                 && other.Id != unit.Id
                 && map.InBounds(other.Position)
                 && (blocks is null || blocks(other))

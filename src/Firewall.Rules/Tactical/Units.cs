@@ -46,7 +46,7 @@ public enum StatusFlags
 }
 
 /// <summary>
-/// A unit's status effects: on/off flags plus bleed-out, which counts the unit's own turns left
+/// A unit's status effects: on/off flags plus bleed-out, which counts the environment phases left
 /// (0 = not bleeding out).
 /// </summary>
 public sealed class StatusSet
@@ -56,6 +56,9 @@ public sealed class StatusSet
     public int BleedingOutTurnsLeft { get; set; }
 
     public bool IsBleedingOut => BleedingOutTurnsLeft > 0;
+
+    /// <summary>Bleeding out or stabilized: on the map, but out of the fight for this mission.</summary>
+    public bool IsDown => IsBleedingOut || Stabilized;
 
     public bool Has(StatusFlags flag) => (Flags & flag) == flag;
 

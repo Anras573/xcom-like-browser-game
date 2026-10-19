@@ -17,7 +17,7 @@ public sealed record StepContext(
 
 /// <summary>
 /// Runs after every step of a move: reaction fire, pod activation, visibility. Hooks append
-/// events and may interrupt the move. A mover that dies or is stunned always stops.
+/// events and may interrupt the move. A mover that dies, goes down or is stunned always stops.
 /// </summary>
 public interface IStepHook
 {

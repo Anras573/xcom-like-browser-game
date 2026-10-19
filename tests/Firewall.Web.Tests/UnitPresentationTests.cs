@@ -73,6 +73,10 @@ public class UnitPresentationTests
         var stunned = Soldier(WeaponClass.Rifle);
         stunned.Statuses.Set(StatusFlags.Stunned);
         Assert.Equal("hold", UnitPresentation.PoseFor(stunned, null, true));
+
+        var bleeding = Soldier(WeaponClass.Rifle);
+        bleeding.Statuses.BleedingOutTurnsLeft = 2;
+        Assert.Equal("hold", UnitPresentation.PoseFor(bleeding, null, false));
     }
 
     [Fact]
@@ -187,6 +191,16 @@ public class UnitPresentationTests
     {
         for (var t = 0f; t < 3f; t += 0.05f)
             Assert.InRange(UnitPresentation.RingAlpha(t), 0.44f, 1.001f);
+    }
+
+    [Fact]
+    public void BleedOutIconPulsesWithinBounds()
+    {
+        var values = new List<float>();
+        for (var t = 0f; t < 1.2f; t += 0.02f)
+            values.Add(UnitPresentation.BleedPulseAlpha(t));
+        Assert.All(values, v => Assert.InRange(v, 0.34f, 1.001f));
+        Assert.True(values.Max() - values.Min() > 0.5f);
     }
 
     [Fact]

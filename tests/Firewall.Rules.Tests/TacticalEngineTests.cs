@@ -362,7 +362,10 @@ public class TacticalEngineTests
             u.IsAlive = false;
         var unit = Soldier(e);
         var events = e.Execute(new MoveCommand(unit.Id, Free(e, unit, 2)));
-        Assert.Contains(events, ev => ev is MissionEnded(MissionResult.Victory));
+        Assert.Contains(
+            events,
+            ev => ev is MissionEnded { Result.Outcome: MissionOutcome.Success }
+        );
         Assert.False(e.Validate(new EndTurnCommand()).IsValid);
     }
 

@@ -127,7 +127,7 @@ public sealed class UnitView
         var top = center.Y + 0.5f * _scale + 0.08f;
         showOverlay &= visible;
         SyncPips(center.X, top, showOverlay);
-        SyncIcons(center.X, top + PipRows() * (PipHeight + PipGap) + 0.05f, showOverlay, cover);
+        SyncIcons(center.X, IconRowBottom, showOverlay, cover, time);
     }
 
     private int PipRows() => Math.Max(1, (Unit.MaxHp + Unit.Armor + PipsPerRow - 1) / PipsPerRow);
@@ -170,7 +170,15 @@ public sealed class UnitView
         }
     }
 
-    private void SyncIcons(float centerX, float bottom, bool show, CoverResult? cover)
+    /// <summary>World Y of the bottom of the status icon row (above the HP pips), for labels drawn above it.</summary>
+    public float IconRowBottom =>
+        (VisualCenter ?? TacticalCamera.TileCenter(Unit.Position.X, Unit.Position.Y)).Y
+        + 0.5f * _scale
+        + 0.08f
+        + PipRows() * (PipHeight + PipGap)
+        + 0.05f;
+
+    private void SyncIcons(float centerX, float bottom, bool show, CoverResult? cover, float time)
     {
         var names = new List<string>();
         if (cover is { } c && CoverShieldsView.FrameName(c.Level) is { } shield)
@@ -189,7 +197,12 @@ public sealed class UnitView
             var frame = _assets.Frame(names[i]);
             var rowWidth = names.Count * IconSize;
             var x = centerX - rowWidth / 2f + i * IconSize + IconSize / 2f;
-            _world.AddComponent(_icons[i], frame.ToSpriteSheet());
+            // Bleeding out pulses red so it reads at a glance.
+            var tint =
+                names[i] == "status.bleeding"
+                    ? new Color(255, 70, 70, (byte)(255 * UnitPresentation.BleedPulseAlpha(time)))
+                    : (Color?)null;
+            _world.AddComponent(_icons[i], frame.ToSpriteSheet(tint));
             _world.AddComponent(_icons[i], new AnimationState(frame.FrameIndex));
             _world.AddComponent(
                 _icons[i],
