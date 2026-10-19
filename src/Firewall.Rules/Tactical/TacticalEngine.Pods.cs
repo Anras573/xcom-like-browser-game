@@ -113,8 +113,17 @@ public sealed partial class TacticalEngine
                 .ToList()
             : [];
 
-        var leader = members.Count > 0 ? members[0].Position : pod.Spawn;
-        events.Add(new PodActivated(pod.Id, pod.Name, leader, members.Select(m => m.Id).ToList()));
+        // Nobody left to reveal (the shot that woke the pod killed its last member).
+        if (members.Count == 0)
+            return woken;
+        events.Add(
+            new PodActivated(
+                pod.Id,
+                pod.Name,
+                members[0].Position,
+                members.Select(m => m.Id).ToList()
+            )
+        );
 
         // The enemy side's view includes the dormant pods' eyes; the shot that woke them is known.
         State.EnemyVision.Recompute();

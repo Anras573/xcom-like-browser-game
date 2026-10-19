@@ -252,8 +252,12 @@ public sealed class SkirmishScene : SceneBase
                 _views.Remove(id);
                 continue;
             }
+            // A unit still waiting its turn in the playback stays where its next walk starts.
             view.VisualCenter =
-                _moving is { } m && m.Unit == id ? m.Tween.Position(m.Elapsed, out _) : null;
+                _moving is { } m && m.Unit == id ? m.Tween.Position(m.Elapsed, out _)
+                : _moves.FirstOrDefault(p => p.Tween is not null && p.Unit == id)?.Tween is { } next
+                    ? next.Position(0f, out _)
+                : null;
             view.Reloading = _reloading.ContainsKey(id);
             view.Sync(
                 selected: id == _selected,
