@@ -34,13 +34,13 @@ public static class ShotPanel
         : Neutral;
 
     /// <summary>The panel rectangle for a breakdown of <paramref name="rows"/> lines.</summary>
-    public static UiRect Rect(int rows)
+    public static UiRect Rect(int rows, float bottomMargin = Margin)
     {
         // Title bar, then the taller of the two columns, then the key hint.
         var height = 40f + MathF.Max(150f, rows * RowHeight + 4f) + 40f;
         return new UiRect(
             (UiSpace.LogicalWidth - Width) / 2f,
-            UiSpace.LogicalHeight - height - Margin,
+            UiSpace.LogicalHeight - height - bottomMargin,
             Width,
             height
         );
@@ -51,12 +51,13 @@ public static class ShotPanel
         UiContext ui,
         TargetCandidate target,
         WeaponState? weapon,
-        int candidateCount
+        int candidateCount,
+        float bottomMargin = Margin
     )
     {
         var p = target.Preview;
         var rows = p.Breakdown.Count + (p.CritBreakdown.Count > 0 ? 1 + p.CritBreakdown.Count : 0);
-        var rect = Rect(rows);
+        var rect = Rect(rows, bottomMargin);
         var title =
             candidateCount > 1
                 ? $"{target.Unit.DisplayName}   ({candidateCount} targets, Tab to cycle)"

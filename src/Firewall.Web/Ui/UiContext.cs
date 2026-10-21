@@ -130,13 +130,14 @@ public sealed class UiContext(
             );
     }
 
-    private void Icon(string region, UiRect rect, Vector4 tint)
+    /// <summary>Draws a UI atlas icon, multiplied by <paramref name="tint"/>.</summary>
+    public void Icon(string region, UiRect rect, Vector4 tint)
     {
         var r = assets.Ui(region);
         _canvas.Image(r.TexturePath, rect.Position, rect.Size, r.UvMin, r.UvMax, tint);
     }
 
-    private void Fill(UiRect r, Vector4 c) => _canvas.FillRect(r.Position, r.Size, c);
+    public void Fill(UiRect r, Vector4 c) => _canvas.FillRect(r.Position, r.Size, c);
 
     private void CenteredText(UiRect rect, string text, TextStyle style)
     {
@@ -154,6 +155,28 @@ public sealed class UiContext(
             return;
         _tooltipCandidate = id;
         _tooltipText = text;
+    }
+
+    // ---------------------------------------------------------------- hit areas
+
+    /// <summary>True while the pointer is over <paramref name="rect"/> and the UI takes input.</summary>
+    public bool IsHovering(UiRect rect) => !Blocked && _input.IsHover(rect);
+
+    /// <summary>
+    /// An invisible clickable area (it blocks the world under it): for panels and tiles drawn by
+    /// hand. Hovering shows <paramref name="tooltip"/>.
+    /// </summary>
+    /// <returns>True on the frame it is clicked.</returns>
+    public bool HitArea(UiRect rect, string key, string? tooltip = null)
+    {
+        var id = IdOf("hit:" + key, rect);
+        _blockers.Add(rect);
+        var state = _input.Interact(id, rect, true, Blocked);
+        if (state.Hover)
+            RequestTooltip(id, tooltip);
+        if (state.Clicked)
+            _tooltip.Reset();
+        return state.Clicked;
     }
 
     // ---------------------------------------------------------------- panel
