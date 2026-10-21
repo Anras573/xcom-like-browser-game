@@ -180,6 +180,8 @@ damage = rand[weapon.Min, weapon.Max]; on a crit, ceil(damage × 1.5); then subt
 - A pod **activates** when any member sees a soldier, is shot at, or is caught in an explosion.
 - **Scamper:** when a pod activates, every member immediately takes one free move to cover (Husks charge instead), even during the player phase. They then act normally in the next enemy phase.
 - The camera pans to the pod reveal, a short beat with a banner showing the pod's name.
+- Patrols are real moves: the leader walks up to its blue range toward a random target within 8 tiles of the spawn (re-rolled on arrival) and the others regroup around it, so patrols can trigger overwatch and reveal themselves. A pod that wakes during its own patrol scampers and skips its normal turn that phase.
+- Optional **chain activation** wakes pods within 4 tiles of an activating pod. It is the mission parameter `podChainActivation` in `missions.json` and is off by default.
 
 ### 4.9 Enemy AI (utility scoring)
 For each enemy on its turn:

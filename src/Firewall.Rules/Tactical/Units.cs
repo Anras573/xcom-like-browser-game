@@ -26,8 +26,24 @@ public readonly record struct PodId(int Value)
     public override string ToString() => $"pod{Value}";
 }
 
-/// <summary>A pod of the mission: its name and where it spawned.</summary>
-public sealed record Pod(PodId Id, string Name, GridPos Spawn);
+/// <summary>
+/// A pod of the mission (GDD §4.8). It starts dormant and patrols as a group; the first member is
+/// the leader. Once <see cref="Active"/> it acts like any other enemy.
+/// </summary>
+public sealed class Pod(PodId id, string name, GridPos spawn)
+{
+    public PodId Id { get; } = id;
+    public string Name { get; } = name;
+    public GridPos Spawn { get; } = spawn;
+
+    /// <summary>Everyone who spawned with the pod, leader first; the dead stay listed.</summary>
+    public List<UnitId> Members { get; } = [];
+
+    public bool Active { get; set; }
+
+    /// <summary>Where the leader is heading while the pod patrols; re-rolled on arrival.</summary>
+    public GridPos PatrolTarget { get; set; } = spawn;
+}
 
 /// <summary>What a mission asks of <see cref="PodSpawner"/>: a pod's name and its members' enemy ids.</summary>
 public sealed record PodSpec(string Name, IReadOnlyList<string> EnemyIds);

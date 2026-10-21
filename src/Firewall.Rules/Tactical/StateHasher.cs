@@ -41,6 +41,12 @@ internal static class StateHasher
             Add(ref h, pod.Name);
             Add(ref h, pod.Spawn.X);
             Add(ref h, pod.Spawn.Y);
+            Add(ref h, pod.Active);
+            Add(ref h, pod.PatrolTarget.X);
+            Add(ref h, pod.PatrolTarget.Y);
+            Add(ref h, pod.Members.Count);
+            foreach (var member in pod.Members)
+                Add(ref h, member.Value);
         }
 
         Add(ref h, state.Units.Count);

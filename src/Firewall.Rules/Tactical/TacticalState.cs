@@ -39,6 +39,9 @@ public sealed class TacticalState(TacticalMap map, IRandom rng, string missionId
 
     public IReadOnlyList<Pod> Pods => _pods;
 
+    /// <summary>Veteran: patrolling pods drift toward the squad (GDD §4.8). Set by the mission setup.</summary>
+    public bool PodsDriftToSquad { get; set; }
+
     /// <summary>What the squad sees (fog of war).</summary>
     public VisibilityMap PlayerVision =>
         _playerVision ??= new VisibilityMap(this, Faction.Firewall);
