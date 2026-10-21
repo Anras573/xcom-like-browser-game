@@ -11,7 +11,7 @@ public class UtilityAiTests
         File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "data", f))
     );
 
-    private static TacticalState Field(ulong seed, params string[] rows) =>
+    internal static TacticalState Field(ulong seed, params string[] rows) =>
         new(
             MapParser.Parse(
                 new MapFile
@@ -26,10 +26,10 @@ public class UtilityAiTests
             new Pcg32Random(seed)
         );
 
-    private static string[] Open(int width, int height) =>
+    internal static string[] Open(int width, int height) =>
         Enumerable.Range(0, height).Select(_ => new string('.', width)).ToArray();
 
-    private static TacticalUnit Soldier(TacticalState state, int x, int y, int hp = 10)
+    internal static TacticalUnit Soldier(TacticalState state, int x, int y, int hp = 10)
     {
         var weapon = Data.Weapons["rifle_t1"];
         var unit = new TacticalUnit(state.NextUnitId(), Faction.Firewall, "soldier", "Soldier")
@@ -48,7 +48,7 @@ public class UtilityAiTests
         return unit;
     }
 
-    private static TacticalUnit Enemy(TacticalState state, string defId, int x, int y)
+    internal static TacticalUnit Enemy(TacticalState state, string defId, int x, int y)
     {
         var def = Data.Enemies[defId];
         var unit = new TacticalUnit(state.NextUnitId(), Faction.Meridian, def.Id, def.Name)
@@ -79,7 +79,7 @@ public class UtilityAiTests
         return unit;
     }
 
-    private static IReadOnlyList<GameEvent> EnemyPhase(
+    internal static IReadOnlyList<GameEvent> EnemyPhase(
         TacticalState state,
         AbilityRegistry? abilities = null,
         Action<AiTiming>? timing = null
@@ -323,6 +323,34 @@ public class UtilityAiTests
     // ------------------------------------------------------------------ determinism & budget
 
     [Fact]
+    public void AUnitWithNothingToDoStaysPutInsteadOfWandering()
+    {
+        // The enforcer knows about the soldier (the warden sees it) but is walled in without a shot.
+        var walls = new[]
+        {
+            "#####.......",
+            "#...#.......",
+            "#...#.......",
+            "#...#.......",
+            "#####.......",
+        };
+        foreach (var seed in new ulong[] { 1, 2, 3, 4, 5 })
+        {
+            var state = Field(seed, walls);
+            var enforcer = Enemy(state, "enforcer", 2, 2);
+            enforcer.Mobility = 2;
+            var warden = Enemy(state, "warden", 7, 2);
+            warden.Mobility = 0;
+            Soldier(state, 10, 2);
+
+            var events = EnemyPhase(state);
+
+            Assert.Empty(Acts(events, enforcer));
+            Assert.Equal(new GridPos(2, 2), enforcer.Position);
+        }
+    }
+
+    [Fact]
     public void TheSameSeedAndStateGiveTheSameTurn()
     {
         TacticalState Build()
@@ -353,17 +381,31 @@ public class UtilityAiTests
     }
 
     [Fact]
+    public void ProfilesAreDefinedForEveryBehaviourKind()
+    {
+        foreach (var kind in Enum.GetValues<AiKind>().Where(k => k != AiKind.Stationary))
+            Assert.Single(Data.AiProfiles, p => p.Kind == kind);
+    }
+}
+
+/// <summary>Wall-clock budget, run alone so other test classes do not compete for the CPU.</summary>
+[Collection(nameof(TimingTests))]
+public class UtilityAiTimingTests
+{
+    [Fact]
     public void ABigMapStaysWithinBudgetAndTheTurnEnds()
     {
-        var state = Field(12, Open(48, 48));
+        var state = UtilityAiTests.Field(12, UtilityAiTests.Open(48, 48));
         var timings = new List<AiTiming>();
         foreach (var id in new[] { "warden", "warden", "proxy", "enforcer", "husk" })
-            Enemy(state, id, 20 + timings.Count % 3, 20 + state.Units.Count).Mobility = 8;
-        Soldier(state, 4, 8);
-        Soldier(state, 6, 12);
-        Soldier(state, 3, 30).Sight = 6;
+            UtilityAiTests
+                .Enemy(state, id, 20 + timings.Count % 3, 20 + state.Units.Count)
+                .Mobility = 8;
+        UtilityAiTests.Soldier(state, 4, 8);
+        UtilityAiTests.Soldier(state, 6, 12);
+        UtilityAiTests.Soldier(state, 3, 30).Sight = 6;
 
-        EnemyPhase(state, timing: timings.Add);
+        UtilityAiTests.EnemyPhase(state, timing: timings.Add);
 
         Assert.Equal(5, timings.Count);
         // Native, not WASM; the point is to catch a planner that explodes.
@@ -371,12 +413,5 @@ public class UtilityAiTests
             timings,
             t => Assert.True(t.Milliseconds < 1000, $"{t.Profile}: {t.Milliseconds} ms")
         );
-    }
-
-    [Fact]
-    public void ProfilesAreDefinedForEveryBehaviourKind()
-    {
-        foreach (var kind in Enum.GetValues<AiKind>().Where(k => k != AiKind.Stationary))
-            Assert.Single(Data.AiProfiles, p => p.Kind == kind);
     }
 }

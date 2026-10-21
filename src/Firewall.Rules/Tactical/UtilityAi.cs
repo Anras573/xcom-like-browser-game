@@ -252,7 +252,8 @@ public sealed class UtilityAi(
                 var move = tile.Tile == _unit.Position ? (GridPos?)null : tile.Tile;
                 if (action is not null)
                     Consider(new Plan(move, action, tile.Score + value));
-                else if (move is not null)
+                else
+                    // Staying put with nothing to do is a plan too: it lets the move cost decide.
                     Consider(new Plan(move, null, tile.Score));
             }
 
@@ -426,6 +427,7 @@ public sealed class UtilityAi(
                 Weapon = _unit.Weapon,
                 MovedThisTurn = _unit.MovedThisTurn || moved,
             };
+            ghost.Abilities.UnionWith(_unit.Abilities);
             ghost.Statuses.Flags = _unit.Statuses.Flags;
             return ghost;
         }
