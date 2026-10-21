@@ -37,11 +37,14 @@ public sealed class AiContext(TacticalEngine engine, List<GameEvent> sink)
 
     public ValidationResult Validate(ICommand cmd) => engine.Validate(cmd);
 
+    /// <summary>Where <paramref name="unit"/> can walk right now, planned the way a move will run.</summary>
+    public MoveZones MoveRange(TacticalUnit unit) => engine.MoveRange(unit);
+
     /// <summary>Runs the command (it throws if invalid); its events join the enemy phase's events.</summary>
     public IReadOnlyList<GameEvent> Execute(ICommand cmd) => engine.ExecuteInternal(cmd, sink);
 }
 
-/// <summary>The "do nothing" AI until #26.</summary>
+/// <summary>The "do nothing" AI: for tests and tools that want a still enemy phase. The game plays <see cref="UtilityAi"/>.</summary>
 public sealed class NullAiController : IAiController
 {
     public void TakeTurn(TacticalUnit unit, AiContext ctx) { }

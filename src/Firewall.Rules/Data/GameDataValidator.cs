@@ -19,6 +19,7 @@ internal static class GameDataValidator
         Ids(errors, "workshop item", d.Workshop);
         Ids(errors, "mission type", d.Missions);
         Ids(errors, "district", d.Districts);
+        Ids(errors, "AI profile", d.AiProfiles);
         foreach (var facility in d.Facilities)
             Ids(errors, $"upgrade of facility '{facility.Id}'", facility.Upgrades);
 
@@ -290,6 +291,22 @@ internal static class GameDataValidator
             }
             else if (t.HitsToDestroy != 0)
                 Err($"{p}: hitsToDestroy {t.HitsToDestroy} without destructibleInto");
+        }
+
+        foreach (var kind in Enum.GetValues<AiKind>())
+            if (kind != AiKind.Stationary && d.AiProfiles.Count(a => a.Kind == kind) != 1)
+                Err($"AI kind {kind} needs exactly one profile in ai_profiles.json");
+        foreach (var a in d.AiProfiles)
+        {
+            var p = $"AI profile '{a.Id}'";
+            if (a.PreferredRangeMin < 0 || a.PreferredRangeMin > a.PreferredRangeMax)
+                Err($"{p}: invalid preferred range {a.PreferredRangeMin}-{a.PreferredRangeMax}");
+            if (a.CoverWeight < 0 || a.FlankWeight < 0 || a.ExposedWeight < 0 || a.RangeWeight < 0)
+                Err($"{p}: negative weight");
+            if (a.AllyWeight < 0 || a.OverwatchAvoidWeight < 0 || a.Noise < 0 || a.MoveCost < 0)
+                Err($"{p}: negative weight");
+            if (a.OverwatchBelowHit is < 0 or > 100)
+                Err($"{p}: overwatchBelowHit {a.OverwatchBelowHit} must be 0-100");
         }
 
         if (d.Names.FirstNames.Count == 0 || d.Names.LastNames.Count == 0)

@@ -97,7 +97,11 @@ public sealed class SkirmishScene : SceneBase
         _state = new TacticalState(map, rng);
         SquadDeployer.Deploy(_state, DebugSquad.Create(_state, Ctx.Data, rng.Fork("squad")));
         PodSpawner.Spawn(_state, Ctx.Data, Pods, rng.Fork("pods"));
-        _engine = new TacticalEngine(_state, Ctx.Data);
+        _engine = new TacticalEngine(
+            _state,
+            Ctx.Data,
+            new UtilityAi(Ctx.Data, timingLog: LogAiTiming)
+        );
 
         map.TileChanged += _ => InvalidateRange();
         _tilemaps = MapTilemaps.Build(World, map, Ctx.Assets);
@@ -126,6 +130,16 @@ public sealed class SkirmishScene : SceneBase
     // The soldiers who can still be selected: on the map and not down.
     private List<TacticalUnit> Soldiers() =>
         _state.Units.Where(u => u.Faction == Faction.Firewall && u.IsStanding).ToList();
+
+    // Debug builds log how long each enemy took to plan (budget: 30 ms per unit in the browser).
+    private static void LogAiTiming(AiTiming timing)
+    {
+#if DEBUG
+        Console.WriteLine(
+            $"[AI] {timing.Unit} ({timing.Profile}): {timing.Milliseconds:F1} ms over {timing.Steps} steps"
+        );
+#endif
+    }
 
     private void Select(TacticalUnit unit, bool instant = false)
     {

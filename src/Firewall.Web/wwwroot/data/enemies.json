@@ -45,8 +45,8 @@
       "usesCover": true,
       "overwatches": true,
       "coverWeight": 1.5,
-      "preferredRangeMin": 5,
-      "preferredRangeMax": 10,
+      "preferredRangeMin": 6,
+      "preferredRangeMax": 11,
       "flankWeight": 1.0
     },
     "sprite": {
