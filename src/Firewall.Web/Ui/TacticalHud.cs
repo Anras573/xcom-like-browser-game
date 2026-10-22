@@ -457,7 +457,8 @@ public static class TacticalHud
             if (ui.IsHovering(rect))
                 hovered = a;
         }
-        if (hovered is not null)
+        // The tooltip repeats this text, so the line steps aside once the tooltip shows.
+        if (hovered is not null && !ui.TooltipVisible)
         {
             var text = $"[c=#3fd0ff]{hovered.Slot.Name}[/c]  {hovered.Slot.Description}";
             var style = ui.Theme.Body;

@@ -194,11 +194,11 @@ public sealed class SkirmishScene : SceneBase
             RequestEndTurn();
         else if (_exhaustedTimer >= 0f && (_exhaustedTimer -= dt) < 0f)
             Play(_engine.EndPlayerPhase());
-        if (_autoSelect && !IsMoving)
+        if (_autoSelect && !Busy)
             AutoSelect();
-        if (_targeting is not null && !IsMoving)
+        if (_targeting is not null && !Busy)
             UpdateTargeting();
-        else if (soldiers.Count > 0 && !IsMoving)
+        else if (soldiers.Count > 0 && !Busy)
         {
             if (
                 HudSlots()
@@ -779,9 +779,16 @@ public sealed class SkirmishScene : SceneBase
 
     // ------------------------------------------------------------------ HUD glue
 
-    /// <summary>Playback or the enemy phase is running (or the mission is over): input is locked.</summary>
+    /// <summary>
+    /// Playback or the enemy phase is running (or the mission is over): input is locked. The rules run
+    /// the enemy phase inside the End Turn command, so the state is already back in the player phase
+    /// while its banners play; only the closing player-phase banner lets input through.
+    /// </summary>
     private bool Busy =>
-        IsMoving || _state.Phase != TacticalPhase.Player || _state.Result is not null;
+        IsMoving
+        || _state.Phase != TacticalPhase.Player
+        || _state.Result is not null
+        || _banners.Any(b => b.Phase != TacticalPhase.Player);
 
     private IReadOnlyList<AbilitySlot> HudSlots() =>
         Selected is { } unit
