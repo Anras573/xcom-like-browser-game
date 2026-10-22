@@ -22,6 +22,7 @@ public sealed class SquadBuilderScene : SceneBase
 
     private SquadBuilderModel _model = null!;
     private TacticalState _scratch = null!;
+    private ScreenCanvas _canvas;
     private int _forceLevel = 2;
 
     public override string Name => "SquadBuilder";
@@ -51,6 +52,7 @@ public sealed class SquadBuilderScene : SceneBase
 
     protected override void DrawScreen(ScreenCanvas canvas, UiContext ui)
     {
+        _canvas = canvas;
         var total = SquadBuilderModel.Size * ColumnWidth + (SquadBuilderModel.Size - 1) * Gap;
         var left = (UiSpace.LogicalWidth - total) / 2f;
         ui.Label(
@@ -68,14 +70,20 @@ public sealed class SquadBuilderScene : SceneBase
             );
 
         var y = UiSpace.LogicalHeight - 70f;
-        ui.Label(new UiRect(left, y, 130f, 40f), $"Force Level {_forceLevel}", ui.Theme.Body);
-        if (ui.Button(new UiRect(left + 130f, y + 6f, ArrowWidth, 28f), "<"))
+        ui.Label(new UiRect(left, y, 110f, 40f), "Force Level", ui.Theme.Body);
+        if (ui.Button(new UiRect(left + 114f, y + 6f, ArrowWidth, 28f), "<"))
             _forceLevel = Cycle(
                 _forceLevel - 1,
                 EncounterBuilder.MinForceLevel,
                 EncounterBuilder.MaxForceLevel
             );
-        if (ui.Button(new UiRect(left + 164f, y + 6f, ArrowWidth, 28f), ">"))
+        ui.Label(
+            new UiRect(left + 114f + ArrowWidth, y, 40f, 40f),
+            _forceLevel.ToString(),
+            ui.Theme.Body,
+            TextAlignment.Center
+        );
+        if (ui.Button(new UiRect(left + 114f + ArrowWidth + 40f, y + 6f, ArrowWidth, 28f), ">"))
             _forceLevel = Cycle(
                 _forceLevel + 1,
                 EncounterBuilder.MinForceLevel,
@@ -110,12 +118,12 @@ public sealed class SquadBuilderScene : SceneBase
         {
             ui.Icon(def.Icon ?? "icon.star", new UiRect(body.X, y, 22f, 22f), ui.Theme.Accent);
             ui.Label(
-                new UiRect(body.X + 28f, y, body.W - 28f, 22f),
+                new UiRect(body.X + 28f, y, body.W - 28f, 40f),
                 def.Description ?? def.Role,
-                ui.Theme.Small
+                ui.Theme.Small,
+                wrap: true
             );
-            ui.Tooltip(new UiRect(body.X, y, body.W, 22f), def.Description ?? def.Role);
-            y += 28f;
+            y += 46f;
         }
         y = Row(
             ui,
@@ -217,8 +225,8 @@ public sealed class SquadBuilderScene : SceneBase
             change(-1);
         ui.Label(
             new UiRect(valueX, y, valueW, RowHeight),
-            value,
-            ui.Theme.Body,
+            Fit(value, ui.Theme.Small, valueW),
+            ui.Theme.Small,
             TextAlignment.Center
         );
         if (
@@ -267,6 +275,16 @@ public sealed class SquadBuilderScene : SceneBase
                 : Ctx.Data.Abilities[offered[0]].Name;
         ui.Label(new UiRect(x + 6f, y, body.Right - x - 6f, 36f), shown, ui.Theme.Small);
         return y + 42f;
+    }
+
+    // Cuts the text with an ellipsis so it stays between the arrows.
+    private string Fit(string text, TextStyle style, float width)
+    {
+        if (_canvas.Measure(text, style) <= width)
+            return text;
+        while (text.Length > 1 && _canvas.Measure(text + "...", style) > width)
+            text = text[..^1];
+        return text + "...";
     }
 
     private static int Cycle(int value, int min, int max) =>

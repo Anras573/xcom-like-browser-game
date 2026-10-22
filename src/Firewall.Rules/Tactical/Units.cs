@@ -110,6 +110,9 @@ public sealed class PerkState
 
     public bool HitAndRunUsed { get; set; }
 
+    /// <summary>A stun cost the unit this turn: it has no AP and is not "done" for Overclock to refill.</summary>
+    public bool LostTurnToStun { get; set; }
+
     /// <summary>Kills refunded this turn by In The Zone.</summary>
     public int InTheZoneUses { get; set; }
 

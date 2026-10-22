@@ -19,7 +19,8 @@ public sealed class DebugMenuScene : SceneBase
     {
         var entries = DebugScenes.All;
         const float w = 420f;
-        const float row = 48f;
+        // Shrinks to fit when the list grows past the screen.
+        var row = MathF.Min(48f, (UiSpace.LogicalHeight - 130f) / MathF.Max(1, entries.Count));
         var h = 70f + entries.Count * row + 40f;
         var body = ui.Panel(
             new UiRect((UiSpace.LogicalWidth - w) / 2f, (UiSpace.LogicalHeight - h) / 2f, w, h),
@@ -28,7 +29,7 @@ public sealed class DebugMenuScene : SceneBase
         var y = body.Y;
         foreach (var (name, create) in entries)
         {
-            if (ui.Button(new UiRect(body.X, y, body.W, 40), name))
+            if (ui.Button(new UiRect(body.X, y, body.W, row - 6f), name))
                 Ctx.Scenes.Push(create());
             y += row;
         }

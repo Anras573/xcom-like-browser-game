@@ -610,6 +610,7 @@ public sealed partial class TacticalEngine
         unit.Perks.DashedThisTurn = false;
         unit.Perks.ShootOnlyAp = 0;
         unit.Perks.HitAndRunUsed = false;
+        unit.Perks.LostTurnToStun = stunned;
         unit.Perks.InTheZoneUses = 0;
         unit.Perks.LightningReflexesSpent = false;
         unit.ActionPoints = stunned ? 0 : ApPerTurn;

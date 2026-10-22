@@ -38,7 +38,11 @@ public sealed class HackAbility : IAbilityHandler, IAbilityPreview
     public ValidationResult Validate(AbilityContext ctx)
     {
         var target = ctx.State.Unit(((UnitTarget)ctx.Target).Id);
-        if (!ctx.Data.Enemies.TryGet(target.DefId, out var enemy) || !enemy.Robot)
+        if (
+            !ctx.Data.Enemies.TryGet(target.DefId, out var enemy)
+            || !enemy.Robot
+            || enemy.Kind != EnemyKind.Unit
+        )
             return ValidationResult.Fail($"{target.DisplayName} is not a robot.");
         if (target.ImmuneToStun || enemy.ImmuneToStun)
             return ValidationResult.Fail($"{target.DisplayName} is immune to hacking.");
@@ -105,8 +109,10 @@ public sealed class HackAbility : IAbilityHandler, IAbilityPreview
             return;
         }
         target.Statuses.Set(StatusFlags.Stunned);
-        target.Reactions.Clear();
         ctx.Events.Add(new StatusAdded(target.Id, StatusFlags.Stunned));
+        // Whatever it was holding goes with it: its suppression, overwatch and other triggers.
+        Suppression.Release(ctx.State, target.Id, ctx.Events);
+        AllyOverclockAbility.StandDown(target, ctx.Events);
         ctx.Events.Add(new AbilityTriggered(target.Id, ctx.Def.Id, "HACKED"));
     }
 }
@@ -127,9 +133,24 @@ public sealed class AllyOverclockAbility : IAbilityHandler
             : ValidationResult.Fail($"{target.DisplayName} cannot act.");
     }
 
+    /// <summary>Drops the unit's reaction triggers and its overwatch and hunker statuses.</summary>
+    public static void StandDown(TacticalUnit unit, List<GameEvent> events)
+    {
+        unit.Reactions.Clear();
+        foreach (var flag in new[] { StatusFlags.Overwatch, StatusFlags.Hunkered })
+        {
+            if (!unit.Statuses.Has(flag))
+                continue;
+            unit.Statuses.Set(flag, false);
+            events.Add(new StatusRemoved(unit.Id, flag));
+        }
+    }
+
     public void Execute(AbilityContext ctx)
     {
         var target = ctx.State.Unit(((UnitTarget)ctx.Target).Id);
+        // A soldier on overwatch or hunkered who gets to act again gives that up.
+        StandDown(target, ctx.Events);
         target.ActionPoints += (int)ctx.Def.Parameters.GetValueOrDefault("grantAp", 1);
         ctx.Events.Add(new ApChanged(target.Id, target.ActionPoints));
         ctx.Events.Add(new AbilityTriggered(target.Id, ctx.Def.Id, "OVERCLOCKED"));

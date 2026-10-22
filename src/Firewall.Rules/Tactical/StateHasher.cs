@@ -102,6 +102,7 @@ internal static class StateHasher
             Add(ref h, u.Perks.DashedThisTurn);
             Add(ref h, u.Perks.ShootOnlyAp);
             Add(ref h, u.Perks.HitAndRunUsed);
+            Add(ref h, u.Perks.LostTurnToStun);
             Add(ref h, u.Perks.InTheZoneUses);
             Add(ref h, u.Perks.LightningReflexesSpent);
             Add(ref h, u.Perks.UntouchableArmed);

@@ -84,18 +84,23 @@ public sealed class TargetingMode
                 TargetsAllies = AimsAtAllies(engine, abilityId),
             };
         }
-        // The nearest candidate gives the most useful reason: no AP, out of ammo, no LOS, ...
-        var nearest = Possible(engine, shooter, isVisible, abilityId)
+        // The nearest unit gives the most useful reason: no AP, out of ammo, no LOS, ... Units the
+        // ability can never aim at ("Husk is not a robot") only count when nothing else is left.
+        var reasons = Possible(engine, shooter, isVisible, abilityId)
             .OrderBy(u => u.Position.DistanceTo(shooter.Position))
             .ThenBy(u => u.Id.Value)
-            .FirstOrDefault();
-        reason = nearest is null
-            ? AimsAtAllies(engine, abilityId)
-                ? "No squadmate to target."
-                : "No enemies in sight."
-            : engine
-                .Validate(new UseAbilityCommand(shooter.Id, abilityId, Target.Unit(nearest.Id)))
-                .Reason;
+            .Select(u =>
+                engine
+                    .Validate(new UseAbilityCommand(shooter.Id, abilityId, Target.Unit(u.Id)))
+                    .Reason
+            )
+            .ToList();
+        reason =
+            reasons.FirstOrDefault(r => !r.EndsWith("is not a robot."))
+            ?? (reasons.Count > 0 ? "No robot in sight." : null)
+            ?? (
+                AimsAtAllies(engine, abilityId) ? "No squadmate to target." : "No enemies in sight."
+            );
         return null;
     }
 

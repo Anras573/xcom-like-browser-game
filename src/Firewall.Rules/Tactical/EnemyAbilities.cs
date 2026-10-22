@@ -16,7 +16,13 @@ public sealed class OverclockAbility : IAbilityHandler
             return ValidationResult.Fail("Overclock needs another unit.");
         if (!ctx.Data.Enemies.TryGet(target.DefId, out var def) || !def.Robot)
             return ValidationResult.Fail($"{target.DisplayName} is not a robot.");
-        if (!target.IsStanding || !target.IsActive || target.Statuses.Stunned)
+        // A robot that lost its turn to a stun (a hack) has no AP because of it, not because it acted.
+        if (
+            !target.IsStanding
+            || !target.IsActive
+            || target.Statuses.Stunned
+            || target.Perks.LostTurnToStun
+        )
             return ValidationResult.Fail($"{target.DisplayName} cannot act.");
         if (!IsWithin(ctx.User.Position, target.Position, (int)ctx.Def.Parameters["range"]))
             return ValidationResult.Fail($"{target.DisplayName} is not adjacent.");

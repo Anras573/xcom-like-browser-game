@@ -627,25 +627,30 @@ public class ClassAbilityTests
     [Fact]
     public void HeadshotAddsThreeDamageAndCoolsDown()
     {
-        var state = Yard();
-        var marksman = Marksman(state, 0, "snap_shot", "sentinel", "headshot");
-        var husk = Enemy(state, "husk", 8);
-        var e = Engine(state);
+        ShotResolved Shot(string ability, ulong seed, out TacticalUnit marksman)
+        {
+            var state = Yard(seed: seed, crates: [7]); // cover keeps the crit chance low
+            marksman = Marksman(state, 0, "snap_shot", "sentinel", "headshot");
+            var husk = Enemy(state, "husk", 8);
+            var e = Engine(state);
+            return Fire(e, marksman, ability, husk).OfType<ShotResolved>().Single();
+        }
 
-        var plain = e.PreviewShot(marksman, husk)!;
-        var head = e.PreviewShot(marksman, husk, SoldierPerks.Headshot)!;
-        Assert.Equal(plain.DamageMin + 3, head.DamageMin);
-        Assert.Equal(plain.DamageMax + 3, head.DamageMax);
-
-        var events = Fire(e, marksman, SoldierPerks.Headshot, husk);
-        Assert.Contains(events, ev => ev is AbilityTriggered { Text: "HEADSHOT" });
-        Assert.InRange(
-            events.OfType<ShotResolved>().Single().Damage,
-            head.DamageMin,
-            head.DamageMax * 2
-        );
-        Assert.Equal(3, marksman.Cooldowns[SoldierPerks.Headshot]);
-        Assert.Equal(0, marksman.ActionPoints);
+        var uncrit = 0;
+        for (ulong seed = 1; seed <= 20; seed++)
+        {
+            var plain = Shot(AbilityRegistry.Shoot, seed, out _);
+            var head = Shot(SoldierPerks.Headshot, seed, out var marksman);
+            Assert.Equal(plain.Hit, head.Hit);
+            if (plain.Crit || head.Crit)
+                continue;
+            // Same rolls: the same damage plus 3.
+            Assert.Equal(plain.Damage + 3, head.Damage);
+            uncrit++;
+            Assert.Equal(3, marksman.Cooldowns[SoldierPerks.Headshot]);
+            Assert.Equal(0, marksman.ActionPoints);
+        }
+        Assert.True(uncrit > 5);
     }
 
     // ------------------------------------------------------------------ Gunner
@@ -741,9 +746,9 @@ public class ClassAbilityTests
     [Fact]
     public void MayhemAddsTwoDamageToSuppressionReactionShots()
     {
-        int Damage(bool mayhem)
+        int Damage(bool mayhem, ulong seed)
         {
-            var state = Yard();
+            var state = Yard(seed: seed);
             var gunner = Gunner(state, 0, "shredder", "grenadier", mayhem ? "mayhem" : "rupture");
             var husk = Enemy(state, "husk", 8);
             var e = Engine(
@@ -751,12 +756,14 @@ public class ClassAbilityTests
                 new ScriptAi(u => [new MoveCommand(u.Id, new GridPos(u.Position.X - 1, 1))])
             );
             Fire(e, gunner, SoldierPerks.Suppression, husk);
-            return e.EndPlayerPhase().OfType<ShotResolved>().Single().Damage;
+            var shot = e.EndPlayerPhase().OfType<ShotResolved>().Single();
+            Assert.False(shot.Crit); // reaction shots cannot crit
+            return shot.Damage;
         }
 
-        // LMG 4 to 6; a reaction shot cannot crit.
-        Assert.InRange(Damage(mayhem: false), 4, 6);
-        Assert.InRange(Damage(mayhem: true), 6, 8);
+        // Same seed, same rolls: the only difference is Mayhem's +2.
+        for (ulong seed = 1; seed <= 10; seed++)
+            Assert.Equal(Damage(mayhem: false, seed) + 2, Damage(mayhem: true, seed));
     }
 
     [Fact]
@@ -796,6 +803,43 @@ public class ClassAbilityTests
 
         Assert.Equal(before.DamageMin + 3, after.DamageMin);
         Assert.Equal(before.DamageMax + 3, after.DamageMax);
+    }
+
+    [Fact]
+    public void ARupturedSoldierTakesThreeMoreFromAnEnemy()
+    {
+        var state = Yard();
+        var rookie = Rookie(state, 0);
+        var husk = Enemy(state, "husk", 1);
+        var plain = HitCalculator.Preview(state, husk, rookie, ShotContext.For(Data, husk));
+
+        rookie.Statuses.Set(StatusFlags.Ruptured);
+        var ruptured = HitCalculator.Preview(state, husk, rookie, ShotContext.For(Data, husk));
+
+        Assert.Equal(plain.DamageMin + 3, ruptured.DamageMin);
+        Assert.Equal(plain.DamageMax + 3, ruptured.DamageMax);
+    }
+
+    [Fact]
+    public void ARupturedTargetTakesThreeMoreFromAReactionShot()
+    {
+        int Damage(bool ruptured, ulong seed)
+        {
+            var state = Yard(seed: seed);
+            var rookie = Rookie(state, 0);
+            var husk = Enemy(state, "husk", 8);
+            if (ruptured)
+                husk.Statuses.Set(StatusFlags.Ruptured);
+            var e = Engine(
+                state,
+                new ScriptAi(u => [new MoveCommand(u.Id, new GridPos(u.Position.X - 1, 1))])
+            );
+            e.Execute(Use(rookie, AbilityRegistry.Overwatch));
+            return e.EndPlayerPhase().OfType<ShotResolved>().Single().Damage;
+        }
+
+        for (ulong seed = 1; seed <= 10; seed++)
+            Assert.Equal(Damage(false, seed) + 3, Damage(true, seed));
     }
 
     // ------------------------------------------------------------------ Tech
@@ -891,6 +935,126 @@ public class ClassAbilityTests
     }
 
     [Fact]
+    public void HackRejectsAnObject()
+    {
+        var state = Yard();
+        var tech = Tech(state, 0);
+        var relay = Enemy(state, "relay_node", 4);
+        var e = Engine(state);
+
+        Assert.Contains("not a robot", e.Validate(Use(tech, SoldierPerks.Hack, relay)).Reason);
+    }
+
+    // Hacks the target on the first seed that succeeds, then hands back the engine.
+    private static TacticalEngine HackUntilItWorks(
+        Func<ulong, (TacticalEngine Engine, TacticalUnit Tech, TacticalUnit Target)> setup,
+        out IReadOnlyList<GameEvent> events,
+        out TacticalUnit target
+    )
+    {
+        for (ulong seed = 1; seed <= 200; seed++)
+        {
+            var (e, tech, hacked) = setup(seed);
+            var result = Fire(e, tech, SoldierPerks.Hack, hacked);
+            if (!hacked.Statuses.Stunned)
+                continue;
+            events = result;
+            target = hacked;
+            return e;
+        }
+        throw new InvalidOperationException("No hack succeeded in 200 seeds.");
+    }
+
+    [Fact]
+    public void AHackedRobotCannotBeOverclockedIntoActing()
+    {
+        TacticalUnit warden = null!;
+        var e = HackUntilItWorks(
+            seed =>
+            {
+                var state = Yard(seed: seed);
+                var tech = Tech(state, 0);
+                warden = Enemy(state, "warden", 5);
+                Enemy(state, "proxy", 6);
+                // The real AI: the Proxy would love to boost a robot that is out of AP.
+                return (Engine(state, new UtilityAi(Data)), tech, warden);
+            },
+            out _,
+            out var hacked
+        );
+
+        var events = e.EndPlayerPhase();
+
+        Assert.DoesNotContain(
+            events,
+            ev => ev is AbilityUsed { AbilityId: AbilityRegistry.ProxyOverclock }
+        );
+        Assert.DoesNotContain(events, ev => ev is UnitMoved m && m.Unit == hacked.Id);
+        Assert.Equal(0, hacked.ActionPoints);
+    }
+
+    [Fact]
+    public void AHackedEnforcerReleasesItsSuppression()
+    {
+        TacticalUnit rookie = null!;
+        HackUntilItWorks(
+            seed =>
+            {
+                var state = Yard(seed: seed);
+                var tech = Tech(state, 0);
+                rookie = Rookie(state, 1);
+                var enforcer = Enemy(state, "enforcer", 5);
+                rookie.Statuses.SuppressedBy = enforcer.Id;
+                rookie.Statuses.Set(StatusFlags.Suppressed);
+                enforcer.Reactions.Add(
+                    new ReactionTrigger(SoldierPerks.Suppression, StatusFlags.None)
+                    {
+                        Only = rookie.Id,
+                    }
+                );
+                return (Engine(state), tech, enforcer);
+            },
+            out var events,
+            out var hacked
+        );
+
+        Assert.False(rookie.Statuses.Suppressed);
+        Assert.Null(rookie.Statuses.SuppressedBy);
+        Assert.Empty(hacked.Reactions);
+        Assert.Contains(
+            events,
+            ev => ev is StatusRemoved(var id, StatusFlags.Suppressed) && id == rookie.Id
+        );
+    }
+
+    [Fact]
+    public void AHackedOverwatcherLosesItsOverwatch()
+    {
+        HackUntilItWorks(
+            seed =>
+            {
+                var state = Yard(seed: seed);
+                var tech = Tech(state, 0);
+                var warden = Enemy(state, "warden", 5);
+                warden.Reactions.Add(
+                    new ReactionTrigger(AbilityRegistry.Overwatch, StatusFlags.Overwatch)
+                );
+                warden.Statuses.Set(StatusFlags.Overwatch);
+                return (Engine(state), tech, warden);
+            },
+            out var events,
+            out var hacked
+        );
+
+        Assert.False(hacked.Statuses.Overwatch);
+        Assert.Empty(hacked.Reactions);
+        Assert.Contains(
+            events,
+            ev => ev is StatusRemoved(var id, StatusFlags.Overwatch) && id == hacked.Id
+        );
+    }
+
+    [Fact]
     public void HackNeedsLineOfSight()
     {
         var state = Yard(wallX: 3);
@@ -920,6 +1084,28 @@ public class ClassAbilityTests
         // It is for this turn only.
         e.EndPlayerPhase();
         Assert.Equal(2, ally.ActionPoints);
+    }
+
+    [Fact]
+    public void OverclockTakesAnAllyOffOverwatchAndHunker()
+    {
+        var state = Yard(crates: [3]);
+        var tech = Tech(state, 0);
+        var ally = Rookie(state, 2);
+        Enemy(state, "husk", 23);
+        var e = Engine(state);
+        e.Execute(Use(ally, AbilityRegistry.Overwatch));
+        Assert.True(ally.Statuses.Overwatch);
+
+        var events = e.Execute(Use(tech, SoldierPerks.Overclock, ally));
+
+        Assert.False(ally.Statuses.Overwatch);
+        Assert.Empty(ally.Reactions);
+        Assert.Contains(
+            events,
+            ev => ev is StatusRemoved(var id, StatusFlags.Overwatch) && id == ally.Id
+        );
+        Assert.Equal(1, ally.ActionPoints);
     }
 
     [Fact]
