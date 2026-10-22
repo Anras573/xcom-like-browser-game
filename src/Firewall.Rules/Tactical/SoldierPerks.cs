@@ -64,8 +64,7 @@ public static class SoldierPerks
     /// Whether a weapon that cannot fire after moving may do so anyway: only with Snap Shot, which
     /// costs aim (<see cref="HitCalculator"/>).
     /// </summary>
-    public static bool CanFireAfterMoving(TacticalUnit unit) =>
-        unit.Abilities.Contains(SnapShot);
+    public static bool CanFireAfterMoving(TacticalUnit unit) => unit.Abilities.Contains(SnapShot);
 
     /// <summary>Run &amp; Gun is ready: the unit dashed this turn and the ability is off cooldown.</summary>
     public static bool CanRunAndGun(TacticalUnit unit) =>
@@ -112,8 +111,16 @@ public static class SoldierPerks
         IReadOnlySet<string> abilities,
         ItemDef item
     ) =>
-        (IsExplosive(item) && abilities.Contains(DangerZone) ? IntParam(data, DangerZone, "radius", 1) : 0)
-        + (IsSmoke(item) && abilities.Contains(SmokeScreen) ? IntParam(data, SmokeScreen, "radius", 1) : 0);
+        (
+            IsExplosive(item) && abilities.Contains(DangerZone)
+                ? IntParam(data, DangerZone, "radius", 1)
+                : 0
+        )
+        + (
+            IsSmoke(item) && abilities.Contains(SmokeScreen)
+                ? IntParam(data, SmokeScreen, "radius", 1)
+                : 0
+        );
 
     /// <summary>HP a medkit heals: the item's, plus Revive and Savior.</summary>
     public static int MedkitHeal(GameData data, IReadOnlySet<string> abilities, ItemDef medkit) =>

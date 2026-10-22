@@ -69,7 +69,10 @@ public sealed class HackAbility : IAbilityHandler, IAbilityPreview
     {
         var tier = ctx.Data.Enemies.TryGet(target.DefId, out var enemy) ? enemy.Tier : 0;
         var p = ctx.Def.Parameters;
-        var breakdown = new List<(string, int)> { ("Hack", (int)p.GetValueOrDefault("baseChance", 50)) };
+        var breakdown = new List<(string, int)>
+        {
+            ("Hack", (int)p.GetValueOrDefault("baseChance", 50)),
+        };
         var rank = (int)(p.GetValueOrDefault("perRank", 5) * (int)ctx.User.Rank);
         if (rank != 0)
             breakdown.Add(("Rank", rank));

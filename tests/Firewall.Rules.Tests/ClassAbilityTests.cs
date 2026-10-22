@@ -63,7 +63,12 @@ public class ClassAbilityTests
     }
 
     // Captain picks, in rank order (Sergeant, Lieutenant, Captain).
-    private static readonly string[] BreacherDefault = ["close_combat", "rapid_fire", "untouchable"];
+    private static readonly string[] BreacherDefault =
+    [
+        "close_combat",
+        "rapid_fire",
+        "untouchable",
+    ];
     private static readonly string[] MarksmanDefault = ["snap_shot", "sentinel", "headshot"];
     private static readonly string[] GunnerDefault = ["shredder", "grenadier", "mayhem"];
     private static readonly string[] TechDefault = ["smoke_screen", "hack", "overclock"];
@@ -80,10 +85,15 @@ public class ClassAbilityTests
     private static TacticalUnit Tech(TacticalState s, int x, params string[] picks) =>
         Soldier(s, "tech", Rank.Captain, x, picks.Length == 3 ? picks : TechDefault);
 
-    private static TacticalUnit Rookie(TacticalState s, int x) =>
-        Soldier(s, null, Rank.Rookie, x);
+    private static TacticalUnit Rookie(TacticalState s, int x) => Soldier(s, null, Rank.Rookie, x);
 
-    private static TacticalUnit Enemy(TacticalState state, string defId, int x, int hp = 100, int y = 1)
+    private static TacticalUnit Enemy(
+        TacticalState state,
+        string defId,
+        int x,
+        int hp = 100,
+        int y = 1
+    )
     {
         var def = Data.Enemies[defId];
         var unit = new TacticalUnit(state.NextUnitId(), Faction.Meridian, defId, def.Name)
@@ -116,8 +126,11 @@ public class ClassAbilityTests
     private static TacticalEngine Engine(TacticalState state, IAiController? ai = null) =>
         new(state, Data, ai);
 
-    private static UseAbilityCommand Use(TacticalUnit unit, string id, TacticalUnit? target = null) =>
-        new(unit.Id, id, target is null ? Target.None : Target.Unit(target.Id));
+    private static UseAbilityCommand Use(
+        TacticalUnit unit,
+        string id,
+        TacticalUnit? target = null
+    ) => new(unit.Id, id, target is null ? Target.None : Target.Unit(target.Id));
 
     private static IReadOnlyList<GameEvent> Fire(
         TacticalEngine e,
@@ -130,7 +143,8 @@ public class ClassAbilityTests
     private static GridPos DashTile(TacticalEngine e, TacticalUnit u)
     {
         var reach = Pathfinder.Reachable(e.State, u, u.Mobility * 4);
-        return e.State.NearestFreeTiles(u.Position)
+        return e
+            .State.NearestFreeTiles(u.Position)
             .First(p => reach.CostTo(p) is { } c && c > u.Mobility * 2);
     }
 
@@ -166,10 +180,7 @@ public class ClassAbilityTests
         Assert.Equal(3, breacher.Cooldowns[SoldierPerks.RunAndGun]);
         // Moving and Overwatch are no shots.
         var step = new GridPos(breacher.Position.X + 1, 1);
-        Assert.Contains(
-            "no action points",
-            e.Validate(new MoveCommand(breacher.Id, step)).Reason
-        );
+        Assert.Contains("no action points", e.Validate(new MoveCommand(breacher.Id, step)).Reason);
         Assert.False(e.Validate(Use(breacher, AbilityRegistry.Overwatch)).IsValid);
         // A shot can.
         Assert.True(e.Validate(Use(breacher, AbilityRegistry.Shoot, husk)).IsValid);
@@ -205,19 +216,30 @@ public class ClassAbilityTests
 
         var close = e.PreviewShot(breacher, near)!;
         Assert.Contains(("Close Combat", 20), close.CritBreakdown);
-        Assert.DoesNotContain(e.PreviewShot(breacher, far)!.CritBreakdown, c => c.Label == "Close Combat");
+        Assert.DoesNotContain(
+            e.PreviewShot(breacher, far)!.CritBreakdown,
+            c => c.Label == "Close Combat"
+        );
     }
 
     [Fact]
     public void LightningReflexesMissesOnlyTheFirstReactionShot()
     {
         var state = Yard();
-        var breacher = Soldier(state, "breacher", Rank.Captain, 0, ["close_combat", "rapid_fire", "untouchable"]);
+        var breacher = Soldier(
+            state,
+            "breacher",
+            Rank.Captain,
+            0,
+            ["close_combat", "rapid_fire", "untouchable"]
+        );
         breacher.Abilities.Add(SoldierPerks.LightningReflexes);
         var first = Enemy(state, "husk", 8);
         var second = Enemy(state, "husk", 9);
         foreach (var watcher in new[] { first, second })
-            watcher.Reactions.Add(new ReactionTrigger(AbilityRegistry.Overwatch, StatusFlags.Overwatch));
+            watcher.Reactions.Add(
+                new ReactionTrigger(AbilityRegistry.Overwatch, StatusFlags.Overwatch)
+            );
         var e = Engine(state);
 
         var events = e.Execute(new MoveCommand(breacher.Id, new GridPos(1, 1)));
@@ -302,7 +324,13 @@ public class ClassAbilityTests
     public void HitAndRunRefundsOneApOnAFlankedTargetOncePerTurn()
     {
         var state = Yard();
-        var breacher = Soldier(state, "breacher", Rank.Captain, 0, ["close_combat", "hit_and_run", "untouchable"]);
+        var breacher = Soldier(
+            state,
+            "breacher",
+            Rank.Captain,
+            0,
+            ["close_combat", "hit_and_run", "untouchable"]
+        );
         var husk = Enemy(state, "husk", 3);
         var e = Engine(state);
 
@@ -319,7 +347,13 @@ public class ClassAbilityTests
     public void HitAndRunNeedsAFlankedTarget()
     {
         var state = Yard(crates: [5]);
-        var breacher = Soldier(state, "breacher", Rank.Captain, 0, ["close_combat", "hit_and_run", "untouchable"]);
+        var breacher = Soldier(
+            state,
+            "breacher",
+            Rank.Captain,
+            0,
+            ["close_combat", "hit_and_run", "untouchable"]
+        );
         var husk = Enemy(state, "husk", 6);
         var e = Engine(state);
 
@@ -338,9 +372,7 @@ public class ClassAbilityTests
         var second = Enemy(state, "husk", 9);
         var e = Engine(
             state,
-            new ScriptAi(u =>
-                u.Id == victim.Id ? [] : [Use(u, AbilityRegistry.Shoot, breacher)]
-            )
+            new ScriptAi(u => u.Id == victim.Id ? [] : [Use(u, AbilityRegistry.Shoot, breacher)])
         );
 
         Assert.False(breacher.Perks.UntouchableArmed);
@@ -607,7 +639,11 @@ public class ClassAbilityTests
 
         var events = Fire(e, marksman, SoldierPerks.Headshot, husk);
         Assert.Contains(events, ev => ev is AbilityTriggered { Text: "HEADSHOT" });
-        Assert.InRange(events.OfType<ShotResolved>().Single().Damage, head.DamageMin, head.DamageMax * 2);
+        Assert.InRange(
+            events.OfType<ShotResolved>().Single().Damage,
+            head.DamageMin,
+            head.DamageMax * 2
+        );
         Assert.Equal(3, marksman.Cooldowns[SoldierPerks.Headshot]);
         Assert.Equal(0, marksman.ActionPoints);
     }
@@ -708,13 +744,7 @@ public class ClassAbilityTests
         int Damage(bool mayhem)
         {
             var state = Yard();
-            var gunner = Gunner(
-                state,
-                0,
-                "shredder",
-                "grenadier",
-                mayhem ? "mayhem" : "rupture"
-            );
+            var gunner = Gunner(state, 0, "shredder", "grenadier", mayhem ? "mayhem" : "rupture");
             var husk = Enemy(state, "husk", 8);
             var e = Engine(
                 state,
@@ -742,7 +772,10 @@ public class ClassAbilityTests
 
         Assert.True(events.OfType<ShotResolved>().Single().Crit);
         Assert.True(husk.Statuses.Ruptured);
-        Assert.Contains(events, ev => ev is StatusAdded(var id, StatusFlags.Ruptured) && id == husk.Id);
+        Assert.Contains(
+            events,
+            ev => ev is StatusAdded(var id, StatusFlags.Ruptured) && id == husk.Id
+        );
         Assert.Equal(1, gunner.ActionPoints); // 1 AP, the turn stays open
         Assert.Equal(4, gunner.Cooldowns[SoldierPerks.Rupture]);
         Assert.Contains("cooldown", e.Validate(Use(gunner, SoldierPerks.Rupture, husk)).Reason);
@@ -980,7 +1013,10 @@ public class ClassAbilityTests
     {
         var unit = Rookie(Yard(), 0);
         Assert.Equal(WeaponClass.Rifle, unit.Weapon!.Def.Class);
-        Assert.Empty(unit.Abilities.Except(AbilityRegistry.StandardActions).Except([AbilityRegistry.DebugStabilize]));
+        Assert.Empty(
+            unit.Abilities.Except(AbilityRegistry.StandardActions)
+                .Except([AbilityRegistry.DebugStabilize])
+        );
     }
 
     [Fact]
@@ -990,7 +1026,12 @@ public class ClassAbilityTests
         var unit = SoldierBuilder.Build(
             state,
             Data,
-            new SoldierSpec { ClassId = "gunner", Rank = Rank.Corporal, WeaponTier = 3 },
+            new SoldierSpec
+            {
+                ClassId = "gunner",
+                Rank = Rank.Corporal,
+                WeaponTier = 3,
+            },
             "T",
             "soldier1"
         );
@@ -1029,7 +1070,12 @@ public class ClassAbilityTests
         Assert.Equal(77, captain.Aim);
         Assert.Equal(Rank.Captain, captain.Rank);
         Assert.Superset(
-            new HashSet<string>(["run_and_gun", "lightning_reflexes", "hit_and_run", "killing_zone"]),
+            new HashSet<string>([
+                "run_and_gun",
+                "lightning_reflexes",
+                "hit_and_run",
+                "killing_zone",
+            ]),
             captain.Abilities
         );
         Assert.DoesNotContain(SoldierPerks.CloseCombat, captain.Abilities);
@@ -1105,16 +1151,30 @@ public class ClassAbilityTests
         // A Sergeant must pick once, and from that rank's two abilities.
         Assert.NotEmpty(Errors(new SoldierSpec { ClassId = "breacher", Rank = Rank.Sergeant }));
         Assert.NotEmpty(
-            Errors(new SoldierSpec { ClassId = "breacher", Rank = Rank.Sergeant, Picks = ["rapid_fire"] })
+            Errors(
+                new SoldierSpec
+                {
+                    ClassId = "breacher",
+                    Rank = Rank.Sergeant,
+                    Picks = ["rapid_fire"],
+                }
+            )
         );
         Assert.Empty(
-            Errors(new SoldierSpec { ClassId = "breacher", Rank = Rank.Sergeant, Picks = ["close_combat"] })
+            Errors(
+                new SoldierSpec
+                {
+                    ClassId = "breacher",
+                    Rank = Rank.Sergeant,
+                    Picks = ["close_combat"],
+                }
+            )
         );
         Assert.NotEmpty(Errors(new SoldierSpec { WeaponTier = 4 }));
         Assert.NotEmpty(Errors(new SoldierSpec { ArmorId = "plate" }));
         Assert.NotEmpty(Errors(new SoldierSpec { ItemIds = ["medkit", "frag_grenade"] }));
-        Assert.Throws<ArgumentException>(
-            () => SoldierBuilder.Build(Yard(), Data, new SoldierSpec { WeaponTier = 0 }, "x", "y")
+        Assert.Throws<ArgumentException>(() =>
+            SoldierBuilder.Build(Yard(), Data, new SoldierSpec { WeaponTier = 0 }, "x", "y")
         );
     }
 

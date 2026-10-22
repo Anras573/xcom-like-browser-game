@@ -469,7 +469,7 @@ public static class TacticalHud
             if (
                 ui.IconButton(
                     rect,
-                    HudModel.IconFor(a.Slot.AbilityId),
+                    a.Slot.Icon,
                     a.Slot.HotkeyLabel,
                     HudModel.AbilityTooltip(a.Slot, reason),
                     cooldown: a.Slot.Cooldown,

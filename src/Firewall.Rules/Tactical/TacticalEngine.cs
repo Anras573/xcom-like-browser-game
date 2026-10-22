@@ -344,7 +344,12 @@ public sealed partial class TacticalEngine
 
         var apBefore = (unit.ActionPoints, unit.Perks.ShootOnlyAp);
         var shooting = handler is ShootAbility;
-        SpendAp(unit, EndsTurn(unit, def, isShot) ? unit.ActionPoints : def.ApCost, events, shooting);
+        SpendAp(
+            unit,
+            EndsTurn(unit, def, isShot) ? unit.ActionPoints : def.ApCost,
+            events,
+            shooting
+        );
         if (def.Cooldown > 0)
             unit.Cooldowns[def.Id] = def.Cooldown;
         if (def.Charges > 0)

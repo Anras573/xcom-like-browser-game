@@ -32,7 +32,13 @@ public static class DebugSquad
         {
             var name = $"{Pick(data.Names.FirstNames, names)} {Pick(data.Names.LastNames, names)}";
             squad.Add(
-                SoldierBuilder.Build(state, data, spec, name, Pick(data.Soldier.AppearanceSets, looks))
+                SoldierBuilder.Build(
+                    state,
+                    data,
+                    spec,
+                    name,
+                    Pick(data.Soldier.AppearanceSets, looks)
+                )
             );
         }
         return squad;

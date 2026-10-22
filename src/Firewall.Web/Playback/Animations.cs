@@ -479,6 +479,8 @@ public sealed class StatusAnimation(UnitId unit, StatusFlags status, bool added)
             StatusFlags.Overwatch => "OVERWATCH",
             StatusFlags.Hunkered => "HUNKERED",
             StatusFlags.Suppressed => "SUPPRESSED",
+            StatusFlags.Stunned => "STUNNED",
+            StatusFlags.Ruptured => "RUPTURED",
             _ => null,
         };
         if (word is not null)
@@ -582,6 +584,22 @@ public sealed class StabilizedAnimation(UnitStabilized stabilized) : TimedAnimat
     }
 }
 
+/// <summary>
+/// <see cref="AbilityTriggered"/>: the ability's name as floating text over the unit ("RUN &amp; GUN",
+/// "IN THE ZONE", "HACKED"). Hostile units only show it while the squad watches them.
+/// </summary>
+public sealed class CalloutAnimation(AbilityTriggered callout) : TimedAnimation
+{
+    private static readonly Color Gold = new(255, 214, 92);
+
+    protected override void Begin()
+    {
+        if (Unit(callout.Unit) is not { } u || !Watched(u))
+            return;
+        Vm.AddFloater(callout.Text, Gold, 22, u.Center + new Vector2(0f, 0.9f));
+    }
+}
+
 /// <summary>An instant change to one unit's view; the callback may also tell the scene.</summary>
 public sealed class UnitEditAnimation(UnitId unit, Action<UnitVm, EventPlayerContext> edit)
     : TimedAnimation
@@ -629,6 +647,8 @@ public static class AnimationFactory
                 0.3f
             ),
             TileChanged t => new FlashAnimation(t.Pos, 1f, new Color(255, 255, 255, 160), 0.15f),
+            AbilityTriggered t => new CalloutAnimation(t),
+            UnitSuppressed s => new UnitEditAnimation(s.Unit, (u, _) => u.SuppressedBy = s.By),
             StatusAdded a => new StatusAnimation(a.Unit, a.Status, true),
             StatusRemoved r => new StatusAnimation(r.Unit, r.Status, false),
             AbilityUsed { AbilityId: AbilityRegistry.Reload } a => new UnitEditAnimation(

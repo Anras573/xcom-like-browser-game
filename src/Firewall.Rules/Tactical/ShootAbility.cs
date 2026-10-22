@@ -109,7 +109,8 @@ public sealed class ShootAbility(RangeType rangeType = RangeType.Ranged)
             if (attacker.Abilities.Contains(SoldierPerks.Shredder) && target.Armor > 0)
                 target.Armor = Math.Max(
                     0,
-                    target.Armor - SoldierPerks.IntParam(shot.Data, SoldierPerks.Shredder, "armorShred", 1)
+                    target.Armor
+                        - SoldierPerks.IntParam(shot.Data, SoldierPerks.Shredder, "armorShred", 1)
                 );
             events.Add(new UnitDamaged(target.Id, damage, target.Hp, target.Armor));
             if (shot.Ruptures && !target.Statuses.Ruptured)

@@ -26,7 +26,12 @@ public sealed record SoldierSpec
         {
             ClassId = classId,
             Rank = classId is null ? Rank.Rookie : rank,
-            Picks = classId is null ? [] : SoldierBuilder.PickRanks(data.Classes[classId], rank).Select(r => r.Abilities[0]).ToList(),
+            Picks = classId is null
+                ? []
+                : SoldierBuilder
+                    .PickRanks(data.Classes[classId], rank)
+                    .Select(r => r.Abilities[0])
+                    .ToList(),
         };
 }
 
@@ -68,7 +73,9 @@ public static class SoldierBuilder
             else
                 for (var i = 0; i < ranks.Count; i++)
                     if (!ranks[i].Abilities.Contains(spec.Picks[i]))
-                        errors.Add($"'{spec.Picks[i]}' is not a {ranks[i].Rank} ability of {def.Name}.");
+                        errors.Add(
+                            $"'{spec.Picks[i]}' is not a {ranks[i].Rank} ability of {def.Name}."
+                        );
         }
 
         if (spec.WeaponTier is < 1 or > 3)
@@ -137,16 +144,15 @@ public static class SoldierBuilder
             AppearanceId = appearanceId,
         };
         unit.Abilities.UnionWith(AbilitiesOf(data, spec));
-        unit.Mobility = soldier.Mobility + armor.Mobility + SoldierPerks.MobilityBonus(data, unit.Abilities);
+        unit.Mobility =
+            soldier.Mobility + armor.Mobility + SoldierPerks.MobilityBonus(data, unit.Abilities);
         foreach (var id in spec.ItemIds)
         {
             var item = data.Items[id];
             // A passive item (the scope) is always on: its aim joins the soldier's.
             if (item.Kind == ItemKind.Passive)
                 unit.Aim += (int)item.Parameters.GetValueOrDefault("aim");
-            unit.Items.Add(
-                new ItemState(id, SoldierPerks.ItemCharges(data, unit.Abilities, item))
-            );
+            unit.Items.Add(new ItemState(id, SoldierPerks.ItemCharges(data, unit.Abilities, item)));
         }
         return unit;
     }
