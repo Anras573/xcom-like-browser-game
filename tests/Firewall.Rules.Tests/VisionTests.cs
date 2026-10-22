@@ -337,6 +337,60 @@ public class VisionTests
         Assert.Equal(engine.State.StateHash(), replayed.State.StateHash());
         Assert.Equal(new GridPos(2, 1), replayed.State.Units[0].Position);
     }
+
+    [Fact]
+    public void UnitsDoNotBlockLineOfSight()
+    {
+        var state = State(".....");
+        var a = Add(state, 0, 0);
+        var b = Add(state, 4, 0, Faction.Meridian);
+        Add(state, 2, 0, Faction.Meridian);
+        Add(state, 1, 0);
+        Add(state, 3, 0, Faction.Neutral);
+
+        Assert.True(LosTracer.CanSee(state, a, b));
+        Assert.True(LosTracer.CanSee(state, b, a));
+    }
+
+    [Theory]
+    [InlineData(2, 1, false)] // the line (0,0)-(4,2) goes through this tile's center
+    [InlineData(0, 2, true)]
+    [InlineData(4, 0, true)]
+    [InlineData(3, 0, true)]
+    public void SupercoverBlocksOnTheTilesAShallowLinePassesThrough(int x, int y, bool los)
+    {
+        var rows = Enumerable.Range(0, 3).Select(_ => new char[5]).ToArray();
+        foreach (var row in rows)
+            Array.Fill(row, '.');
+        rows[2 - y][x] = '#'; // rows are top first
+        var map = Map(rows.Select(r => new string(r)).ToArray());
+
+        Assert.Equal(los, LosTracer.Trace(map, new GridPos(0, 0), new GridPos(4, 2)));
+        Assert.Equal(los, LosTracer.Trace(map, new GridPos(4, 2), new GridPos(0, 0)));
+    }
+
+    [Fact]
+    public void SquadVisionIsTheUnionOfEverySoldiersSight()
+    {
+        // A wall splits the room: each soldier sees only its own side.
+        var state = State("...#...", "...#...", "...#...");
+        var west = Add(state, 1, 1, sight: 3);
+        var east = Add(state, 5, 1, sight: 3);
+        var husk = Add(state, 6, 2, Faction.Meridian);
+
+        state.PlayerVision.Recompute();
+        Assert.True(state.PlayerVision.IsVisible(new GridPos(0, 0)));
+        Assert.True(state.PlayerVision.IsVisible(new GridPos(6, 0)));
+        Assert.Contains(husk.Id, state.PlayerVision.VisibleEnemies);
+
+        // Only the west soldier left: the east half is explored but no longer visible.
+        east.Hp = 0;
+        east.IsAlive = false;
+        state.PlayerVision.Recompute();
+        Assert.True(state.PlayerVision.IsVisible(west.Position));
+        Assert.Equal(TileVisibility.Explored, state.PlayerVision[new GridPos(6, 0)]);
+        Assert.DoesNotContain(husk.Id, state.PlayerVision.VisibleEnemies);
+    }
 }
 
 /// <summary>Wall-clock timings, run alone so other test classes do not compete for the CPU.</summary>
@@ -369,5 +423,22 @@ public class TimingTests
         }
         times.Sort();
         Assert.True(times[times.Count / 2] <= 3.0, $"median {times[times.Count / 2]:F2} ms");
+    }
+
+    [Fact]
+    public void ReachableIsFastOnALargeOpenMap()
+    {
+        var state = PathfinderTests.Open(40, 40);
+        var unit = PathfinderTests.Add(state, 20, 20, mobility: 12);
+        Pathfinder.Reachable(state, unit, 48); // warm up the JIT
+
+        const int runs = 20;
+        var watch = Stopwatch.StartNew();
+        for (var i = 0; i < runs; i++)
+            Pathfinder.Reachable(state, unit, 24);
+        watch.Stop();
+
+        var perCall = watch.Elapsed.TotalMilliseconds / runs;
+        Assert.True(perCall < 2.0, $"Reachable took {perCall:0.00} ms per call.");
     }
 }

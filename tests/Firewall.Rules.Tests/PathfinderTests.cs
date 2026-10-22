@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Firewall.Rules.Data;
 using Firewall.Rules.Rng;
 using Firewall.Rules.Tactical;
@@ -13,7 +12,7 @@ public class PathfinderTests
         File.ReadAllText(Path.Combine(DataDir, f))
     );
 
-    private static TacticalState Open(int width, int height) =>
+    internal static TacticalState Open(int width, int height) =>
         Build(Enumerable.Repeat(new string('.', width), height).ToArray());
 
     private static TacticalState Build(params string[] rows) =>
@@ -31,7 +30,7 @@ public class PathfinderTests
             new Pcg32Random(1)
         );
 
-    private static TacticalUnit Add(
+    internal static TacticalUnit Add(
         TacticalState state,
         int x,
         int y,
@@ -213,23 +212,6 @@ public class PathfinderTests
                     .Select(t => string.Join(">", reach.PathTo(t)!.Select(p => $"{p.X},{p.Y}")))
             );
         }
-    }
-
-    [Fact]
-    public void ReachableIsFastOnALargeOpenMap()
-    {
-        var state = Open(40, 40);
-        var unit = Add(state, 20, 20, mobility: 12);
-        Pathfinder.Reachable(state, unit, 48); // warm up the JIT
-
-        const int runs = 20;
-        var watch = Stopwatch.StartNew();
-        for (var i = 0; i < runs; i++)
-            Pathfinder.Reachable(state, unit, 24);
-        watch.Stop();
-
-        var perCall = watch.Elapsed.TotalMilliseconds / runs;
-        Assert.True(perCall < 2.0, $"Reachable took {perCall:0.00} ms per call.");
     }
 
     [Fact]

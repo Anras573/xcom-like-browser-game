@@ -279,11 +279,12 @@ public class UtilityAiTests
     // ------------------------------------------------------------------ fallbacks
 
     [Fact]
-    public void WithNobodyInSightAWardenOverwatches()
+    public void WithNobodyInSightAndNothingLeftToSearchAWardenOverwatches()
     {
-        var state = Field(9, Open(30, 3));
+        // The soldier is sealed off behind a wall, and everything the warden can reach is in view.
+        var state = Field(9, "...#...", "...#...", "...#...");
         var warden = Enemy(state, "warden", 1, 1);
-        Soldier(state, 28, 1);
+        Soldier(state, 5, 1);
 
         var events = EnemyPhase(state);
 
@@ -297,9 +298,9 @@ public class UtilityAiTests
     [Fact]
     public void WithNothingToDoAHuskDoesNothing()
     {
-        var state = Field(10, Open(30, 3));
+        var state = Field(10, "...#...", "...#...", "...#...");
         var husk = Enemy(state, "husk", 1, 1);
-        Soldier(state, 28, 1);
+        Soldier(state, 5, 1);
 
         var events = EnemyPhase(state);
 
@@ -307,17 +308,275 @@ public class UtilityAiTests
     }
 
     [Fact]
+    public void WithNobodyKnownAnActiveUnitSearchesUnexploredGround()
+    {
+        // GDD §4.9: an active enemy that has lost the squad sweeps toward ground it has not seen,
+        // so a mission cannot stall with one enemy overwatching a corner forever.
+        foreach (var id in new[] { "warden", "husk" })
+        {
+            var state = Field(12, Open(40, 3));
+            var enemy = Enemy(state, id, 1, 1);
+            Soldier(state, 38, 1);
+
+            var events = EnemyPhase(state);
+
+            Assert.True(enemy.Position.X > 1, $"{id} stayed at {enemy.Position}");
+            Assert.DoesNotContain(
+                events,
+                e =>
+                    e is AbilityUsed { AbilityId: AbilityRegistry.Overwatch } a
+                    && a.Unit == enemy.Id
+            );
+        }
+    }
+
+    [Fact]
+    public void ASearchingEnemyEventuallyFindsAHiddenSquad()
+    {
+        var state = Field(13, Open(40, 3));
+        var warden = Enemy(state, "warden", 1, 1);
+        var soldier = Soldier(state, 38, 1);
+        var engine = new TacticalEngine(state, Data, new UtilityAi(Data));
+
+        for (var turn = 0; turn < 12 && state.Result is null && soldier.IsAlive; turn++)
+        {
+            engine.EndPlayerPhase();
+            if (state.EnemyVision.IsUnitVisible(soldier))
+                break;
+        }
+
+        Assert.True(state.EnemyVision.IsUnitVisible(soldier) || !soldier.IsAlive);
+        Assert.True(warden.Position.X > 20);
+    }
+
+    [Fact]
     public void ALoneUnitWithoutOverwatchHunkersDownNextToCover()
     {
-        var state = Field(11, "......", "..c...", "......");
+        var state = Field(11, "......#.", "..c...#.", "......#.");
         var enforcer = Enemy(state, "enforcer", 3, 1);
         enforcer.Abilities.Add(AbilityRegistry.HunkerDown);
-        enforcer.Sight = 1;
-        Soldier(state, 5, 0);
+        Soldier(state, 7, 0);
 
         var events = EnemyPhase(state);
 
         Assert.Contains(events, e => e is StatusAdded { Status: StatusFlags.Hunkered });
+    }
+
+    // ------------------------------------------------------------------ GDD 4.9 scoring
+
+    private static IReadOnlyList<GameEvent> Phase(TacticalState state, AiDifficulty difficulty) =>
+        new TacticalEngine(state, Data, new UtilityAi(Data, difficulty)).EndPlayerPhase();
+
+    private static readonly AiDifficulty Steady = new(0, 1);
+
+    [Fact]
+    public void ADashIsOnlyUsedWhenNoOneApTileHasAShot()
+    {
+        // In range already: the warden shoots without dashing.
+        var near = Field(20, Open(24, 3));
+        var warden = Enemy(near, "warden", 2, 1);
+        Soldier(near, 9, 1, hp: 100);
+        var shot = Phase(near, Steady);
+        Assert.DoesNotContain(shot, e => e is UnitMoved { Dashed: true });
+        Assert.Contains(shot, e => e is AbilityUsed { AbilityId: AbilityRegistry.Shoot });
+        Assert.NotNull(warden);
+
+        // Out of reach of any shot from a 1 AP tile: it dashes to close in.
+        var far = Field(21, Open(40, 3));
+        far.Map.SetTile(new GridPos(0, 0), TileType.Floor);
+        var distant = Enemy(far, "warden", 1, 1);
+        distant.Sight = 30;
+        Soldier(far, 36, 1, hp: 100);
+        var dash = Phase(far, Steady);
+        Assert.Contains(dash, e => e is UnitMoved { Dashed: true } m && m.Unit == distant.Id);
+    }
+
+    [Fact]
+    public void ARiflemanClosesToItsPreferredRangeBandAndNoFurther()
+    {
+        var state = Field(22, Open(40, 3));
+        var warden = Enemy(state, "warden", 1, 1);
+        warden.Sight = 30;
+        var soldier = Soldier(state, 30, 1, hp: 1000);
+        var engine = new TacticalEngine(state, Data, new UtilityAi(Data, Steady));
+        var profile = Data.AiProfiles.First(p => p.Kind == AiKind.CoverShooter);
+
+        for (var turn = 0; turn < 4; turn++)
+            engine.EndPlayerPhase();
+
+        var distance = warden.Position.DistanceTo(soldier.Position);
+        // It stops where one more step would cost more than the range penalty it removes.
+        Assert.InRange(distance, profile.PreferredRangeMin, profile.PreferredRangeMax + 2);
+    }
+
+    [Fact]
+    public void AUnitMovesAndShootsInTheSameTurnWhenItHasNoShotFromWhereItStands()
+    {
+        // A wall hides the soldier from the warden's tile, but a step north opens the view.
+        var state = Field(23, "..........", "..........", "....#.....", "..........");
+        var warden = Enemy(state, "warden", 3, 1);
+        var soldier = Soldier(state, 6, 1, hp: 100);
+        var left = Enemy(state, "husk", 9, 0);
+        left.Hp = left.MaxHp = 100;
+
+        var events = Phase(state, Steady).Where(e => Acts([e], warden).Any()).ToList();
+
+        var move = events.FindIndex(e => e is UnitMoved);
+        var shot = events.FindIndex(e => e is AbilityUsed { AbilityId: AbilityRegistry.Shoot });
+        Assert.True(move >= 0 && shot > move, "expected a move followed by a shot");
+        Assert.NotNull(soldier);
+    }
+
+    [Fact]
+    public void TheKillBonusPicksTheTargetItCanFinishOff()
+    {
+        var state = Field(24, Open(14, 5));
+        var warden = Enemy(state, "warden", 1, 2);
+        warden.Aim = 100;
+        warden.Mobility = 0;
+        var healthy = Soldier(state, 8, 1, hp: 100);
+        var dying = Soldier(state, 8, 3, hp: 1);
+
+        var events = Phase(state, Steady);
+
+        var shot = events.OfType<AbilityUsed>().First(a => a.AbilityId == AbilityRegistry.Shoot);
+        Assert.Equal(Target.Unit(dying.Id), shot.Target);
+        Assert.NotEqual(Target.Unit(healthy.Id), shot.Target);
+    }
+
+    [Fact]
+    public void SeededNoiseLetsDifferentSeedsPickDifferentTiles()
+    {
+        // Many equivalent open tiles: noise alone decides, so seeds spread out; no noise does not.
+        HashSet<GridPos> Spread(AiDifficulty difficulty)
+        {
+            var ends = new HashSet<GridPos>();
+            for (ulong seed = 1; seed <= 16; seed++)
+            {
+                var state = Field(seed, Open(30, 9));
+                var proxy = Enemy(state, "proxy", 4, 4);
+                Soldier(state, 14, 4, hp: 100);
+                Phase(state, difficulty);
+                ends.Add(proxy.Position);
+            }
+            return ends;
+        }
+
+        Assert.Single(Spread(Steady));
+        Assert.True(Spread(AiDifficulty.Recruit).Count > 1);
+    }
+
+    [Fact]
+    public void RecruitBlursChoicesMoreThanVeteran()
+    {
+        Assert.True(AiDifficulty.Recruit.NoiseScale > AiDifficulty.Normal.NoiseScale);
+        Assert.True(AiDifficulty.Normal.NoiseScale > AiDifficulty.Veteran.NoiseScale);
+        Assert.True(AiDifficulty.Recruit.FlankScale < AiDifficulty.Normal.FlankScale);
+        Assert.True(AiDifficulty.Normal.FlankScale < AiDifficulty.Veteran.FlankScale);
+
+        int Spread(AiDifficulty difficulty)
+        {
+            var ends = new HashSet<GridPos>();
+            for (ulong seed = 1; seed <= 24; seed++)
+            {
+                var state = Field(seed, Open(30, 9));
+                var proxy = Enemy(state, "proxy", 4, 4);
+                Soldier(state, 14, 4, hp: 100);
+                Phase(state, difficulty);
+                ends.Add(proxy.Position);
+            }
+            return ends.Count;
+        }
+
+        Assert.True(Spread(AiDifficulty.Recruit) >= Spread(AiDifficulty.Veteran));
+    }
+
+    [Fact]
+    public void ProxiesPreferToStayNearRobotAllies()
+    {
+        TacticalState Build(bool allies)
+        {
+            var state = Field(25, Open(24, 9));
+            var proxy = Enemy(state, "proxy", 4, 4);
+            proxy.Mobility = 5;
+            if (allies)
+                foreach (var y in new[] { 1, 7 })
+                {
+                    var robot = Enemy(state, "warden", 11, y);
+                    robot.Mobility = 0;
+                    robot.Aim = 0;
+                }
+            Soldier(state, 18, 4, hp: 1000);
+            return state;
+        }
+
+        var alone = Build(false);
+        var proxyAlone = alone.Units.First(u => u.DefId == "proxy");
+        Phase(alone, Steady);
+
+        var escorted = Build(true);
+        var proxyEscorted = escorted.Units.First(u => u.DefId == "proxy");
+        Phase(escorted, Steady);
+
+        var robots = escorted.Units.Where(u => u.DefId == "warden").ToList();
+        Assert.All(robots, r => Assert.True(proxyEscorted.Position.DistanceTo(r.Position) <= 4.5));
+        Assert.NotEqual(proxyAlone.Position, proxyEscorted.Position);
+    }
+
+    [Fact]
+    public void UnitsAvoidWalkingThroughASoldiersOverwatchWhenCoverIsNotWorthIt()
+    {
+        TacticalState Build(bool overwatch)
+        {
+            var state = Field(
+                26,
+                "............",
+                "............",
+                "...C........",
+                "............",
+                "...c........",
+                "............",
+                "............"
+            );
+            var warden = Enemy(state, "warden", 2, 2);
+            warden.Mobility = 4;
+            var soldier = Soldier(state, 11, 2, hp: 100);
+            soldier.Statuses.Set(StatusFlags.Overwatch, overwatch);
+            return state;
+        }
+
+        var calm = Build(false);
+        var calmWarden = calm.Units.First(u => u.DefId == "warden");
+        Phase(calm, Steady);
+        var watched = Build(true);
+        var watchedWarden = watched.Units.First(u => u.DefId == "warden");
+        var events = Phase(watched, Steady);
+
+        // Full cover is worth the walk until a soldier watches the way.
+        Assert.NotEqual(new GridPos(2, 2), calmWarden.Position);
+        Assert.Equal(new GridPos(2, 2), watchedWarden.Position);
+        Assert.DoesNotContain(events, e => e is ReactionShotTriggered);
+    }
+
+    [Fact]
+    public void HusksIgnoreCoverAndHeadStraightForTheNearestSoldier()
+    {
+        var state = Field(
+            27,
+            "....................",
+            "....................",
+            "..C.................",
+            "....................",
+            "...................."
+        );
+        var husk = Enemy(state, "husk", 3, 2);
+        husk.Mobility = 5;
+        husk.Sight = 14;
+        var soldier = Soldier(state, 16, 2, hp: 100);
+
+        Phase(state, Steady);
+
+        Assert.True(husk.Position.DistanceTo(soldier.Position) <= 5);
     }
 
     // ------------------------------------------------------------------ determinism & budget

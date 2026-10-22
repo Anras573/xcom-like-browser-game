@@ -166,7 +166,7 @@ damage = rand[weapon.Min, weapon.Max]; on a crit, ceil(damage × 1.5); then subt
 
 ### 4.6 Overwatch & reactions
 - Overwatch costs 1 AP and ends the unit's turn. During the enemy phase, the **first** enemy that moves **within the unit's LOS** triggers one reaction shot.
-- A reaction shot uses Aim × 0.7 and cannot crit (the *Sentinel* ability changes this).
+- A reaction shot's final hit chance is multiplied by 0.7 (applied last, as in §4.5) and it cannot crit (the *Sentinel* ability changes this).
 - Overwatch is cleared at the start of the unit's next turn.
 - Enemies (Proxies, Wardens) can overwatch too. Soldiers moving through it trigger it.
 
@@ -196,6 +196,7 @@ For each enemy on its turn:
 3. Choose an action plan: move+shoot, shoot, move+move, overwatch, or use an ability. Pick by `expectedDamage + killBonus + tileScore`, with a little seeded noise so enemies aren't fully predictable.
 4. **Husks** ignore cover. They path to the nearest soldier (or civilian) and melee if they end adjacent.
 5. **Difficulty** adjusts the noise and how heavily flanking is weighted.
+6. **Searching:** an active enemy that knows of no soldier (none in view, none seen last turn) sweeps toward the nearest ground its side has never seen, so a mission cannot stall on one enemy overwatching in place. It still only uses what its side has seen. Units that hold position (bosses) and robots with nowhere left to search overwatch as before.
 
 ### 4.10 Mission types
 | Type | Goal | Fail | Notes |

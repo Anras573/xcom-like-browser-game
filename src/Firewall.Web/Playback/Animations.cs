@@ -425,6 +425,9 @@ public sealed class PodAnimation(PodActivated pod) : TimedAnimation
 
     protected override void Begin()
     {
+        // A pod waking out of sight (shot at from the fog) gives nothing away: no banner, no pan.
+        if (!Ctx.IsTileVisible(pod.At))
+            return;
         Duration = Seconds;
         Vm.PodBanner = pod.Name.ToUpperInvariant();
         Ctx.Camera.Focus(UnitVm.TileCenter(pod.At));

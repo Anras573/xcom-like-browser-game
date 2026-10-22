@@ -412,4 +412,35 @@ public class ReactionFireTests
             e.Validate(Use(rookie, AbilityRegistry.Reload)).Reason
         );
     }
+
+    [Fact]
+    public void HunkerHoldsThroughTheEnemyPhaseAndClearsAtTheUnitsNextTurn()
+    {
+        var state = Yard(crateX: 1);
+        var rookie = Rookie(state, 0);
+        Enemy(state, "husk", 15);
+        var hunkeredDuringEnemyPhase = false;
+        var e = new TacticalEngine(
+            state,
+            Data,
+            new ScriptAi(_ =>
+            {
+                hunkeredDuringEnemyPhase |= rookie.Statuses.Hunkered;
+                return [];
+            })
+        );
+        e.Execute(Use(rookie, AbilityRegistry.HunkerDown));
+        Assert.True(rookie.Statuses.Hunkered);
+
+        var events = e.EndPlayerPhase();
+
+        Assert.True(hunkeredDuringEnemyPhase);
+        Assert.False(rookie.Statuses.Hunkered);
+        Assert.Contains(
+            events,
+            ev => ev is StatusRemoved(var id, StatusFlags.Hunkered) && id == rookie.Id
+        );
+        // The turn after the phase started: the soldier is ready to act again.
+        Assert.Equal(2, rookie.ActionPoints);
+    }
 }

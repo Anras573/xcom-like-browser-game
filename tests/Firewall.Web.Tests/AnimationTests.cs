@@ -290,6 +290,21 @@ public class AnimationTests
     }
 
     [Fact]
+    public void APodWakingInTheFogGetsNoBannerAndNoCameraPan()
+    {
+        var (player, vm, camera, _) = Setup();
+        player.Enqueue([
+            new PodActivated(new PodId(1), "Husk Swarm", new GridPos(8, 2), [EnemyId]),
+        ]);
+
+        player.Update(0.1f);
+
+        Assert.Null(vm.PodBanner);
+        Assert.Equal(0, camera.Moves);
+        Assert.False(player.IsBusy);
+    }
+
+    [Fact]
     public void PodRevealShowsItsNameThenScampersAtOneAndAHalfSpeed()
     {
         var (player, vm, camera, seen) = Setup();

@@ -325,4 +325,120 @@ public class PodTests
         Assert.True(pod.Active);
         Assert.True(warden.Position.DistanceTo(soldier.Position) > 5);
     }
+
+    // ------------------------------------------------------------------ more of §4.8
+
+    /// <summary>Stand-in for the explosives (#30): sets off a blast at a fixed tile.</summary>
+    private sealed class DebugBlast(GridPos at, int radius) : IAbilityHandler
+    {
+        public ValidationResult Validate(AbilityContext ctx) => ValidationResult.Ok;
+
+        public void Execute(AbilityContext ctx) => ctx.Events.Add(new ExplosionAt(at, radius));
+    }
+
+    [Fact]
+    public void APodCaughtInAnExplosionActivates()
+    {
+        var state = Field();
+        var soldier = Rookie(state, 0, sight: 3);
+        // Neither pod sees the soldier (sight 3); only the first is in the blast.
+        var hit = SpawnPod(state, "Hit", 12, 6, 3, "warden", "warden");
+        var clear = SpawnPod(state, "Clear", 20, 6, 3, "warden");
+        var registry = new AbilityRegistry();
+        registry.Register(
+            AbilityRegistry.Reload,
+            new DebugBlast(Member(state, hit, 0).Position, radius: 2)
+        );
+        var e = new TacticalEngine(state, Data, abilities: registry);
+        soldier.Weapon!.Ammo = 0;
+        Assert.False(hit.Active);
+
+        var events = e.Execute(
+            new UseAbilityCommand(soldier.Id, AbilityRegistry.Reload, Target.None)
+        );
+
+        Assert.True(hit.Active);
+        Assert.False(clear.Active);
+        var all = events.ToList();
+        Assert.True(
+            all.FindIndex(ev => ev is ExplosionAt) < all.FindIndex(ev => ev is PodActivated)
+        );
+        Assert.NotEmpty(events.OfType<UnitScampered>());
+    }
+
+    [Fact]
+    public void APodWokenInThePlayerPhaseActsInTheNextEnemyPhase()
+    {
+        var state = Field();
+        var soldier = Rookie(state, 10);
+        var pod = SpawnPod(state, "Warden Patrol", 20, 6, 12, "warden", "warden");
+        var ai = new CountingAi();
+        var e = new TacticalEngine(state, Data, ai);
+
+        e.Execute(MoveTo(soldier, 9));
+        Assert.True(pod.Active);
+        Assert.Empty(ai.Turns);
+
+        e.EndPlayerPhase();
+
+        Assert.All(pod.Members, id => Assert.Equal(1, ai.Turns[id]));
+    }
+
+    [Fact]
+    public void ThePatrolLeaderWalksAtMostItsBlueRangeAndRerollsOnArrival()
+    {
+        var state = Field();
+        Rookie(state, 0, sight: 3);
+        var pod = SpawnPod(state, "Warden Patrol", 15, 6, 5, "warden");
+        var leader = Member(state, pod, 0);
+        var e = new TacticalEngine(state, Data);
+
+        pod.PatrolTarget = new GridPos(23, 1);
+        e.EndPlayerPhase();
+        Assert.Equal(new GridPos(21, 1), leader.Position); // Mobility 6 tiles, not the whole way
+        Assert.Equal(new GridPos(23, 1), pod.PatrolTarget);
+
+        e.EndPlayerPhase();
+        Assert.Equal(new GridPos(23, 1), leader.Position);
+        Assert.NotEqual(new GridPos(23, 1), pod.PatrolTarget); // arrived: a new target
+        Assert.True(pod.PatrolTarget.DistanceTo(pod.Spawn) <= TacticalEngine.PatrolRadius + 1);
+    }
+
+    [Theory]
+    [InlineData(4, true)]
+    [InlineData(5, false)]
+    public void ChainActivationReachesExactlyFourTiles(int gap, bool wakes)
+    {
+        var state = Field();
+        var soldier = Rookie(state, 0, sight: 3);
+        var first = SpawnPod(state, "A", 10, 6, 12, "warden");
+        var second = SpawnPod(state, "B", 10 + gap, 6, 3, "husk");
+        var e = new TacticalEngine(state, ChainData);
+
+        e.Execute(MoveTo(soldier, 1));
+
+        Assert.True(first.Active);
+        Assert.Equal(wakes, second.Active);
+    }
+
+    [Fact]
+    public void VeteranPodsDriftTowardTheSquadWhenTheyPatrol()
+    {
+        double MeanTargetDistance(bool drift)
+        {
+            var total = 0.0;
+            for (ulong seed = 1; seed <= 24; seed++)
+            {
+                var state = Field(seed);
+                state.PodsDriftToSquad = drift;
+                Rookie(state, 0, sight: 3);
+                var pod = SpawnPod(state, "Patrol", 22, 6, 3, "warden");
+                new TacticalEngine(state, Data).EndPlayerPhase();
+                total += pod.PatrolTarget.DistanceTo(new GridPos(0, 1));
+            }
+            return total / 24;
+        }
+
+        Assert.True(MeanTargetDistance(true) < MeanTargetDistance(false) - 1);
+    }
 }
