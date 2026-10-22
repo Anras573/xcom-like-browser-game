@@ -2,6 +2,7 @@ using System.Numerics;
 using Firewall.Rules.Data;
 using Firewall.Rules.Tactical;
 using Firewall.Web.Assets;
+using Firewall.Web.Playback;
 using Firewall.Web.Rendering;
 using Yaeger.ECS;
 using Yaeger.Graphics;
@@ -10,7 +11,8 @@ namespace Firewall.Web.Units;
 
 /// <summary>
 /// The entities that show one <see cref="TacticalUnit"/>: body sprite, selection ring, HP pips and
-/// status icons. Reads the unit; never changes it. Call <see cref="Sync"/> every frame.
+/// status icons. Draws from the <see cref="UnitVm"/>, which playback keeps in step with the events,
+/// and never reads the rules state. Call <see cref="Sync"/> every frame.
 /// </summary>
 public sealed class UnitView
 {
@@ -36,23 +38,18 @@ public sealed class UnitView
     private readonly List<Entity> _pips = [];
     private readonly Entity[] _icons;
     private string _frameName = "";
-    private bool _bodyVisible = true;
+    private Color _bodyColor;
+    private bool _bodyColorSet;
+    private bool _onGround;
 
-    public UnitView(
-        World world,
-        AssetRegistry assets,
-        GameData data,
-        TacticalUnit unit,
-        Vector2 facing
-    )
+    public UnitView(World world, AssetRegistry assets, GameData data, UnitVm unit)
     {
         _world = world;
         _assets = assets;
         Unit = unit;
-        _enemy = unit.Faction == Faction.Meridian ? data.Enemies[unit.DefId] : null;
+        _enemy = unit.IsHostile ? data.Enemies[unit.DefId] : null;
         _tint = UnitPresentation.ParseTint(_enemy?.Sprite.Tint);
         _scale = (float)(_enemy?.Sprite.Scale ?? 1.0);
-        Rotation = UnitPresentation.RotationFor(facing);
 
         _body = world.CreateEntity();
         world.AddComponent(_body, RenderLayers.Of(RenderLayers.Units));
@@ -71,18 +68,7 @@ public sealed class UnitView
         }
     }
 
-    public TacticalUnit Unit { get; }
-
-    /// <summary>Body rotation in radians; sprites face +X at 0.</summary>
-    public float Rotation { get; set; }
-
-    /// <summary>Where to draw the unit instead of its tile, e.g. mid-move tween; null draws it on its tile.</summary>
-    public Vector2? VisualCenter { get; set; }
-
-    /// <summary>True for the frame(s) the unit plays its reload pose.</summary>
-    public bool Reloading { get; set; }
-
-    public void FaceToward(Vector2 dir) => Rotation = UnitPresentation.RotationFor(dir);
+    public UnitVm Unit { get; }
 
     /// <param name="selected">Draw the pulsing selection ring.</param>
     /// <param name="showOverlay">Draw HP pips and status icons (soldiers always, enemies when seen).</param>
@@ -98,22 +84,37 @@ public sealed class UnitView
     )
     {
         var unit = Unit;
-        var center = VisualCenter ?? TacticalCamera.TileCenter(unit.Position.X, unit.Position.Y);
+        var center = unit.Center;
+        var scrap = unit.Corpse == CorpseKind.Scrap;
+        var scale = scrap ? 1f : _scale;
 
-        var frameName = UnitPresentation.BodyFrame(unit, _enemy, Reloading);
-        var frame = _assets.Frame(frameName);
-        if (visible != _bodyVisible)
-        {
-            _bodyVisible = visible;
-            _frameName = ""; // re-add the sprite below, hidden or tinted
-        }
-        if (frameName != _frameName)
+        var frameName = scrap
+            ? "decal.corpse_scrap"
+            : UnitPresentation.BodyFrame(unit, _enemy, unit.ReloadSeconds > 0f);
+        var color = visible ? BodyColor(unit) : Hidden;
+        if (frameName != _frameName || !_bodyColorSet || !SameColor(color, _bodyColor))
         {
             _frameName = frameName;
-            _world.AddComponent(_body, frame.ToSpriteSheet(visible ? _tint : Hidden));
+            _bodyColor = color;
+            _bodyColorSet = true;
+            var frame = _assets.Frame(frameName);
+            _world.AddComponent(_body, frame.ToSpriteSheet(color));
             _world.AddComponent(_body, new AnimationState(frame.FrameIndex));
         }
-        _world.AddComponent(_body, new Transform2D(center, Rotation, new Vector2(_scale, _scale)));
+        // Corpses stay on the ground, under props and living units.
+        var onGround = unit.Corpse != CorpseKind.None;
+        if (onGround != _onGround)
+        {
+            _onGround = onGround;
+            _world.AddComponent(
+                _body,
+                RenderLayers.Of(onGround ? RenderLayers.GroundDecal : RenderLayers.Units)
+            );
+        }
+        _world.AddComponent(
+            _body,
+            new Transform2D(center, unit.Rotation, new Vector2(scale, scale))
+        );
 
         var ringScale = 1.1f * _scale;
         _world.AddComponent(_ring, new Transform2D(center, 0f, new Vector2(ringScale, ringScale)));
@@ -121,14 +122,34 @@ public sealed class UnitView
         var alpha = (byte)(255 * UnitPresentation.RingAlpha(time));
         _world.AddComponent(
             _ring,
-            ring.ToSpriteSheet(selected && visible ? new Color(255, 255, 255, alpha) : Hidden)
+            ring.ToSpriteSheet(
+                selected && visible && !unit.Dead ? new Color(255, 255, 255, alpha) : Hidden
+            )
         );
 
         var top = center.Y + 0.5f * _scale + 0.08f;
-        showOverlay &= visible;
+        showOverlay &= visible && !unit.Dead;
         SyncPips(center.X, top, showOverlay);
         SyncIcons(center.X, IconRowBottom, showOverlay, cover, time);
     }
+
+    // The tint the unit's own sprite has, darkened for corpses, pulled toward a flash, faded.
+    private Color BodyColor(UnitVm unit)
+    {
+        var baseTint = _tint ?? Color.White;
+        float Channel(byte c, byte flash) =>
+            (c * unit.Brightness * (1f - unit.FlashAmount) + flash * unit.FlashAmount) / 255f;
+        byte ToByte(float v) => (byte)Math.Clamp((int)MathF.Round(v * 255f), 0, 255);
+        return new Color(
+            ToByte(Channel(baseTint.R, unit.FlashColor.R)),
+            ToByte(Channel(baseTint.G, unit.FlashColor.G)),
+            ToByte(Channel(baseTint.B, unit.FlashColor.B)),
+            ToByte(baseTint.A / 255f * unit.Alpha)
+        );
+    }
+
+    private static bool SameColor(Color a, Color b) =>
+        a.R == b.R && a.G == b.G && a.B == b.B && a.A == b.A;
 
     private int PipRows() => Math.Max(1, (Unit.MaxHp + Unit.Armor + PipsPerRow - 1) / PipsPerRow);
 
@@ -172,11 +193,7 @@ public sealed class UnitView
 
     /// <summary>World Y of the bottom of the status icon row (above the HP pips), for labels drawn above it.</summary>
     public float IconRowBottom =>
-        (VisualCenter ?? TacticalCamera.TileCenter(Unit.Position.X, Unit.Position.Y)).Y
-        + 0.5f * _scale
-        + 0.08f
-        + PipRows() * (PipHeight + PipGap)
-        + 0.05f;
+        Unit.Center.Y + 0.5f * _scale + 0.08f + PipRows() * (PipHeight + PipGap) + 0.05f;
 
     private void SyncIcons(float centerX, float bottom, bool show, CoverResult? cover, float time)
     {

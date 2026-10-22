@@ -21,20 +21,32 @@ public static class UnitPresentation
     public static string BodyFrame(TacticalUnit unit, EnemyDef? enemy, bool reloading) =>
         $"unit.{unit.AppearanceId}.{PoseFor(unit, enemy, reloading)}";
 
+    /// <summary>Frame name for a unit as the view model shows it.</summary>
+    public static string BodyFrame(Playback.UnitVm unit, EnemyDef? enemy, bool reloading) =>
+        $"unit.{unit.AppearanceId}.{PoseFor(unit.Statuses, unit.WeaponClass, enemy, reloading)}";
+
     /// <summary>
     /// GDD §3 sprite mapping. Soldiers: rifle, shotgun and LMG hold <c>machine</c>, the sniper rifle
     /// <c>silencer</c>, a reload <c>reload</c>, unarmed <c>hold</c>. Stunned and downed (bleeding out
     /// or stabilized) units <c>hold</c>. Enemies use their definition's pose.
     /// </summary>
-    public static string PoseFor(TacticalUnit unit, EnemyDef? enemy, bool reloading)
+    public static string PoseFor(TacticalUnit unit, EnemyDef? enemy, bool reloading) =>
+        PoseFor(unit.Statuses, unit.Weapon?.Def.Class, enemy, reloading);
+
+    public static string PoseFor(
+        StatusSet statuses,
+        WeaponClass? weapon,
+        EnemyDef? enemy,
+        bool reloading
+    )
     {
-        if (unit.Statuses.Stunned || unit.Statuses.IsDown)
+        if (statuses.Stunned || statuses.IsDown)
             return "hold";
         if (enemy is not null)
             return enemy.Sprite.Pose;
         if (reloading)
             return "reload";
-        return unit.Weapon?.Def.Class switch
+        return weapon switch
         {
             WeaponClass.Sniper => "silencer",
             WeaponClass.Rifle or WeaponClass.Shotgun or WeaponClass.Lmg => "machine",

@@ -4,6 +4,7 @@ using Firewall.Rules.Data;
 using Firewall.Rules.Rng;
 using Firewall.Rules.Tactical;
 using Firewall.Web.Input;
+using Firewall.Web.Playback;
 using Firewall.Web.Rendering;
 using Firewall.Web.Ui;
 using Firewall.Web.Units;
@@ -35,8 +36,6 @@ public sealed class SkirmishScene : SceneBase
     private TacticalCameraController _controller = null!;
     private TacticalState _state = null!;
     private TacticalEngine _engine = null!;
-    private readonly Queue<PhaseStarted> _banners = new();
-    private float _bannerTime;
     private float _exhaustedTimer = -1f;
     private MapTilemaps? _tilemaps;
     private CoverShieldsView _shields = null!;
@@ -45,35 +44,22 @@ public sealed class SkirmishScene : SceneBase
     private UnitId? _selected;
     private MoveRangeOverlay? _range;
     private GridPos? _hoverTile;
-    private readonly Queue<Playback> _moves = new();
-    private (UnitId Unit, MoveTween Tween, float Elapsed)? _moving;
-    private (string Name, float Elapsed)? _reveal;
-    private bool _cameraReturn;
+    private ViewModel _vm = null!;
+    private EventPlayer _player = null!;
+    private CameraDirector _director = null!;
+    private FloatersView _floatersView = null!;
+    private EffectsView _effects = null!;
     private TacticalUnit? _hover;
     private TargetingMode? _targeting;
     private TargetReticleView _reticle = null!;
     private float _time;
-    private readonly Dictionary<UnitId, float> _reloading = [];
-    private readonly List<FloatingText> _floaters = [];
 
     private bool _confirmAbort;
     private bool _confirmEnd;
     private bool _autoSelect;
     private float _resultTimer = -1f;
 
-    private const float ReloadPoseSeconds = 0.6f;
-    private const float RevealSeconds = 1.2f;
-    private const float FloaterSeconds = 1.4f;
     private const float ResultDelaySeconds = 2f;
-
-    // One beat of the playback: a unit walking, or the pod reveal (banner and camera) between walks.
-    private sealed record Playback(UnitId Unit, MoveTween? Tween, string? PodName, GridPos At);
-
-    // Temporary world-anchored text until the event player (#28).
-    private sealed record FloatingText(string Text, GridPos Tile)
-    {
-        public float Age { get; set; }
-    }
 
     public override string Name => "Skirmish";
 
@@ -103,20 +89,28 @@ public sealed class SkirmishScene : SceneBase
         _shields = new CoverShieldsView(World, Ctx.Assets);
         _fog = new FogView(World, map.Width, map.Height);
         _reticle = new TargetReticleView(World, Ctx.Assets);
-        foreach (var unit in _state.Units)
-            _views[unit.Id] = new UnitView(
-                World,
-                Ctx.Assets,
-                Ctx.Data,
-                unit,
-                UnitPresentation.InitialFacing(unit, _state)
-            );
+        _vm = ViewModel.FromState(_state, Ctx.Data);
+        foreach (var unit in _vm.Units.Values)
+            _views[unit.Id] = new UnitView(World, Ctx.Assets, Ctx.Data, unit);
+        _floatersView = new FloatersView(World);
+        _effects = new EffectsView(World, Ctx.Assets);
 
         _controller = new TacticalCameraController(_camera, Ctx.Input, Ctx.Bindings)
         {
             MapSize = new Vector2(map.Width, map.Height),
         };
         _camera.Center = new Vector2(map.Width / 2f, map.Height / 2f);
+        _director = new CameraDirector(_camera, _controller, () => Ctx.Render.CanvasSize);
+        _player = new EventPlayer(
+            _vm,
+            new EventPlayerContext
+            {
+                Camera = _director,
+                IsTileVisible = tile => !_fogEnabled || _state.PlayerVision.IsVisible(tile),
+                SceneEvent = OnSceneEvent,
+            },
+            AnimationFactory.Create
+        );
         Select(Soldiers().First(), instant: true);
     }
 
@@ -141,12 +135,14 @@ public sealed class SkirmishScene : SceneBase
         _selected = unit.Id;
         _targeting = null;
         InvalidateRange();
+        _director.Cancel();
         _controller.FocusOn(UnitFocus(unit), instant ? 0f : 0.35f);
     }
 
     protected override void OnUpdate(float dt)
     {
         _time += dt;
+        UpdatePlayback(dt);
         if (_resultTimer >= 0f && (_resultTimer -= dt) < 0f && _state.Result is { } result)
         {
             Ctx.Scenes.Replace(new MissionResultScene(result));
@@ -155,7 +151,6 @@ public sealed class SkirmishScene : SceneBase
         // The Abort Mission dialog takes the input (its own Esc cancels it).
         if (_confirmAbort || _confirmEnd)
         {
-            UpdateFloaters(dt);
             SyncViews();
             return;
         }
@@ -178,7 +173,6 @@ public sealed class SkirmishScene : SceneBase
         _hoverTile = tile;
         _hover =
             tile is { } t && _state.UnitAt(t) is { } hovered && IsVisible(hovered) ? hovered : null;
-        UpdateMoveAnimation(dt);
 
         if (Ctx.Input.WasKeyPressed(Keys.F2))
             _fogEnabled = !_fogEnabled;
@@ -186,8 +180,6 @@ public sealed class SkirmishScene : SceneBase
             DebugTeleportEnemy(tile);
         if (Ctx.Input.WasKeyPressed(Keys.F9))
             Console.WriteLine(_engine.Log.ToJson());
-        UpdateBanner(dt);
-        UpdateFloaters(dt);
 
         var soldiers = Soldiers();
         if (Ctx.Bindings.WasPressed(GameAction.EndTurn))
@@ -259,30 +251,36 @@ public sealed class SkirmishScene : SceneBase
     {
         foreach (var (id, view) in _views)
         {
-            var unit = _state.Unit(id);
-            // Killed or evacuated: gone from the map.
-            if (!unit.IsOnMap)
+            var unit = view.Unit;
+            // Evacuated: gone from the map. Killed units stay as corpses.
+            if (unit.Removed)
             {
                 view.Destroy();
                 _views.Remove(id);
+                _vm.Units.Remove(id);
                 continue;
             }
-            // A unit still waiting its turn in the playback stays where its next walk starts.
-            view.VisualCenter =
-                _moving is { } m && m.Unit == id ? m.Tween.Position(m.Elapsed, out _)
-                : _moves.FirstOrDefault(p => p.Tween is not null && p.Unit == id)?.Tween is { } next
-                    ? next.Position(0f, out _)
-                : null;
-            view.Reloading = _reloading.ContainsKey(id);
+            var visible = ViewVisible(unit);
             view.Sync(
                 selected: id == _selected,
-                showOverlay: ShowOverlay(unit),
+                showOverlay: visible,
                 time: _time,
-                cover: id == _selected ? StandingCover(unit) : null,
-                visible: IsVisible(unit)
+                cover: id == _selected && !Busy ? StandingCover(_state.Unit(id)) : null,
+                visible: visible
             );
         }
+        var size = Ctx.Render.CanvasSize;
+        _floatersView.Sync(_vm.Floaters, _camera.PixelsPerTile(size.Y));
+        _effects.Sync(_vm.Effects);
     }
+
+    // What the view model shows is drawn when it is a friend, or an enemy the squad sees (or whose
+    // action is being played). The tile is the view model's, so playback never peeks at the state.
+    private bool ViewVisible(UnitVm unit) =>
+        !unit.IsHostile
+        || unit.ForceVisible
+        || !_fogEnabled
+        || _state.PlayerVision.IsVisible(unit.Tile);
 
     // ------------------------------------------------------------------ self abilities
 
@@ -436,6 +434,8 @@ public sealed class SkirmishScene : SceneBase
         if (enemy is null)
             return;
         enemy.Position = to;
+        if (_vm.Units.TryGetValue(enemy.Id, out var shown))
+            shown.SnapTo(to);
         _state.RefreshVision();
         InvalidateRange();
     }
@@ -470,7 +470,7 @@ public sealed class SkirmishScene : SceneBase
         Selected is { } unit ? new MoveCommand(unit.Id, dest) : null;
 
     /// <summary>A move is playing back; input is locked until it ends.</summary>
-    private bool IsMoving => _moving is not null || _reveal is not null || _moves.Count > 0;
+    private bool IsMoving => _player.IsBusy;
 
     private void InvalidateRange() => _range = null;
 
@@ -493,100 +493,53 @@ public sealed class SkirmishScene : SceneBase
         return _range = new MoveRangeOverlay(_engine.MoveRange(unit));
     }
 
-    private void UpdateMoveAnimation(float dt)
+    // Plays queued events at the chosen speed (Space held fast-forwards) and tidies up after them.
+    private void UpdatePlayback(float dt)
     {
-        if (_reveal is { } reveal)
-        {
-            // The pod reveal holds everything else: the banner shows, then the scampers play.
-            _reveal =
-                reveal.Elapsed + dt >= RevealSeconds
-                    ? null
-                    : reveal with
-                    {
-                        Elapsed = reveal.Elapsed + dt,
-                    };
+        _player.Speed = Ctx.Playback.Effective(Ctx.Input.IsKeyPressed(Keys.Space));
+        var wasBusy = _player.IsBusy;
+        _player.Update(dt);
+        if (!wasBusy || _player.IsBusy)
             return;
-        }
-        if (_moving is null && _moves.Count > 0)
-        {
-            var next = _moves.Dequeue();
-            if (next.Tween is null)
-            {
-                _reveal = (next.PodName ?? "", 0f);
-                _cameraReturn = true;
-                _controller.FocusOn(TacticalCamera.TileCenter(next.At.X, next.At.Y), 0.35f);
-                return;
-            }
-            _moving = (next.Unit, next.Tween, 0f);
-        }
-        if (_moving is null && _cameraReturn && _moves.Count == 0)
-        {
-            _cameraReturn = false;
-            if (Selected is { } sel)
-                _controller.FocusOn(UnitFocus(sel), 0.35f);
-        }
-        if (_moving is not { } m)
-            return;
-        var elapsed = m.Elapsed + dt;
-        if (_views.TryGetValue(m.Unit, out var view))
-        {
-            var pos = m.Tween.Position(elapsed, out var dir);
-            view.FaceToward(dir);
-            // Gentle follow: re-aim a short ease at the walker every frame.
-            if (m.Unit == _selected)
-                _controller.FocusOn(HudModel.FocusPoint(pos, _camera.TilesVisibleVertically), 0.2f);
-        }
-        _moving = m.Tween.IsDone(elapsed) ? null : m with { Elapsed = elapsed };
-        if (_moving is null)
-            InvalidateRange();
+        InvalidateRange();
+        if (Selected is { } sel)
+            _director.Return(TacticalCamera.TileCenter(sel.Position.X, sel.Position.Y));
     }
 
-    // Temporary: events are applied straight away (views read the state, so units jump). The
-    // event player (#28) animates from a view model instead and must not read the state.
+    // The scene's share of the events: things that are not drawn but must happen when playback gets there.
+    private void OnSceneEvent(GameEvent e)
+    {
+        switch (e)
+        {
+            case MoveBlocked:
+                Ctx.Ui.Toast("Something is in the way.");
+                break;
+            case UnitBleedingOut down:
+                Ctx.Ui.Toast(
+                    $"{_state.Unit(down.Unit).DisplayName} is bleeding out! {Casualties.BleedOutTurns} turns to stabilize.",
+                    4f
+                );
+                break;
+            case UnitEvacuated evacuated:
+                Ctx.Ui.Toast($"{_state.Unit(evacuated.Unit).DisplayName} evacuated.");
+                break;
+            case MissionEnded:
+                _resultTimer = ResultDelaySeconds;
+                break;
+            case AllSoldiersExhausted:
+                // End the turn after a short beat.
+                _exhaustedTimer = 0.8f;
+                break;
+        }
+    }
+
+    // Hands the events to the player. The state has already moved on; the view model catches up.
     private void Play(IReadOnlyList<GameEvent> events)
     {
         InvalidateRange();
         _targeting = null;
-        foreach (var e in events)
-        {
-            if (e is UnitFacing facing && _views.TryGetValue(facing.Unit, out var turning))
-            {
-                var from = _state.Unit(facing.Unit).Position;
-                turning.FaceToward(new Vector2(facing.LookAt.X - from.X, facing.LookAt.Y - from.Y));
-            }
-            if (e is ShotResolved shot)
-                Ctx.Ui.Toast(ShotText(shot));
-            if (e is ReactionShotTriggered reaction)
-                Float("REACTION FIRE", reaction.Shooter);
-            if (e is StatusAdded { Status: StatusFlags.Overwatch } overwatch)
-                Float("OVERWATCH", overwatch.Unit);
-            if (e is StatusAdded { Status: StatusFlags.Hunkered } hunker)
-                Float("HUNKERED", hunker.Unit);
-            if (e is AbilityUsed { AbilityId: AbilityRegistry.Reload } reload)
-                _reloading[reload.Unit] = ReloadPoseSeconds;
-            if (e is PhaseStarted p)
-                _banners.Enqueue(p);
-            if (e is MoveBlocked)
-                Ctx.Ui.Toast("Something is in the way.");
-            if (e is UnitBleedingOut { Turns: Casualties.BleedOutTurns } down)
-                OnBleedingOut(down.Unit);
-            if (e is UnitStabilized stabilized)
-                Float("STABILIZED", stabilized.Unit);
-            if (e is UnitEvacuated evacuated)
-                Ctx.Ui.Toast($"{_state.Unit(evacuated.Unit).DisplayName} evacuated.");
-            if (e is MissionEnded)
-                _resultTimer = ResultDelaySeconds;
-            if (e is UnitMoved moved && ShouldAnimate(moved.Unit, moved.Path))
-                _moves.Enqueue(new Playback(moved.Unit, new MoveTween(moved.Path), null, default));
-            if (e is UnitScampered scamper && ShouldAnimate(scamper.Unit, scamper.Path))
-                _moves.Enqueue(
-                    new Playback(scamper.Unit, new MoveTween(scamper.Path), null, default)
-                );
-            if (e is PodActivated pod)
-                _moves.Enqueue(new Playback(default, null, pod.Name.ToUpperInvariant(), pod.At));
-        }
-        // "All soldiers exhausted": end the turn after a short beat.
-        _exhaustedTimer = events.Any(e => e is AllSoldiersExhausted) ? 0.8f : -1f;
+        _exhaustedTimer = -1f;
+        _player.Enqueue(events);
         _autoSelect = true;
     }
 
@@ -600,75 +553,6 @@ public sealed class SkirmishScene : SceneBase
         if (HudModel.SelectionAfterAction(soldiers, _selected) is { } next && next.Id != _selected)
             Select(next);
     }
-
-    // Soldiers always walk on screen; an enemy only if the squad can see where it starts or ends,
-    // so patrols in the fog play instantly and show nothing.
-    private bool ShouldAnimate(UnitId unit, IReadOnlyList<GridPos> path) =>
-        _state.Unit(unit).Faction != Faction.Meridian
-        || _state.PlayerVision.IsVisible(path[0])
-        || _state.PlayerVision.IsVisible(path[^1]);
-
-    // Someone just went down: say so and look at them.
-    private void OnBleedingOut(UnitId id)
-    {
-        var unit = _state.Unit(id);
-        Ctx.Ui.Toast(
-            $"{unit.DisplayName} is bleeding out! {Casualties.BleedOutTurns} turns to stabilize.",
-            4f
-        );
-        _controller.FocusOn(UnitFocus(unit), 0.35f);
-    }
-
-    // Temporary feedback until the event player (#28) shows floating numbers.
-    private string ShotText(ShotResolved shot)
-    {
-        var unit = _state.Unit(shot.Target);
-        var target = unit.DisplayName;
-        if (!shot.Hit)
-            return $"Missed {target} ({shot.HitChance}%).";
-        // Nobody shoots a downed unit, so one that is down now went down to this shot.
-        var kill =
-            !unit.IsAlive ? " Killed!"
-            : unit.Statuses.IsDown ? " Down!"
-            : "";
-        return shot.Crit
-            ? $"Critical! {shot.Damage} damage to {target}.{kill}"
-            : $"Hit {target} for {shot.Damage}.{kill}";
-    }
-
-    private void Float(string text, UnitId unit)
-    {
-        var u = _state.Unit(unit);
-        if (IsVisible(u))
-            _floaters.Add(new FloatingText(text, u.Position));
-    }
-
-    private void UpdateFloaters(float dt)
-    {
-        foreach (var f in _floaters)
-            f.Age += dt;
-        _floaters.RemoveAll(f => f.Age >= FloaterSeconds);
-        foreach (var id in _reloading.Keys.ToList())
-            if ((_reloading[id] -= dt) <= 0f)
-                _reloading.Remove(id);
-    }
-
-    private void UpdateBanner(float dt)
-    {
-        if (_banners.Count == 0)
-            return;
-        _bannerTime += dt;
-        if (_bannerTime >= BannerSeconds)
-        {
-            _bannerTime = 0f;
-            _banners.Dequeue();
-        }
-    }
-
-    private const float BannerSeconds = 0.9f;
-
-    // Soldiers always; enemies while visible.
-    private bool ShowOverlay(TacticalUnit unit) => unit.IsOnMap && IsVisible(unit);
 
     private GridPos? PickTile(Vector2 canvas)
     {
@@ -769,7 +653,6 @@ public sealed class SkirmishScene : SceneBase
         }
 
         DrawBleedOutCounters(canvas, ui);
-        DrawFloaters(canvas, ui);
         DrawPodBanner(canvas, ui);
         if (_confirmAbort)
             DrawAbortDialog(ui);
@@ -785,10 +668,7 @@ public sealed class SkirmishScene : SceneBase
     /// while its banners play; only the closing player-phase banner lets input through.
     /// </summary>
     private bool Busy =>
-        IsMoving
-        || _state.Phase != TacticalPhase.Player
-        || _state.Result is not null
-        || _banners.Any(b => b.Phase != TacticalPhase.Player);
+        IsMoving || _state.Phase != TacticalPhase.Player || _state.Result is not null;
 
     private IReadOnlyList<AbilitySlot> HudSlots() =>
         Selected is { } unit
@@ -815,7 +695,8 @@ public sealed class SkirmishScene : SceneBase
 
     private HudFrame BuildHud()
     {
-        var animated = _banners.Count > 0;
+        var banner = _vm.Banner;
+        var animated = banner is not null;
         return new HudFrame
         {
             Squad = _state.Units.Where(u => u.Faction == Faction.Firewall).ToList(),
@@ -835,11 +716,11 @@ public sealed class SkirmishScene : SceneBase
                 : null,
             Busy = Busy,
             BannerText =
-                animated ? HudModel.PhaseText(_banners.Peek().Phase, _banners.Peek().Turn)
+                banner is not null ? HudModel.PhaseText(banner.Phase, banner.Turn)
                 : _state.Result is { } result ? MissionResultText.Title(result.Outcome)
                 : null,
-            BannerTime = _bannerTime,
-            BannerSeconds = BannerSeconds,
+            BannerTime = banner?.Elapsed ?? 0f,
+            BannerSeconds = ViewModel.BannerSeconds,
             BannerStatic = !animated,
             Time = _time,
         };
@@ -974,42 +855,17 @@ public sealed class SkirmishScene : SceneBase
         var size = Ctx.Render.CanvasSize;
         var vp = _camera.ToCamera2D().ViewProjection(size.X / MathF.Max(size.Y, 1f));
         var style = new TextStyle(TextStyles.Future, 18, new Color(255, 80, 70), Shadow: true);
-        foreach (var (id, view) in _views)
+        foreach (var (_, view) in _views)
         {
-            var unit = _state.Unit(id);
-            if (!unit.Statuses.IsBleedingOut || !IsVisible(unit))
+            var unit = view.Unit;
+            if (!unit.Statuses.IsBleedingOut || !ViewVisible(unit))
                 continue;
-            var anchor = new Vector2(unit.Position.X + 0.5f, view.IconRowBottom + 0.45f);
+            var anchor = new Vector2(unit.Center.X, view.IconRowBottom + 0.45f);
             var at = ui.Space.FromCanvasPixels(
                 Picking.NdcToCanvas(Vector2.Transform(anchor, vp), size)
             );
             var text = unit.Statuses.BleedingOutTurnsLeft.ToString();
             canvas.Text(text, at - new Vector2(canvas.Measure(text, style) / 2f, 10f), style);
-        }
-    }
-
-    // "OVERWATCH" / "REACTION FIRE" rising above the unit's tile and fading out.
-    private void DrawFloaters(ScreenCanvas canvas, UiContext ui)
-    {
-        var size = Ctx.Render.CanvasSize;
-        var vp = _camera.ToCamera2D().ViewProjection(size.X / MathF.Max(size.Y, 1f));
-        foreach (var f in _floaters)
-        {
-            var t = f.Age / FloaterSeconds;
-            var ndc = Vector2.Transform(
-                TacticalCamera.TileCenter(f.Tile.X, f.Tile.Y) + new Vector2(0f, 0.9f + 0.5f * t),
-                vp
-            );
-            var at = ui.Space.FromCanvasPixels(Picking.NdcToCanvas(ndc, size));
-            var alpha = (byte)(255 * Math.Clamp(1.5f - 1.5f * t, 0f, 1f));
-            var style = new TextStyle(
-                TextStyles.Future,
-                20,
-                new Color(255, 214, 92, alpha),
-                Shadow: true
-            );
-            var width = canvas.Measure(f.Text, style);
-            canvas.Text(f.Text, at - new Vector2(width / 2f, 10f), style);
         }
     }
 
@@ -1050,12 +906,12 @@ public sealed class SkirmishScene : SceneBase
     // Top centre, for the length of the pod reveal beat.
     private void DrawPodBanner(ScreenCanvas canvas, UiContext ui)
     {
-        if (_reveal is not { } reveal)
+        if (_vm.PodBanner is not { } name)
             return;
-        var width = canvas.Measure(reveal.Name, TextStyles.Heading) + 64f;
+        var width = canvas.Measure(name, TextStyles.Heading) + 64f;
         var pos = new Vector2(UiSpace.LogicalWidth / 2f - width / 2f, ui.Space.CanvasRect.Y + 140f);
         canvas.FillRect(pos, new Vector2(width, 48f), new Vector4(0.45f, 0.06f, 0.06f, 0.85f));
-        canvas.Text(reveal.Name, new Vector2(pos.X + 32f, pos.Y + 10f), TextStyles.Heading);
+        canvas.Text(name, new Vector2(pos.X + 32f, pos.Y + 10f), TextStyles.Heading);
     }
 
     private void DrawTooltip(ScreenCanvas canvas, UiContext ui, TacticalUnit unit)

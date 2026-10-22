@@ -1,6 +1,7 @@
 using Firewall.Rules.Data;
 using Firewall.Web.Assets;
 using Firewall.Web.Input;
+using Firewall.Web.Playback;
 using Firewall.Web.Rendering;
 using Firewall.Web.Ui;
 using Yaeger.Platform;
@@ -61,6 +62,9 @@ public sealed class SceneContext(
     public SceneManager Scenes { get; internal set; } = null!;
 
     public AudioService Audio { get; } = new();
+
+    /// <summary>How fast combat plays back; lives here so it outlasts a scene.</summary>
+    public PlaybackSettings Playback { get; } = new();
     public SaveService Saves { get; } = new();
     public SeedSource Seeds { get; set; } = new(0);
     public GameData Data { get; private set; } = GameData.Empty;
