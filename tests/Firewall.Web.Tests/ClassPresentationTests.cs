@@ -145,7 +145,7 @@ public class ClassPresentationTests
         model.CycleItem(3, 1, 1);
         Assert.NotNull(model.ItemAt(3, 0) ?? model.ItemAt(3, 1));
         model.CycleItem(0, 1, 1); // no second slot
-        Assert.Equal(0, model.Specs[0].ItemIds.Count);
+        Assert.Empty(model.Specs[0].ItemIds);
 
         // Losing the rank takes the second item away.
         model.CycleItem(3, 0, 1);
@@ -230,7 +230,7 @@ public class ClassPresentationTests
                 $"{def.Id} icon '{def.Icon}'"
             );
         foreach (var cls in Data.Classes)
-            Assert.Contains(cls.Icon, regions);
+            Assert.Contains(cls.Icon!, regions);
     }
 
     // ------------------------------------------------------------------ targeting
