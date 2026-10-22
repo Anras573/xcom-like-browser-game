@@ -138,6 +138,8 @@ public sealed class UtilityAi(
         private readonly List<TacticalUnit> _soldiers;
         private readonly List<Threat> _threats;
         private readonly List<GridPos> _approach;
+        private readonly bool _searching;
+        private MoveZones? _zones;
         private readonly List<TacticalUnit> _overwatchers;
         private readonly List<TacticalUnit> _allies;
         private readonly Dictionary<(GridPos, GridPos), bool> _los = [];
@@ -193,6 +195,15 @@ public sealed class UtilityAi(
             ).ToList();
             Targets = [.. civilians, .. _soldiers];
 
+            // Nobody known to hunt: sweep toward ground the enemy has not looked at yet, so an
+            // active unit cannot sit in overwatch forever while the squad stays out of sight.
+            if (_approach.Count == 0 && Targets.Count == 0 && !profile.HoldUnlessFlanked)
+                if (SearchWaypoint() is { } waypoint)
+                {
+                    _approach.Add(waypoint);
+                    _searching = true;
+                }
+
             _overwatchers = _soldiers.Where(s => s.Statuses.Overwatch).ToList();
             _allies = _state
                 .Units.Where(u =>
@@ -212,7 +223,7 @@ public sealed class UtilityAi(
             if (_approach.Count == 0 && Targets.Count == 0)
                 return OverwatchPlan(_unit.Position, 0);
 
-            var zones = _ctx.MoveRange(_unit);
+            var zones = Zones;
             var aps = _unit.ActionPoints;
             var candidates = Candidates(zones, aps);
             var best = (Plan?)null;
@@ -258,7 +269,7 @@ public sealed class UtilityAi(
             }
 
             // Overwatch, when nothing is worth shooting at.
-            if (_p.OverwatchBelowHit > 0 && bestShot < _p.OverwatchBelowHit)
+            if (!_searching && _p.OverwatchBelowHit > 0 && bestShot < _p.OverwatchBelowHit)
                 foreach (var (tile, _, _, _) in pairs.Where(p => p.Tile.ApCost < 2))
                     if (
                         _unit.ActionPoints - tile.ApCost >= 1
@@ -266,6 +277,39 @@ public sealed class UtilityAi(
                     )
                         Consider(ow);
             return best;
+        }
+
+        private MoveZones Zones => _zones ??= _ctx.MoveRange(_unit);
+
+        /// <summary>
+        /// The farthest tile this turn along the shortest path to the nearest tile the enemy faction
+        /// has never seen (else the nearest one out of sight now).
+        /// </summary>
+        private GridPos? SearchWaypoint()
+        {
+            var vision = _state.EnemyVision;
+            var map = _state.Map;
+            var all = Pathfinder.Reachable(_state, _unit, map.Width * map.Height * 3);
+            GridPos? target = null;
+            var best = (Rank: int.MaxValue, Cost: int.MaxValue);
+            foreach (var tile in all.Tiles())
+            {
+                var rank = vision[tile] switch
+                {
+                    TileVisibility.Unexplored => 0,
+                    TileVisibility.Explored => 1,
+                    _ => 2,
+                };
+                var cost = all.CostTo(tile)!.Value;
+                if (rank < 2 && (rank, cost).CompareTo(best) < 0)
+                {
+                    best = (rank, cost);
+                    target = tile;
+                }
+            }
+            if (target is not { } goal || all.PathTo(goal) is not { } path)
+                return null;
+            return path.Skip(1).Where(Zones.Reachable.Contains).Cast<GridPos?>().LastOrDefault();
         }
 
         private Plan? OverwatchPlan(GridPos tile, double score) =>
@@ -329,6 +373,8 @@ public sealed class UtilityAi(
             if (_approach.Count == 0)
                 return 0;
             var d = Distance(tile);
+            if (_searching)
+                return d;
             return Math.Max(0, Math.Max(_rangeMin - d, d - _rangeMax));
         }
 

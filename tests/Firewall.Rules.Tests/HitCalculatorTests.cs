@@ -378,4 +378,98 @@ public class HitCalculatorTests
         var replayed = TacticalEngine.Replay(0, engine.Log.Commands, Make, Data);
         Assert.Equal(engine.State.StateHash(), replayed.State.StateHash());
     }
+
+    [Fact]
+    public void HitChanceIsClampedAtBothEnds()
+    {
+        var state = Yard();
+        var rookie = Rookie(state, 0, "shotgun_t1");
+        var husk = Enemy(state, "husk", 2);
+
+        var high = HitCalculator.Preview(
+            state,
+            rookie,
+            husk,
+            ShotContext.Default with
+            {
+                AimMods = [("Overclock", 50)],
+            }
+        );
+        Assert.True(high.RawHitChance > 100);
+        Assert.Equal(100, high.HitChance);
+
+        var low = HitCalculator.Preview(
+            state,
+            rookie,
+            husk,
+            ShotContext.Default with
+            {
+                AimMods = [("Panic", -200)],
+            }
+        );
+        Assert.True(low.RawHitChance < 0);
+        Assert.Equal(0, low.HitChance);
+    }
+
+    [Fact]
+    public void CritModifiersAddToTheWeaponAndFlankBonusAndClamp()
+    {
+        var state = Yard(crateX: 7);
+        var rookie = Rookie(state, 16); // flanks the warden
+        var warden = Enemy(state, "warden", 8);
+
+        var p = HitCalculator.Preview(
+            state,
+            rookie,
+            warden,
+            ShotContext.Default with
+            {
+                CritMods = [("Laser Sight", 15)],
+            }
+        );
+        Assert.Equal([("Weapon", 10), ("Flanked", 50), ("Laser Sight", 15)], p.CritBreakdown);
+        Assert.Equal(75, p.CritChance);
+
+        var capped = HitCalculator.Preview(
+            state,
+            rookie,
+            warden,
+            ShotContext.Default with
+            {
+                CritMods = [("Executioner", 80)],
+            }
+        );
+        Assert.Equal(100, capped.CritChance);
+    }
+
+    [Fact]
+    public void ReactionShotsOnlyCritWithSentinel()
+    {
+        var state = Yard(crateX: 7);
+        var rookie = Rookie(state, 16);
+        var warden = Enemy(state, "warden", 8);
+
+        var plain = HitCalculator.Preview(
+            state,
+            rookie,
+            warden,
+            ShotContext.Default with
+            {
+                Reaction = true,
+            }
+        );
+        var sentinel = HitCalculator.Preview(
+            state,
+            rookie,
+            warden,
+            ShotContext.Default with
+            {
+                Reaction = true,
+                ReactionCrit = true,
+            }
+        );
+
+        Assert.Equal(0, plain.CritChance);
+        Assert.Equal(60, sentinel.CritChance);
+    }
 }

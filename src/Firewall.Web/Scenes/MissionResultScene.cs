@@ -62,7 +62,7 @@ public static class MissionResultText
 public sealed class MissionResultScene(MissionResult result) : SceneBase
 {
     private static readonly string[] Columns = ["Soldier", "Status", "Kills", "Damage", "Hits"];
-    private static readonly float[] ColumnX = [0f, 240f, 470f, 560f, 670f];
+    private static readonly float[] ColumnX = [0f, 290f, 510f, 600f, 700f];
 
     public override string Name => "MissionResult";
 
