@@ -13,7 +13,8 @@ public sealed record AbilitySlot(
     int ApCost,
     int Cooldown,
     int Slot,
-    GameAction? Key
+    GameAction? Key,
+    string Icon = "icon.star"
 )
 {
     public string HotkeyLabel => Slot.ToString();
@@ -108,11 +109,12 @@ public static class HudModel
                 new AbilitySlot(
                     id,
                     def.Name,
-                    def.Description,
+                    def.Describe(),
                     def.ApCost,
                     unit.Cooldowns.GetValueOrDefault(id),
                     slot,
-                    KeyForSlot(slot)
+                    KeyForSlot(slot),
+                    def.Icon ?? "icon.star"
                 )
             );
         }
@@ -137,6 +139,21 @@ public static class HudModel
             yield return line;
     }
 
+    /// <summary>An ability's name, cost and description, for places with no hotkey or reason (the squad builder).</summary>
+    public static string AbilityInfo(AbilityDef def)
+    {
+        var lines = new List<string>
+        {
+            $"[c=#3fd0ff]{def.Name}[/c]",
+            def.Targeting == TargetingType.Passive
+                ? "Passive"
+                : $"Cost: [c=#ffb000]{def.ApCost} AP[/c]"
+                    + (def.Cooldown > 0 ? $"   Cooldown: [c=#ffb000]{def.Cooldown}[/c] turns" : ""),
+        };
+        lines.AddRange(Wrap(def.Describe(), 44));
+        return string.Join('\n', lines);
+    }
+
     /// <summary>
     /// Name and hotkey, AP cost and cooldown, the description, and in red why it is disabled.
     /// </summary>
@@ -153,19 +170,6 @@ public static class HudModel
             lines.Add($"[c=#ff4d4d]{blockedReason}[/c]");
         return string.Join('\n', lines);
     }
-
-    /// <summary>The ability bar icon (a UI atlas region).</summary>
-    public static string IconFor(string abilityId) =>
-        abilityId switch
-        {
-            AbilityRegistry.Shoot => "icon.target",
-            AbilityRegistry.Overwatch => "icon.exclamation",
-            AbilityRegistry.Reload => "icon.return",
-            AbilityRegistry.HunkerDown => "icon.locked",
-            AbilityRegistry.Evac => "icon.export",
-            AbilityRegistry.DebugStabilize => "icon.plus",
-            _ => "icon.star",
-        };
 
     /// <summary>Two diamonds: <paramref name="ap"/> counts whole points, so each is full or empty.</summary>
     public static IReadOnlyList<ApPip> ApPips(int ap, int max = TacticalEngine.ApPerTurn)

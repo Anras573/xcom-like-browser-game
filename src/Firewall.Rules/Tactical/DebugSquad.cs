@@ -4,8 +4,9 @@ using Firewall.Rules.Rng;
 namespace Firewall.Rules.Tactical;
 
 /// <summary>
-/// Stand-in for the barracks roster: rookies with the starting rifle, random names and the debug
-/// Stabilize ability. The real roster replaces it with the barracks work.
+/// Stand-in for the barracks roster: rookies with the starting rifle by default, or the soldiers of
+/// the debug squad builder (#30), with random names and the debug Stabilize ability. The real
+/// roster replaces it with the barracks work.
 /// </summary>
 public static class DebugSquad
 {
@@ -14,37 +15,31 @@ public static class DebugSquad
         GameData data,
         IRandom rng,
         int count = 4
+    ) => Create(state, data, rng, Enumerable.Repeat(new SoldierSpec(), count).ToList());
+
+    /// <summary>One soldier per spec (the squad builder's choices), with random names and looks.</summary>
+    public static IReadOnlyList<TacticalUnit> Create(
+        TacticalState state,
+        GameData data,
+        IRandom rng,
+        IReadOnlyList<SoldierSpec> specs
     )
     {
-        var soldier = data.Soldier;
-        var weapon = data.Weapon(soldier.StartingWeaponClass, 1);
         var names = rng.Fork("squad-names");
         var looks = rng.Fork("squad-looks");
         var squad = new List<TacticalUnit>();
-        for (var i = 0; i < count; i++)
+        foreach (var spec in specs)
         {
             var name = $"{Pick(data.Names.FirstNames, names)} {Pick(data.Names.LastNames, names)}";
             squad.Add(
-                new TacticalUnit(
-                    state.NextUnitId(),
-                    Faction.Firewall,
-                    SquadDeployer.SoldierDefId,
-                    name
+                SoldierBuilder.Build(
+                    state,
+                    data,
+                    spec,
+                    name,
+                    Pick(data.Soldier.AppearanceSets, looks)
                 )
-                {
-                    Hp = soldier.Hp,
-                    MaxHp = soldier.Hp,
-                    Aim = soldier.Aim,
-                    Mobility = soldier.Mobility,
-                    Defense = soldier.Defense,
-                    Sight = soldier.Sight,
-                    ActionPoints = 2,
-                    Weapon = new WeaponState(weapon, weapon.Clip),
-                    AppearanceId = Pick(soldier.AppearanceSets, looks),
-                }
             );
-            squad[^1].Abilities.UnionWith(AbilityRegistry.StandardActions);
-            squad[^1].Abilities.Add(AbilityRegistry.DebugStabilize);
         }
         return squad;
     }

@@ -36,6 +36,12 @@ public sealed record ClassDef : IDef
     [JsonRequired]
     public WeaponClass WeaponClass { get; init; }
 
+    /// <summary>UI atlas region for the class, such as <c>icon.target</c>.</summary>
+    public string? Icon { get; init; }
+
+    /// <summary>One line for the squad builder and the barracks.</summary>
+    public string? Description { get; init; }
+
     /// <summary>Character sprite pose while armed with the class weapon.</summary>
     [JsonRequired]
     public string Pose { get; init; } = "";

@@ -88,6 +88,12 @@ internal static class GameDataValidator
                 Err($"ability '{a.Id}': negative apCost {a.ApCost}");
             if (a.Cooldown < 0)
                 Err($"ability '{a.Id}': negative cooldown {a.Cooldown}");
+            if (a.Charges < 0)
+                Err($"ability '{a.Id}': negative charges {a.Charges}");
+            var values = AbilityText.Values(a);
+            foreach (var key in AbilityText.Keys(a.Description))
+                if (!values.ContainsKey(key))
+                    Err($"ability '{a.Id}': description uses {{{key}}} but has no such parameter");
         }
 
         foreach (var c in d.Classes)

@@ -38,6 +38,18 @@ public sealed record ShotContext
     /// <summary>Rounds the shot uses (Suppression uses 2). Attackers without a weapon use none.</summary>
     public int AmmoCost { get; init; } = 1;
 
+    /// <summary>The game data, for the numbers of passive abilities; null falls back to the GDD values.</summary>
+    public GameData? Data { get; init; }
+
+    /// <summary>The ability this shot belongs to (Rapid Fire, Headshot, ...); null for a plain shot.</summary>
+    public string? AbilityId { get; init; }
+
+    /// <summary>Flat damage added to the roll before a crit multiplies it (Headshot, Mayhem).</summary>
+    public int BonusDamage { get; init; }
+
+    /// <summary>A hit leaves the target <see cref="StatusFlags.Ruptured"/> (Rupture).</summary>
+    public bool Ruptures { get; init; }
+
     private readonly IReadOnlyList<(string Label, int Value)>? _aimMods;
 
     /// <summary>Additive hit modifiers from abilities and items, applied before overwatch.</summary>
@@ -63,16 +75,46 @@ public sealed record ShotContext
     public static ShotContext For(
         GameData data,
         TacticalUnit attacker,
-        RangeType rangeType = RangeType.Ranged
-    ) =>
-        attacker.Weapon is null && data.Enemies.TryGet(attacker.DefId, out var enemy)
-            ? new ShotContext
-            {
-                RangeType = rangeType,
-                DamageMin = enemy.DmgMin,
-                DamageMax = enemy.DmgMax,
-            }
-            : new ShotContext { RangeType = rangeType };
+        RangeType rangeType = RangeType.Ranged,
+        AbilityDef? ability = null
+    )
+    {
+        var context =
+            attacker.Weapon is null && data.Enemies.TryGet(attacker.DefId, out var enemy)
+                ? new ShotContext
+                {
+                    RangeType = rangeType,
+                    DamageMin = enemy.DmgMin,
+                    DamageMax = enemy.DmgMax,
+                }
+                : new ShotContext { RangeType = rangeType };
+        context = context with { Data = data };
+        return ability is null ? context : context.ForAbility(ability);
+    }
+
+    /// <summary>
+    /// The numbers an active shot ability adds (GDD §5.2): Rapid Fire's aim penalty, Headshot's
+    /// damage, Rupture's guaranteed crit.
+    /// </summary>
+    private ShotContext ForAbility(AbilityDef ability)
+    {
+        var context = this with { AbilityId = ability.Id };
+        if (ability.Parameters.TryGetValue("aim", out var aim) && aim != 0)
+            context = context with { AimMods = [.. AimMods, (ability.Name, (int)aim)] };
+        switch (ability.Id)
+        {
+            case SoldierPerks.Headshot:
+                return context with { BonusDamage = (int)ability.Parameters["damage"] };
+            case SoldierPerks.Rupture:
+                return context with
+                {
+                    CritMods = [.. CritMods, (ability.Name, 100)],
+                    Ruptures = true,
+                };
+            default:
+                return context;
+        }
+    }
 }
 
 /// <summary>The odds of one shot, as shown in the shot panel.</summary>
@@ -90,6 +132,9 @@ public sealed record ShotPreview(
     string? Reason
 )
 {
+    /// <summary>The ability that makes this shot miss for certain (Untouchable, Lightning Reflexes), if any.</summary>
+    public string? AutoMissBy { get; init; }
+
     /// <summary>The breakdown's sum: the hit chance before clamping.</summary>
     public int RawHitChance => Breakdown.Sum(b => b.Value);
 }
@@ -132,18 +177,41 @@ public static class HitCalculator
             flanked = cover.Flanked;
             if (cover.Level != CoverLevel.None)
             {
+                var level = cover.Level;
+                var bonus = cover.DefenseBonus;
+                var lowProfile =
+                    level == CoverLevel.Half && target.Abilities.Contains(SoldierPerks.LowProfile);
+                if (lowProfile)
+                {
+                    level = CoverLevel.Full;
+                    bonus = CoverCalculator.FullDefense;
+                }
                 breakdown.Add(
                     (
-                        cover.Level == CoverLevel.Full ? "Full Cover" : "Half Cover",
-                        -cover.DefenseBonus
+                        lowProfile ? "Full Cover (Low Profile)"
+                        : level == CoverLevel.Full ? "Full Cover"
+                        : "Half Cover",
+                        -bonus
                     )
                 );
                 if (target.Statuses.Hunkered)
-                    breakdown.Add(("Hunkered", -cover.DefenseBonus * (HunkerCoverMultiplier - 1)));
+                    breakdown.Add(("Hunkered", -bonus * (HunkerCoverMultiplier - 1)));
             }
         }
         if (attacker.Statuses.Suppressed)
             breakdown.Add(("Suppressed", SuppressedAim));
+        if (attacker.Abilities.Contains(SoldierPerks.SteadyAim) && attacker.Stats.ShotsFired == 0)
+            AddIfNonZero(
+                breakdown,
+                "Steady Aim",
+                SoldierPerks.IntParam(ctx.Data, SoldierPerks.SteadyAim, "aim", 15)
+            );
+        if (!melee && FiresAfterMoving(attacker))
+            AddIfNonZero(
+                breakdown,
+                "Snap Shot",
+                SoldierPerks.IntParam(ctx.Data, SoldierPerks.SnapShot, "aim", -20)
+            );
         foreach (var (label, value) in ctx.AimMods)
             AddIfNonZero(breakdown, label, value);
         if (ctx.Reaction)
@@ -151,6 +219,9 @@ public static class HitCalculator
             var sum = breakdown.Sum(b => b.Item2);
             breakdown.Add(("Overwatch x0.7", RoundPercent(sum, ReactionAimPercent) - sum));
         }
+        var autoMiss = AutoMissBy(target, ctx);
+        if (autoMiss is not null)
+            breakdown.Add((AbilityName(ctx, autoMiss), -breakdown.Sum(b => b.Item2)));
         var hit = Math.Clamp(breakdown.Sum(b => b.Item2), 0, 100);
 
         var critBreakdown = new List<(string, int)>();
@@ -161,22 +232,67 @@ public static class HitCalculator
                 critBreakdown.Add(("Flanked", FlankedCrit));
             foreach (var (label, value) in ctx.CritMods)
                 AddIfNonZero(critBreakdown, label, value);
+            if (
+                attacker.Abilities.Contains(SoldierPerks.CloseCombat)
+                && attacker.Position.DistanceTo(target.Position)
+                    <= SoldierPerks.Param(ctx.Data, SoldierPerks.CloseCombat, "maxDist", 4)
+            )
+                AddIfNonZero(
+                    critBreakdown,
+                    "Close Combat",
+                    SoldierPerks.IntParam(ctx.Data, SoldierPerks.CloseCombat, "crit", 20)
+                );
         }
+        var bonusDamage =
+            ctx.BonusDamage
+            + (
+                target.Statuses.Ruptured
+                    ? SoldierPerks.IntParam(ctx.Data, SoldierPerks.Rupture, "damage", 3)
+                    : 0
+            );
         var crit = Math.Clamp(critBreakdown.Sum(b => b.Item2), 0, 100);
 
         var reason = WhyNot(state, attacker, target, ctx);
         return new ShotPreview(
             hit,
             crit,
-            weapon?.Def.DmgMin ?? ctx.DamageMin,
-            weapon?.Def.DmgMax ?? ctx.DamageMax,
+            (weapon?.Def.DmgMin ?? ctx.DamageMin) + bonusDamage,
+            (weapon?.Def.DmgMax ?? ctx.DamageMax) + bonusDamage,
             breakdown,
             critBreakdown,
             flanked,
             reason is null,
             reason
-        );
+        )
+        {
+            AutoMissBy = autoMiss,
+        };
     }
+
+    /// <summary>
+    /// The ability that turns this attack into a sure miss: Lightning Reflexes against the first
+    /// reaction shot of a phase, or an armed Untouchable against any attack.
+    /// </summary>
+    private static string? AutoMissBy(TacticalUnit target, ShotContext ctx) =>
+        ctx.Reaction
+        && target.Abilities.Contains(SoldierPerks.LightningReflexes)
+        && !target.Perks.LightningReflexesSpent
+            ? SoldierPerks.LightningReflexes
+        : target.Abilities.Contains(SoldierPerks.Untouchable) && target.Perks.UntouchableArmed
+            ? SoldierPerks.Untouchable
+        : null;
+
+    private static string AbilityName(ShotContext ctx, string abilityId) =>
+        ctx.Data is not null && ctx.Data.Abilities.TryGet(abilityId, out var def)
+            ? def.Name
+            : abilityId;
+
+    /// <summary>The shooter moved this turn and its weapon would not allow a shot: Snap Shot is in use.</summary>
+    private static bool FiresAfterMoving(TacticalUnit attacker) =>
+        attacker.MovedThisTurn
+        && attacker.Weapon is { } weapon
+        && weapon.Def.Flags.Contains(WeaponFlag.NoFireAfterMove)
+        && SoldierPerks.CanFireAfterMoving(attacker);
 
     /// <summary>
     /// Rolls a previewed shot in the fixed order: hit, then crit (only on a hit), then damage
@@ -232,13 +348,33 @@ public static class HitCalculator
         {
             if (weapon.Ammo < ctx.AmmoCost)
                 return weapon.Ammo == 0 ? "Out of ammo." : "Not enough ammo.";
-            if (weapon.Def.Flags.Contains(WeaponFlag.NoFireAfterMove) && attacker.MovedThisTurn)
+            if (
+                weapon.Def.Flags.Contains(WeaponFlag.NoFireAfterMove)
+                && attacker.MovedThisTurn
+                && !SoldierPerks.CanFireAfterMoving(attacker)
+            )
                 return "Sniper rifles can't fire after moving";
         }
-        if (!LosTracer.CanSee(state, attacker, target))
+        if (!LosTracer.CanSee(state, attacker, target) && !SquadSees(state, attacker, target, ctx))
             return "No line of sight to the target.";
         return null;
     }
+
+    /// <summary>
+    /// Squadsight: the target is in the squad's view and there is a clear line from the shooter's
+    /// own tile, however far. Reaction shots still need the shooter's own sight.
+    /// </summary>
+    private static bool SquadSees(
+        TacticalState state,
+        TacticalUnit attacker,
+        TacticalUnit target,
+        ShotContext ctx
+    ) =>
+        !ctx.Reaction
+        && attacker.Faction == Faction.Firewall
+        && attacker.Abilities.Contains(SoldierPerks.Squadsight)
+        && state.PlayerVision.IsUnitVisible(target)
+        && LosTracer.HasLos(state.Map, attacker.Position, target.Position);
 
     private static bool IsAdjacent(GridPos a, GridPos b) =>
         a != b && Math.Abs(a.X - b.X) <= 1 && Math.Abs(a.Y - b.Y) <= 1;

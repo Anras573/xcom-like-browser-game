@@ -26,6 +26,15 @@ public interface IAbilityHandler
     void Execute(AbilityContext ctx);
 }
 
+/// <summary>
+/// An ability the targeting UI can show odds for: a shot's hit chance, a hack's success chance.
+/// Handlers without it (Suppression, Overclock) have nothing to preview.
+/// </summary>
+public interface IAbilityPreview
+{
+    ShotPreview? Preview(AbilityContext ctx, TacticalUnit target);
+}
+
 /// <summary>Ability handlers by ability id.</summary>
 public sealed class AbilityRegistry
 {
@@ -54,7 +63,7 @@ public sealed class AbilityRegistry
 
     private readonly Dictionary<string, IAbilityHandler> _handlers = new(StringComparer.Ordinal);
 
-    /// <summary>The handlers implemented so far: Shoot, Melee, Overwatch, Reload, Hunker Down, Evac and the debug Stabilize.</summary>
+    /// <summary>The handlers implemented so far: the standard actions, the debug Stabilize, the enemy abilities and every active class ability.</summary>
     public static AbilityRegistry CreateDefault()
     {
         var registry = new AbilityRegistry();
@@ -67,6 +76,15 @@ public sealed class AbilityRegistry
         registry.Register(DebugStabilize, new DebugStabilizeAbility());
         registry.Register(SuppressionAbility.AbilityId, new SuppressionAbility());
         registry.Register(ProxyOverclock, new OverclockAbility());
+
+        // The class abilities (#30). The shot abilities are plain shots with their own numbers.
+        registry.Register(SoldierPerks.RunAndGun, new RunAndGunAbility());
+        registry.Register(SoldierPerks.RapidFire, new ShootAbility());
+        registry.Register(SoldierPerks.Headshot, new ShootAbility());
+        registry.Register(SoldierPerks.Rupture, new ShootAbility());
+        registry.Register(SoldierPerks.KillingZone, new OverwatchAbility());
+        registry.Register(SoldierPerks.Hack, new HackAbility());
+        registry.Register(SoldierPerks.Overclock, new AllyOverclockAbility());
         return registry;
     }
 

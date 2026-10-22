@@ -15,6 +15,12 @@ public sealed record ApChanged(UnitId Unit, int Ap) : GameEvent;
 
 public sealed record AbilityUsed(UnitId Unit, string AbilityId, Target Target) : GameEvent;
 
+/// <summary>
+/// An ability did something worth a word on screen: "RUN &amp; GUN", "IN THE ZONE", "HACKED". It
+/// follows the events it explains.
+/// </summary>
+public sealed record AbilityTriggered(UnitId Unit, string AbilityId, string Text) : GameEvent;
+
 /// <summary>Always the last event of the mission; carries everything the result screen shows.</summary>
 public sealed record MissionEnded(MissionResult Result) : GameEvent;
 
@@ -61,6 +67,12 @@ public sealed record AmmoChanged(UnitId Unit, int Ammo) : GameEvent;
 public sealed record StatusAdded(UnitId Unit, StatusFlags Status) : GameEvent;
 
 public sealed record StatusRemoved(UnitId Unit, StatusFlags Status) : GameEvent;
+
+/// <summary>
+/// A unit swept into someone else's suppression (Danger Zone), so the view can draw the line to
+/// the suppressor. The main target's line starts with the Suppression <see cref="AbilityUsed"/>.
+/// </summary>
+public sealed record UnitSuppressed(UnitId Unit, UnitId By) : GameEvent;
 
 // Pods and map
 /// <summary>

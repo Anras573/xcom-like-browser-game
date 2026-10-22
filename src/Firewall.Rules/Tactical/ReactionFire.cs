@@ -57,6 +57,12 @@ public sealed class ReactionFireHook(GameData data, ShootAbility shoot) : IStepH
             {
                 Reaction = true,
                 ReactionCrit = watcher.Abilities.Contains(AbilityRegistry.Sentinel),
+                // Mayhem: the reaction shots of a suppression hit harder.
+                BonusDamage =
+                    trigger.Source == SoldierPerks.Suppression
+                    && watcher.Abilities.Contains(SoldierPerks.Mayhem)
+                        ? SoldierPerks.IntParam(data, SoldierPerks.Mayhem, "damage", 2)
+                        : 0,
             };
             // Out of ammo, stunned and the like: the trigger stays for a later step.
             if (!HitCalculator.Preview(ctx.State, watcher, mover, shot).CanFire)

@@ -64,6 +64,9 @@ public sealed class TacticalUnit(UnitId id, Faction faction, string defId, strin
     public Dictionary<string, int> Cooldowns { get; } = new(StringComparer.Ordinal);
     public StatusSet Statuses { get; } = new();
 
+    /// <summary>Soldier ability bookkeeping (Run &amp; Gun, Hit &amp; Run, Untouchable, ...).</summary>
+    public PerkState Perks { get; } = new();
+
     /// <summary>Overwatch and the like: reaction shots waiting for a hostile to move (<see cref="ReactionFireHook"/>).</summary>
     public List<ReactionTrigger> Reactions { get; } = [];
 

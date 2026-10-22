@@ -17,11 +17,12 @@ namespace Firewall.Web.Scenes;
 /// "Skirmish (debug)": the test yard with a debug squad of four and three enemy pods, played through
 /// the tactical HUD (#27). Click a soldier, the strip or Tab (soldiers with AP) to select, F
 /// re-centres, 1 to 9 use the ability bar, Backspace ends the turn, Esc cancels aiming or opens the
-/// pause menu. The mission ends on a Purge or a wipe (or Abort Mission) and moves on to the result
+/// pause menu. The squad is four rookies unless the squad builder (#30) passes soldiers. The mission ends on a Purge or a wipe (or Abort Mission) and moves on to the result
 /// screen. The pods come from the encounter table of the chosen Force Level (#29). Debug keys: F6
 /// picks an enemy type, F7 its tier, F10 spawns it on the hovered tile (a Relay Node or a pod member).
 /// </summary>
-public sealed class SkirmishScene(int forceLevel = 2) : SceneBase
+public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>? squad = null)
+    : SceneBase
 {
     public const string MapId = "test-yard";
 
@@ -70,7 +71,7 @@ public sealed class SkirmishScene(int forceLevel = 2) : SceneBase
 
     private const float ResultDelaySeconds = 2f;
 
-    public override string Name => $"Skirmish FL{forceLevel}";
+    public override string Name => squad is null ? $"Skirmish FL{forceLevel}" : "Skirmish (squad)";
 
     /// <summary>The soldier currently selected, if any.</summary>
     public TacticalUnit? Selected => _selected is { } id ? _state.Unit(id) : null;
@@ -85,7 +86,12 @@ public sealed class SkirmishScene(int forceLevel = 2) : SceneBase
         var map = Ctx.Data.LoadMap(source.Json);
         var rng = new Pcg32Random(Ctx.Seeds.Next());
         _state = new TacticalState(map, rng);
-        SquadDeployer.Deploy(_state, DebugSquad.Create(_state, Ctx.Data, rng.Fork("squad")));
+        SquadDeployer.Deploy(
+            _state,
+            squad is null
+                ? DebugSquad.Create(_state, Ctx.Data, rng.Fork("squad"))
+                : DebugSquad.Create(_state, Ctx.Data, rng.Fork("squad"), squad)
+        );
         var pods = EncounterBuilder.Build(Ctx.Data, forceLevel, PodCount, rng.Fork("encounter"));
         PodSpawner.Spawn(_state, Ctx.Data, pods, rng.Fork("pods"));
         _engine = new TacticalEngine(
@@ -363,19 +369,22 @@ public sealed class SkirmishScene(int forceLevel = 2) : SceneBase
 
     // ------------------------------------------------------------------ targeting
 
-    private TargetingMode? TryBeginTargeting(out string reason)
+    private TargetingMode? TryBeginTargeting(
+        out string reason,
+        string abilityId = AbilityRegistry.Shoot
+    )
     {
         if (Selected is not { } shooter || IsMoving)
         {
             reason = "Select a soldier.";
             return null;
         }
-        return TargetingMode.TryBegin(_engine, shooter, IsVisible, out reason);
+        return TargetingMode.TryBegin(_engine, shooter, IsVisible, out reason, abilityId);
     }
 
-    private void BeginTargeting()
+    private void BeginTargeting(string abilityId = AbilityRegistry.Shoot)
     {
-        if (TryBeginTargeting(out var reason) is not { } mode)
+        if (TryBeginTargeting(out var reason, abilityId) is not { } mode)
         {
             Ctx.Ui.Toast(reason);
             return;
@@ -419,7 +428,11 @@ public sealed class SkirmishScene(int forceLevel = 2) : SceneBase
             Fire();
         else if (
             _hover is { } clicked
-            && clicked.Faction != Faction.Firewall
+            && (
+                mode.TargetsAllies
+                    ? clicked.Faction == Faction.Firewall
+                    : clicked.Faction != Faction.Firewall
+            )
             && !Ctx.Ui.PointerOverUi
             && Ctx.Clicks.ConsumeClick()
         )
@@ -734,19 +747,22 @@ public sealed class SkirmishScene(int forceLevel = 2) : SceneBase
     // Why the slot cannot be used right now; null when it can.
     private string? SlotBlocked(AbilitySlot slot)
     {
-        if (slot.AbilityId == AbilityRegistry.Shoot)
-            return _targeting is not null || TryBeginTargeting(out var reason) is not null
-                ? null
-                : reason;
         if (slot.AbilityId == AbilityRegistry.DebugStabilize)
             return StabilizeCommand() is not { } cmd
                     ? "No bleeding-out squadmate next to this soldier."
                 : IsMoving ? "Wait for the move to finish."
                 : _engine.Validate(cmd) is { IsValid: false } bad ? bad.Reason
                 : null;
-        return Ctx.Data.Abilities[slot.AbilityId].Targeting == TargetingType.Self
-            ? SelfAbilityBlocked(slot.AbilityId)
-            : "Not available yet.";
+        return Ctx.Data.Abilities[slot.AbilityId].Targeting switch
+        {
+            // Armed targeting can always be left again by pressing the button once more.
+            TargetingType.Enemy or TargetingType.Ally => _targeting is not null
+            || TryBeginTargeting(out var reason, slot.AbilityId) is not null
+                ? null
+                : reason,
+            TargetingType.Self => SelfAbilityBlocked(slot.AbilityId),
+            _ => "This ability is always on.",
+        };
     }
 
     private HudFrame BuildHud()
@@ -812,7 +828,7 @@ public sealed class SkirmishScene(int forceLevel = 2) : SceneBase
             .Select(u => new HudEnemy(
                 u,
                 Ctx.Data.Enemies[u.DefId].Name,
-                _targeting?.Candidates.FirstOrDefault(c => c.Unit.Id == u.Id)?.Preview.HitChance,
+                _targeting?.Candidates.FirstOrDefault(c => c.Unit.Id == u.Id)?.Preview?.HitChance,
                 _targeting?.Current.Unit.Id == u.Id
             ))
             .ToList();
@@ -844,19 +860,28 @@ public sealed class SkirmishScene(int forceLevel = 2) : SceneBase
     {
         if (Busy)
             return;
-        if (abilityId == AbilityRegistry.Shoot)
+        if (abilityId == AbilityRegistry.DebugStabilize)
         {
-            if (_targeting is not null)
-                ExitTargeting();
-            else
-                BeginTargeting();
-        }
-        else if (abilityId == AbilityRegistry.DebugStabilize)
             Stabilize();
-        else if (Ctx.Data.Abilities[abilityId].Targeting == TargetingType.Self)
-            UseSelfAbility(abilityId);
-        else
-            Ctx.Ui.Toast("Not available yet.");
+            return;
+        }
+        switch (Ctx.Data.Abilities[abilityId].Targeting)
+        {
+            case TargetingType.Enemy or TargetingType.Ally:
+                // The same button again cancels; another aimed ability swaps over.
+                var armed = _targeting?.AbilityId;
+                if (armed is not null)
+                    ExitTargeting();
+                if (armed != abilityId)
+                    BeginTargeting(abilityId);
+                break;
+            case TargetingType.Self:
+                UseSelfAbility(abilityId);
+                break;
+            default:
+                Ctx.Ui.Toast("This ability is always on.");
+                break;
+        }
     }
 
     // Targets the enemy while Shoot is armed, otherwise looks at it.

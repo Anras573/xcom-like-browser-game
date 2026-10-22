@@ -55,7 +55,13 @@ public static class ShotPanel
         float bottomMargin = Margin
     )
     {
-        var p = target.Preview;
+        if (target.Preview is not { } p)
+        {
+            DrawPlain(ui, target, candidateCount, bottomMargin);
+            return;
+        }
+        // A hack has a chance but no damage.
+        var attack = p.DamageMax > 0;
         var rows = p.Breakdown.Count + (p.CritBreakdown.Count > 0 ? 1 + p.CritBreakdown.Count : 0);
         var rect = Rect(rows, bottomMargin);
         var title =
@@ -80,15 +86,18 @@ public static class ShotPanel
         // Left: the odds.
         var left = new Vector2(content.X + 4f, content.Y);
         canvas.Text($"{p.HitChance}%", left, HitStyle);
-        canvas.Text("TO HIT", left + new Vector2(4f, 58f), TextStyles.Small);
+        canvas.Text(attack ? "TO HIT" : "TO HACK", left + new Vector2(4f, 58f), TextStyles.Small);
         var y = left.Y + 84f;
-        canvas.Text($"Crit {p.CritChance}%", new Vector2(left.X, y), TextStyles.Body);
-        canvas.Text(
-            $"Damage {p.DamageMin}-{p.DamageMax}",
-            new Vector2(left.X, y + 22f),
-            TextStyles.Body
-        );
-        if (weapon is not null)
+        if (attack)
+        {
+            canvas.Text($"Crit {p.CritChance}%", new Vector2(left.X, y), TextStyles.Body);
+            canvas.Text(
+                $"Damage {p.DamageMin}-{p.DamageMax}",
+                new Vector2(left.X, y + 22f),
+                TextStyles.Body
+            );
+        }
+        if (attack && weapon is not null)
             canvas.Text(
                 $"Ammo {weapon.Ammo}/{weapon.Def.Clip}",
                 new Vector2(left.X, y + 44f),
@@ -110,9 +119,37 @@ public static class ShotPanel
         }
 
         canvas.Text(
-            "Enter / Space / click target: fire    Tab: next target    Esc / RMB: cancel",
+            attack
+                ? "Enter / Space / click target: fire    Tab: next target    Esc / RMB: cancel"
+                : "Enter / Space / click target: hack    Tab: next target    Esc / RMB: cancel",
             new Vector2(content.X, rect.Bottom - 26f),
             TextStyles.Small
+        );
+    }
+
+    // Abilities with no odds to show (Suppression, Overclock): just who, and the keys.
+    private static void DrawPlain(
+        UiContext ui,
+        TargetCandidate target,
+        int candidateCount,
+        float bottomMargin
+    )
+    {
+        var rect = new UiRect(
+            (UiSpace.LogicalWidth - Width) / 2f,
+            UiSpace.LogicalHeight - 100f - bottomMargin,
+            Width,
+            100f
+        );
+        var title =
+            candidateCount > 1
+                ? $"{target.Unit.DisplayName}   ({candidateCount} targets, Tab to cycle)"
+                : target.Unit.DisplayName;
+        var content = ui.Panel(rect, title);
+        ui.Label(
+            new UiRect(content.X, content.Y + 8f, content.W, 24f),
+            "Enter / Space / click target: use    Tab: next target    Esc / RMB: cancel",
+            ui.Theme.Small
         );
     }
 
