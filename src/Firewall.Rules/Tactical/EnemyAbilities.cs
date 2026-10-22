@@ -73,6 +73,39 @@ public sealed class SuppressionAbility : IAbilityHandler
             ctx.Events.Add(new AmmoChanged(user.Id, weapon.Ammo));
         }
 
+        Suppress(ctx, user, target);
+        // Danger Zone: the suppression also covers the hostile units around the target that the
+        // suppressor's side can see. Each gets its own reaction trigger.
+        if (user.Abilities.Contains(SoldierPerks.DangerZone))
+        {
+            var radius = SoldierPerks.IntParam(ctx.Data, SoldierPerks.DangerZone, "radius", 1);
+            var vision = ctx.State.VisionOf(user.Faction);
+            foreach (
+                var other in ctx
+                    .State.Units.Where(u =>
+                        u.Id != target.Id
+                        && u.IsStanding
+                        && u.Faction != user.Faction
+                        && u.Faction != Faction.Neutral
+                        && u.Statuses.SuppressedBy != user.Id
+                        && Math.Max(
+                            Math.Abs(u.Position.X - target.Position.X),
+                            Math.Abs(u.Position.Y - target.Position.Y)
+                        ) <= radius
+                        && (vision is null || vision.IsUnitVisible(u))
+                    )
+                    .OrderBy(u => u.Id.Value)
+                    .ToList()
+            )
+            {
+                Suppress(ctx, user, other);
+                ctx.Events.Add(new UnitSuppressed(other.Id, user.Id));
+            }
+        }
+    }
+
+    private static void Suppress(AbilityContext ctx, TacticalUnit user, TacticalUnit target)
+    {
         target.Statuses.SuppressedBy = user.Id;
         target.Statuses.Set(StatusFlags.Suppressed);
         ctx.Events.Add(new StatusAdded(target.Id, StatusFlags.Suppressed));

@@ -59,6 +59,9 @@ public enum StatusFlags
     Stabilized = 1 << 4,
     Smoked = 1 << 5,
     Capturable = 1 << 6,
+
+    /// <summary>Takes extra damage from every source for the rest of the mission (Rupture).</summary>
+    Ruptured = 1 << 7,
 }
 
 /// <summary>
@@ -90,4 +93,32 @@ public sealed class StatusSet
     public bool Stabilized => Has(StatusFlags.Stabilized);
     public bool Smoked => Has(StatusFlags.Smoked);
     public bool Capturable => Has(StatusFlags.Capturable);
+    public bool Ruptured => Has(StatusFlags.Ruptured);
+}
+
+/// <summary>
+/// Per-unit bookkeeping for soldier abilities (#30): what has been used this turn or phase and
+/// what is armed. See <see cref="SoldierPerks"/>.
+/// </summary>
+public sealed class PerkState
+{
+    /// <summary>The unit dashed (spent 2 AP on one move) this turn; Run &amp; Gun needs it.</summary>
+    public bool DashedThisTurn { get; set; }
+
+    /// <summary>AP among <see cref="TacticalUnit.ActionPoints"/> that only a shot may spend (Run &amp; Gun).</summary>
+    public int ShootOnlyAp { get; set; }
+
+    public bool HitAndRunUsed { get; set; }
+
+    /// <summary>Kills refunded this turn by In The Zone.</summary>
+    public int InTheZoneUses { get; set; }
+
+    /// <summary>The first reaction shot of this phase against the unit was already absorbed.</summary>
+    public bool LightningReflexesSpent { get; set; }
+
+    /// <summary>The unit killed something and its next incoming attack misses.</summary>
+    public bool UntouchableArmed { get; set; }
+
+    /// <summary>Uses left per ability this mission, created on first use (see <see cref="Data.AbilityDef.Charges"/>).</summary>
+    public Dictionary<string, int> ChargesUsed { get; } = new(StringComparer.Ordinal);
 }

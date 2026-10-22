@@ -329,7 +329,8 @@ public class TacticalEngineTests
     [Fact]
     public void UnregisteredAbilityFailsValidation()
     {
-        var e = NewEngine();
+        // An engine whose registry lacks the handler: the data knows "hack", the code does not.
+        var e = new TacticalEngine(Skirmish(1), Data, abilities: new AbilityRegistry());
         var unit = Soldier(e);
         var enemy = e.State.Units.First(u => u.Faction == Faction.Meridian);
         unit.Abilities.Add("hack");

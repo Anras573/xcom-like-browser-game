@@ -3,6 +3,8 @@
     "id": "breacher",
     "name": "Breacher",
     "role": "Assault",
+    "icon": "icon.warning",
+    "description": "Close-range assault with a shotgun. Gets in, shoots and gets out.",
     "weaponClass": "Shotgun",
     "pose": "machine",
     "abilityTree": [
@@ -43,6 +45,8 @@
     "id": "marksman",
     "name": "Marksman",
     "role": "Sniper",
+    "icon": "icon.target",
+    "description": "Long-range sniper. Sees through the squad's eyes and picks targets off.",
     "weaponClass": "Sniper",
     "pose": "silencer",
     "abilityTree": [
@@ -83,6 +87,8 @@
     "id": "gunner",
     "name": "Gunner",
     "role": "Heavy",
+    "icon": "icon.pause",
+    "description": "Heavy with an LMG. Pins enemies down and wears armor away.",
     "weaponClass": "Lmg",
     "pose": "machine",
     "abilityTree": [
@@ -123,6 +129,8 @@
     "id": "tech",
     "name": "Tech",
     "role": "Support",
+    "icon": "icon.gear",
+    "description": "Support with a rifle. Heals, hacks robots and powers the squad.",
     "weaponClass": "Rifle",
     "pose": "machine",
     "extraUtilitySlotRank": "Sergeant",

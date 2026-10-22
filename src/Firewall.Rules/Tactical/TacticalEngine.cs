@@ -42,6 +42,8 @@ public sealed partial class TacticalEngine
 
     public TacticalState State { get; }
 
+    public GameData Data => _data;
+
     /// <summary>The mission's goal; Purge unless the mission says otherwise.</summary>
     public IMissionObjective Objective { get; }
 
@@ -54,7 +56,9 @@ public sealed partial class TacticalEngine
     public bool AllSoldiersExhausted =>
         State is { Phase: TacticalPhase.Player, Result: null }
         && State.Units.Any(IsOperationalSoldier)
-        && !State.Units.Any(u => IsOperationalSoldier(u) && u.ActionPoints > 0);
+        && !State.Units.Any(u =>
+            IsOperationalSoldier(u) && (u.ActionPoints > 0 || SoldierPerks.CanRunAndGun(u))
+        );
 
     /// <summary>
     /// Replays <paramref name="commands"/> on a fresh state from <paramref name="createState"/>;
@@ -119,7 +123,7 @@ public sealed partial class TacticalEngine
 
     /// <summary>
     /// The odds of <paramref name="attacker"/> using <paramref name="abilityId"/> on
-    /// <paramref name="target"/>, or null when that ability is not a shot. <see cref="ShotPreview.CanFire"/>
+    /// <paramref name="target"/> (a shot or a hack), or null when that ability has none. <see cref="ShotPreview.CanFire"/>
     /// covers the shot itself; <see cref="Validate"/> still has the final say (AP, phase, cooldown).
     /// </summary>
     public ShotPreview? PreviewShot(
@@ -128,9 +132,9 @@ public sealed partial class TacticalEngine
         string abilityId = AbilityRegistry.Shoot
     ) =>
         _abilities.TryGet(abilityId, out var handler)
-        && handler is ShootAbility shoot
+        && handler is IAbilityPreview previewer
         && _data.Abilities.TryGet(abilityId, out var def)
-            ? shoot.Preview(
+            ? previewer.Preview(
                 MakeContext(attacker, Target.Unit(target.Id), def, State.Rng.Fork("validate"), []),
                 target
             )
@@ -214,14 +218,23 @@ public sealed partial class TacticalEngine
         return ValidationResult.Ok;
     }
 
-    private static ValidationResult CheckAp(TacticalUnit unit, int cost) =>
-        unit.ActionPoints >= cost
+    /// <summary>
+    /// AP the unit can spend: Run &amp; Gun's bonus AP is for shots only, so everything else sees less.
+    /// </summary>
+    private static int Available(TacticalUnit unit, bool shooting) =>
+        shooting ? unit.ActionPoints : unit.ActionPoints - unit.Perks.ShootOnlyAp;
+
+    private static ValidationResult CheckAp(TacticalUnit unit, int cost, bool shooting = false)
+    {
+        var available = Available(unit, shooting);
+        return available >= cost
             ? ValidationResult.Ok
             : ValidationResult.Fail(
-                unit.ActionPoints == 0
+                available == 0
                     ? $"{unit.DisplayName} has no action points left."
-                    : $"Not enough action points (needs {cost}, has {unit.ActionPoints})."
+                    : $"Not enough action points (needs {cost}, has {available})."
             );
+    }
 
     private ValidationResult ValidateMove(MoveCommand cmd)
     {
@@ -260,14 +273,16 @@ public sealed partial class TacticalEngine
             return ValidationResult.Fail($"{def.Name} is passive.");
         if (unit.Cooldowns.TryGetValue(def.Id, out var cooldown) && cooldown > 0)
             return ValidationResult.Fail($"{def.Name} is on cooldown ({cooldown} turns).");
-        var ap = CheckAp(unit, def.ApCost);
+        if (def.Charges > 0 && unit.Perks.ChargesUsed.GetValueOrDefault(def.Id) >= def.Charges)
+            return ValidationResult.Fail($"{def.Name} has no charges left.");
+        if (!_abilities.TryGet(def.Id, out var handler))
+            return ValidationResult.Fail($"{def.Name} is not implemented yet.");
+        var ap = CheckAp(unit, def.ApCost, handler is ShootAbility);
         if (!ap.IsValid)
             return ap;
         var shape = ValidateTargetShape(def, cmd.Target, unit);
         if (!shape.IsValid)
             return shape;
-        if (!_abilities.TryGet(def.Id, out var handler))
-            return ValidationResult.Fail($"{def.Name} is not implemented yet.");
         // A throwaway stream: validation runs every frame for UI reasons and must not advance the RNG.
         return handler.Validate(MakeContext(unit, cmd.Target, def, State.Rng.Fork("validate"), []));
     }
@@ -317,29 +332,119 @@ public sealed partial class TacticalEngine
         var unit = State.Unit(cmd.UnitId);
         var def = _data.Abilities[cmd.AbilityId];
         _abilities.TryGet(def.Id, out var handler);
+        var isShot = handler is ShootAbility && def.Id != AbilityRegistry.Melee;
+        var target = cmd.Target is UnitTarget(var targetId) ? State.Unit(targetId) : null;
+        // Looked at before the shot: whether the target is flanked is the state it is fired at.
+        var flanked =
+            isShot
+            && target is not null
+            && ((ShootAbility)handler!)
+                .Preview(MakeContext(unit, cmd.Target, def, State.Rng.Fork("validate"), []), target)
+                .Flanked;
 
-        // Twin Volley: shots don't end the turn, so 2 AP buys two shots.
-        var endsTurn =
-            def.EndsTurn
-            && !(
-                def.Id == AbilityRegistry.Shoot
-                && unit.Abilities.Contains(AbilityRegistry.DoubleShot)
-            );
-        SpendAp(unit, endsTurn ? unit.ActionPoints : def.ApCost, events);
+        var apBefore = (unit.ActionPoints, unit.Perks.ShootOnlyAp);
+        var shooting = handler is ShootAbility;
+        SpendAp(unit, EndsTurn(unit, def, isShot) ? unit.ActionPoints : def.ApCost, events, shooting);
         if (def.Cooldown > 0)
             unit.Cooldowns[def.Id] = def.Cooldown;
+        if (def.Charges > 0)
+            unit.Perks.ChargesUsed[def.Id] = unit.Perks.ChargesUsed.GetValueOrDefault(def.Id) + 1;
         events.Add(new AbilityUsed(unit.Id, def.Id, cmd.Target));
+        if (def.Callout)
+            events.Add(new AbilityTriggered(unit.Id, def.Id, def.Name.ToUpperInvariant()));
         // The state's own stream, so every use rolls differently and the state hash covers it.
         var first = events.Count;
-        handler.Execute(MakeContext(unit, cmd.Target, def, State.Rng, events));
+        handler!.Execute(MakeContext(unit, cmd.Target, def, State.Rng, events));
+        if (isShot && target is not null)
+        {
+            var killed = events.Skip(first).OfType<UnitKilled>().Any(k => k.Unit == target.Id);
+            AfterShot(unit, apBefore, flanked, killed, events);
+        }
         ActivatePodsFromEvents(events, first);
     }
 
-    private static void SpendAp(TacticalUnit unit, int amount, List<GameEvent> events)
+    /// <summary>
+    /// Whether using <paramref name="def"/> spends the soldier's whole turn. Twin Volley and
+    /// Bulletstorm (a soldier who has not moved) let shots leave the turn open.
+    /// </summary>
+    private static bool EndsTurn(TacticalUnit unit, AbilityDef def, bool isShot)
+    {
+        if (!def.EndsTurn)
+            return false;
+        if (def.Id == AbilityRegistry.Shoot && unit.Abilities.Contains(AbilityRegistry.DoubleShot))
+            return false;
+        return !(
+            isShot && unit.Abilities.Contains(SoldierPerks.Bulletstorm) && !unit.MovedThisTurn
+        );
+    }
+
+    /// <summary>
+    /// The AP rules of the shooting abilities: Hit &amp; Run refunds 1 AP after a shot at a flanked
+    /// target (once a turn); In The Zone gives the whole shot back after killing a flanked target
+    /// (a few times a turn). A soldier who went down does not get either.
+    /// </summary>
+    private void AfterShot(
+        TacticalUnit unit,
+        (int Ap, int ShootOnly) before,
+        bool flanked,
+        bool killed,
+        List<GameEvent> events
+    )
+    {
+        if (!unit.IsStanding || !flanked)
+            return;
+        if (
+            unit.Abilities.Contains(SoldierPerks.HitAndRun)
+            && !unit.Perks.HitAndRunUsed
+            && unit.ActionPoints < before.Ap
+        )
+        {
+            unit.Perks.HitAndRunUsed = true;
+            unit.ActionPoints += SoldierPerks.IntParam(
+                _data,
+                SoldierPerks.HitAndRun,
+                "apRefund",
+                1
+            );
+            events.Add(new ApChanged(unit.Id, unit.ActionPoints));
+            events.Add(Callout(unit, SoldierPerks.HitAndRun));
+        }
+        var max = SoldierPerks.IntParam(_data, SoldierPerks.InTheZone, "maxPerTurn", 3);
+        if (
+            killed
+            && unit.Abilities.Contains(SoldierPerks.InTheZone)
+            && unit.Perks.InTheZoneUses < max
+            && unit.ActionPoints < before.Ap
+        )
+        {
+            unit.Perks.InTheZoneUses++;
+            unit.ActionPoints = before.Ap;
+            unit.Perks.ShootOnlyAp = before.ShootOnly;
+            events.Add(new ApChanged(unit.Id, unit.ActionPoints));
+            events.Add(Callout(unit, SoldierPerks.InTheZone));
+        }
+    }
+
+    private AbilityTriggered Callout(TacticalUnit unit, string abilityId) =>
+        new(unit.Id, abilityId, _data.Abilities[abilityId].Name.ToUpperInvariant());
+
+    /// <summary>
+    /// Takes AP. A shot spends Run &amp; Gun's shot-only AP first; anything else can only spend
+    /// what is not reserved for shots.
+    /// </summary>
+    private static void SpendAp(
+        TacticalUnit unit,
+        int amount,
+        List<GameEvent> events,
+        bool shooting = false
+    )
     {
         if (amount == 0)
             return;
         unit.ActionPoints -= amount;
+        if (shooting)
+            unit.Perks.ShootOnlyAp = Math.Max(0, unit.Perks.ShootOnlyAp - amount);
+        unit.Perks.ShootOnlyAp = Math.Min(unit.Perks.ShootOnlyAp, unit.ActionPoints);
         events.Add(new ApChanged(unit.Id, unit.ActionPoints));
     }
 
@@ -352,6 +457,7 @@ public sealed partial class TacticalEngine
         var dashed = cost == 2;
         SpendAp(unit, cost, events);
         unit.MovedThisTurn = true;
+        unit.Perks.DashedThisTurn |= dashed;
 
         Walk(unit, path, segment => new UnitMoved(unit.Id, segment, dashed), events);
     }
@@ -496,6 +602,11 @@ public sealed partial class TacticalEngine
     {
         var stunned = unit.Statuses.Stunned;
         unit.MovedThisTurn = false;
+        unit.Perks.DashedThisTurn = false;
+        unit.Perks.ShootOnlyAp = 0;
+        unit.Perks.HitAndRunUsed = false;
+        unit.Perks.InTheZoneUses = 0;
+        unit.Perks.LightningReflexesSpent = false;
         unit.ActionPoints = stunned ? 0 : ApPerTurn;
         events.Add(new ApChanged(unit.Id, unit.ActionPoints));
 

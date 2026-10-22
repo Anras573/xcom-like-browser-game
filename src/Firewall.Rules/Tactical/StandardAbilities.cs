@@ -5,7 +5,7 @@ namespace Firewall.Rules.Tactical;
 /// <summary>
 /// Overwatch (GDD §4.6): 1 AP, ends the turn, needs a round in the clip. Sets
 /// <see cref="StatusFlags.Overwatch"/> and a <see cref="ReactionTrigger"/> until the unit's next
-/// turn or until it fires.
+/// turn or until it fires. Killing Zone (#30) is the same with <c>maxShots</c> shots, one per mover.
 /// </summary>
 public sealed class OverwatchAbility : IAbilityHandler
 {
@@ -15,7 +15,11 @@ public sealed class OverwatchAbility : IAbilityHandler
             return ValidationResult.Ok;
         if (weapon.Ammo < 1)
             return ValidationResult.Fail("Out of ammo.");
-        if (weapon.Def.Flags.Contains(WeaponFlag.NoFireAfterMove) && ctx.User.MovedThisTurn)
+        if (
+            weapon.Def.Flags.Contains(WeaponFlag.NoFireAfterMove)
+            && ctx.User.MovedThisTurn
+            && !SoldierPerks.CanFireAfterMoving(ctx.User)
+        )
             return ValidationResult.Fail("Sniper rifles can't overwatch after moving");
         return ValidationResult.Ok;
     }
@@ -23,7 +27,12 @@ public sealed class OverwatchAbility : IAbilityHandler
     public void Execute(AbilityContext ctx)
     {
         var unit = ctx.User;
-        unit.Reactions.Add(new ReactionTrigger(ctx.Def.Id, StatusFlags.Overwatch));
+        unit.Reactions.Add(
+            new ReactionTrigger(ctx.Def.Id, StatusFlags.Overwatch)
+            {
+                ShotsLeft = (int)ctx.Def.Parameters.GetValueOrDefault("maxShots", 1),
+            }
+        );
         unit.Statuses.Set(StatusFlags.Overwatch);
         ctx.Events.Add(new StatusAdded(unit.Id, StatusFlags.Overwatch));
     }

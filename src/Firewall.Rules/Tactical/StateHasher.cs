@@ -99,6 +99,17 @@ internal static class StateHasher
                 foreach (var id in t.FiredAt.Select(i => i.Value).Order())
                     Add(ref h, id);
             }
+            Add(ref h, u.Perks.DashedThisTurn);
+            Add(ref h, u.Perks.ShootOnlyAp);
+            Add(ref h, u.Perks.HitAndRunUsed);
+            Add(ref h, u.Perks.InTheZoneUses);
+            Add(ref h, u.Perks.LightningReflexesSpent);
+            Add(ref h, u.Perks.UntouchableArmed);
+            foreach (var (k, v) in u.Perks.ChargesUsed.OrderBy(c => c.Key, StringComparer.Ordinal))
+            {
+                Add(ref h, k);
+                Add(ref h, v);
+            }
             Add(ref h, u.Stats.Kills);
             Add(ref h, u.Stats.DamageDealt);
             Add(ref h, u.Stats.ShotsFired);

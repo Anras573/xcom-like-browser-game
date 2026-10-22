@@ -5,7 +5,8 @@
     "description": "Fire the equipped weapon.",
     "apCost": 1,
     "endsTurn": true,
-    "targeting": "Enemy"
+    "targeting": "Enemy",
+    "icon": "icon.target"
   },
   {
     "id": "overwatch",
@@ -14,6 +15,7 @@
     "apCost": 1,
     "endsTurn": true,
     "targeting": "Self",
+    "icon": "icon.exclamation",
     "parameters": {
       "reactionAimMult": 0.7
     }
@@ -24,7 +26,8 @@
     "description": "Refill the clip.",
     "apCost": 1,
     "endsTurn": false,
-    "targeting": "Self"
+    "targeting": "Self",
+    "icon": "icon.return"
   },
   {
     "id": "hunker_down",
@@ -33,6 +36,7 @@
     "apCost": 1,
     "endsTurn": true,
     "targeting": "Self",
+    "icon": "icon.locked",
     "parameters": {
       "coverMult": 2
     }
@@ -43,7 +47,8 @@
     "description": "Strike an adjacent target.",
     "apCost": 1,
     "endsTurn": true,
-    "targeting": "Enemy"
+    "targeting": "Enemy",
+    "icon": "icon.target"
   },
   {
     "id": "evac",
@@ -51,7 +56,8 @@
     "description": "Leave the map from an evac zone tile.",
     "apCost": 1,
     "endsTurn": true,
-    "targeting": "Self"
+    "targeting": "Self",
+    "icon": "icon.export"
   },
   {
     "id": "debug_stabilize",
@@ -59,24 +65,31 @@
     "description": "Debug stand-in for the Medkit: stabilize an adjacent bleeding-out ally.",
     "apCost": 1,
     "endsTurn": false,
-    "targeting": "Ally"
+    "targeting": "Ally",
+    "icon": "icon.plus"
   },
   {
     "id": "run_and_gun",
     "name": "Run & Gun",
-    "description": "May fire after a dash, once every 3 turns.",
+    "description": "After a dash, gain {grantAp} AP that may only be used to shoot. Cooldown {cooldown} turns.",
     "apCost": 0,
     "endsTurn": false,
-    "targeting": "Passive",
-    "cooldown": 3
+    "targeting": "Self",
+    "icon": "icon.forward",
+    "cooldown": 3,
+    "callout": true,
+    "parameters": {
+      "grantAp": 1
+    }
   },
   {
     "id": "close_combat",
     "name": "Close Combat",
-    "description": "+20 crit within 4 tiles.",
+    "description": "+{crit} crit within {maxDist} tiles.",
     "apCost": 0,
     "endsTurn": false,
     "targeting": "Passive",
+    "icon": "icon.warning",
     "parameters": {
       "crit": 20,
       "maxDist": 4
@@ -85,19 +98,22 @@
   {
     "id": "lightning_reflexes",
     "name": "Lightning Reflexes",
-    "description": "The first reaction shot against this unit each enemy phase misses.",
+    "description": "The first reaction shot against this soldier each turn misses.",
     "apCost": 0,
     "endsTurn": false,
-    "targeting": "Passive"
+    "targeting": "Passive",
+    "icon": "icon.power"
   },
   {
     "id": "rapid_fire",
     "name": "Rapid Fire",
-    "description": "Two shots at -15 aim each for 1 AP.",
+    "description": "Fire {shots} shots at {aim} aim each for {apCost} AP, then the turn ends. Uses 1 ammo per shot. Cooldown {cooldown} turns.",
     "apCost": 1,
     "endsTurn": true,
     "targeting": "Enemy",
+    "icon": "icon.next",
     "cooldown": 3,
+    "callout": true,
     "parameters": {
       "shots": 2,
       "aim": -15
@@ -106,10 +122,11 @@
   {
     "id": "hit_and_run",
     "name": "Hit & Run",
-    "description": "A shot at a flanked target refunds 1 AP (once per turn).",
+    "description": "A shot at a flanked target refunds {apRefund} AP (once per turn), so the turn does not end.",
     "apCost": 0,
     "endsTurn": false,
     "targeting": "Passive",
+    "icon": "icon.import",
     "parameters": {
       "apRefund": 1
     }
@@ -117,18 +134,21 @@
   {
     "id": "untouchable",
     "name": "Untouchable",
-    "description": "After a kill, the next attack against this unit misses.",
+    "description": "After a kill, the next attack against this soldier misses.",
     "apCost": 0,
     "endsTurn": false,
-    "targeting": "Passive"
+    "targeting": "Passive",
+    "icon": "icon.unlocked"
   },
   {
     "id": "killing_zone",
     "name": "Killing Zone",
-    "description": "Overwatch fires at every mover in LOS (max 3 shots).",
-    "apCost": 0,
-    "endsTurn": false,
-    "targeting": "Passive",
+    "description": "Overwatch that fires at every mover in line of sight: up to {maxShots} shots, one per mover.",
+    "apCost": 1,
+    "endsTurn": true,
+    "targeting": "Self",
+    "icon": "icon.cross",
+    "callout": true,
     "parameters": {
       "maxShots": 3
     }
@@ -136,18 +156,20 @@
   {
     "id": "squadsight",
     "name": "Squadsight",
-    "description": "Can target enemies visible to any squadmate.",
+    "description": "Can target enemies visible to any squadmate, at any distance in line of sight.",
     "apCost": 0,
     "endsTurn": false,
-    "targeting": "Passive"
+    "targeting": "Passive",
+    "icon": "icon.zoomIn"
   },
   {
     "id": "snap_shot",
     "name": "Snap Shot",
-    "description": "May fire after moving, at -20 aim.",
+    "description": "May fire after moving, at {aim} aim.",
     "apCost": 0,
     "endsTurn": false,
     "targeting": "Passive",
+    "icon": "icon.arrowUp",
     "parameters": {
       "aim": -20
     }
@@ -155,10 +177,11 @@
   {
     "id": "steady_aim",
     "name": "Steady Aim",
-    "description": "+15 aim on this soldier's first shot of each mission.",
+    "description": "+{aim} aim on this soldier's first shot of the mission.",
     "apCost": 0,
     "endsTurn": false,
     "targeting": "Passive",
+    "icon": "icon.medal1",
     "parameters": {
       "aim": 15
     }
@@ -169,7 +192,8 @@
     "description": "Reaction shots can crit.",
     "apCost": 0,
     "endsTurn": false,
-    "targeting": "Passive"
+    "targeting": "Passive",
+    "icon": "icon.information"
   },
   {
     "id": "low_profile",
@@ -177,15 +201,17 @@
     "description": "Half cover counts as full.",
     "apCost": 0,
     "endsTurn": false,
-    "targeting": "Passive"
+    "targeting": "Passive",
+    "icon": "icon.arrowDown"
   },
   {
     "id": "in_the_zone",
     "name": "In The Zone",
-    "description": "Killing a flanked or uncovered target refunds the action (max 3 per turn).",
+    "description": "Killing a flanked or uncovered target refunds the action (max {maxPerTurn} per turn).",
     "apCost": 0,
     "endsTurn": false,
     "targeting": "Passive",
+    "icon": "icon.star",
     "parameters": {
       "maxPerTurn": 3
     }
@@ -193,11 +219,13 @@
   {
     "id": "headshot",
     "name": "Headshot",
-    "description": "+3 damage.",
+    "description": "+{damage} damage. Cooldown {cooldown} turns.",
     "apCost": 1,
     "endsTurn": true,
     "targeting": "Enemy",
+    "icon": "icon.target",
     "cooldown": 3,
+    "callout": true,
     "parameters": {
       "damage": 3
     }
@@ -205,10 +233,11 @@
   {
     "id": "suppression",
     "name": "Suppression",
-    "description": "Costs 1 AP, ends the turn, uses 2 ammo. The target gets -30 aim, and if it moves it takes a reaction shot. Lasts until the next turn.",
+    "description": "Costs {apCost} AP, ends the turn, uses {ammo} ammo. The target gets {aim} aim, and if it moves it takes a reaction shot. Lasts until your next turn.",
     "apCost": 1,
     "endsTurn": true,
     "targeting": "Enemy",
+    "icon": "icon.pause",
     "parameters": {
       "ammo": 2,
       "aim": -30
@@ -217,10 +246,11 @@
   {
     "id": "shredder",
     "name": "Shredder",
-    "description": "Hits remove 1 armor permanently.",
+    "description": "Hits remove {armorShred} armor permanently.",
     "apCost": 0,
     "endsTurn": false,
     "targeting": "Passive",
+    "icon": "icon.trashcan",
     "parameters": {
       "armorShred": 1
     }
@@ -231,15 +261,17 @@
     "description": "Firing doesn't end the turn if the soldier hasn't moved this turn.",
     "apCost": 0,
     "endsTurn": false,
-    "targeting": "Passive"
+    "targeting": "Passive",
+    "icon": "icon.multiplayer"
   },
   {
     "id": "grenadier",
     "name": "Grenadier",
-    "description": "+1 grenade charge and +1 grenade damage.",
+    "description": "+{charges} grenade charge and +{damage} grenade damage.",
     "apCost": 0,
     "endsTurn": false,
     "targeting": "Passive",
+    "icon": "icon.home",
     "parameters": {
       "charges": 1,
       "damage": 1
@@ -248,10 +280,11 @@
   {
     "id": "danger_zone",
     "name": "Danger Zone",
-    "description": "+1 radius for suppression area and explosives.",
+    "description": "Suppression also covers enemies within {radius} tile of the target; explosives get +{radius} radius.",
     "apCost": 0,
     "endsTurn": false,
     "targeting": "Passive",
+    "icon": "icon.zoomOut",
     "parameters": {
       "radius": 1
     }
@@ -259,10 +292,11 @@
   {
     "id": "mayhem",
     "name": "Mayhem",
-    "description": "+2 damage for suppression reaction shots and explosives.",
+    "description": "+{damage} damage for suppression reaction shots and explosives.",
     "apCost": 0,
     "endsTurn": false,
     "targeting": "Passive",
+    "icon": "icon.exclamation",
     "parameters": {
       "damage": 2
     }
@@ -270,11 +304,13 @@
   {
     "id": "rupture",
     "name": "Rupture",
-    "description": "The next shot always crits and the target takes +3 damage from all sources for the rest of the mission.",
+    "description": "Fires a shot that always crits. The target takes +{damage} damage from all sources for the rest of the mission. Cooldown {cooldown} turns.",
     "apCost": 1,
     "endsTurn": false,
     "targeting": "Enemy",
+    "icon": "icon.minus",
     "cooldown": 4,
+    "callout": true,
     "parameters": {
       "damage": 3
     }
@@ -282,10 +318,11 @@
   {
     "id": "field_medic",
     "name": "Field Medic",
-    "description": "+1 medkit charge; medkits can be used at range 1 (adjacent including diagonals).",
+    "description": "+{charges} medkit charge; medkits work at range {range}, diagonals included.",
     "apCost": 0,
     "endsTurn": false,
     "targeting": "Passive",
+    "icon": "icon.plus",
     "parameters": {
       "charges": 1,
       "range": 1
@@ -294,10 +331,11 @@
   {
     "id": "smoke_screen",
     "name": "Smoke Screen",
-    "description": "+1 smoke grenade, and its radius is +1.",
+    "description": "+{charges} smoke grenade, and its radius is +{radius}.",
     "apCost": 0,
     "endsTurn": false,
     "targeting": "Passive",
+    "icon": "icon.singleplayer",
     "parameters": {
       "charges": 1,
       "radius": 1
@@ -306,10 +344,11 @@
   {
     "id": "revive",
     "name": "Revive",
-    "description": "Medkits heal 2 extra HP and instantly revive a bleeding-out soldier to 1 HP.",
+    "description": "Medkits heal {heal} extra HP and revive a bleeding-out soldier to {reviveHp} HP, who keeps 0 AP this turn.",
     "apCost": 0,
     "endsTurn": false,
     "targeting": "Passive",
+    "icon": "icon.return",
     "parameters": {
       "heal": 2,
       "reviveHp": 1
@@ -318,10 +357,11 @@
   {
     "id": "hack",
     "name": "Hack",
-    "description": "Stun a robot within 6 tiles for 1 turn. Hack% = 50 + 5 x rankIndex - 15 x robotTier.",
+    "description": "Stun a robot within {range} tiles for {stunTurns} turn. Chance: {baseChance} + {perRank} x rank index {perTier} x robot tier. Cooldown {cooldown} turns.",
     "apCost": 1,
     "endsTurn": false,
     "targeting": "Enemy",
+    "icon": "icon.gear",
     "cooldown": 3,
     "parameters": {
       "range": 6,
@@ -334,10 +374,11 @@
   {
     "id": "sprinter",
     "name": "Sprinter",
-    "description": "+3 mobility.",
+    "description": "+{mobility} mobility.",
     "apCost": 0,
     "endsTurn": false,
     "targeting": "Passive",
+    "icon": "icon.forward",
     "parameters": {
       "mobility": 3
     }
@@ -345,10 +386,11 @@
   {
     "id": "savior",
     "name": "Savior",
-    "description": "Medkits heal +4.",
+    "description": "Medkits heal +{heal}.",
     "apCost": 0,
     "endsTurn": false,
     "targeting": "Passive",
+    "icon": "icon.checkmark",
     "parameters": {
       "heal": 4
     }
@@ -356,10 +398,11 @@
   {
     "id": "overclock",
     "name": "Overclock",
-    "description": "Give an ally +1 AP this turn.",
+    "description": "Give an ally +{grantAp} AP this turn. Cooldown {cooldown} turns.",
     "apCost": 1,
     "endsTurn": false,
     "targeting": "Ally",
+    "icon": "icon.power",
     "cooldown": 4,
     "parameters": {
       "grantAp": 1
@@ -372,6 +415,7 @@
     "apCost": 1,
     "endsTurn": false,
     "targeting": "Ally",
+    "icon": "icon.power",
     "cooldown": 3,
     "parameters": {
       "grantAp": 1,
@@ -385,6 +429,7 @@
     "apCost": 0,
     "endsTurn": false,
     "targeting": "Passive",
+    "icon": "icon.next",
     "parameters": {
       "shots": 2
     }
