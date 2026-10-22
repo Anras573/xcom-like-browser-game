@@ -120,6 +120,8 @@ public static class UnitPresentation
             icons.Add("status.overwatch");
         if (statuses.Hunkered)
             icons.Add("status.hunker");
+        if (statuses.Suppressed)
+            icons.Add("status.suppressed");
         if (statuses.IsBleedingOut)
             icons.Add("status.bleeding");
         return icons;
@@ -128,6 +130,14 @@ public static class UnitPresentation
     /// <summary>The bleeding-out icon's red pulse: alpha between 0.35 and 1, about twice a second.</summary>
     public static float BleedPulseAlpha(float seconds) =>
         0.675f + 0.325f * MathF.Sin(seconds * 2f * MathF.PI / 0.6f);
+
+    /// <summary>The Relay Node's cyan pulse: a brightness factor between 0.55 and 1, about once a second.</summary>
+    public static float RelayPulse(float seconds) =>
+        0.775f + 0.225f * MathF.Sin(seconds * 2f * MathF.PI / 1.0f);
+
+    /// <summary>Opacity of the suppression line: a pulse between 0.35 and 0.9.</summary>
+    public static float SuppressionPulse(float seconds) =>
+        0.625f + 0.275f * MathF.Sin(seconds * 2f * MathF.PI / 0.8f);
 
     /// <summary>Selection-ring opacity: a slow sine between 0.45 and 1.</summary>
     public static float RingAlpha(float seconds) =>

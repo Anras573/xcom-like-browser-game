@@ -49,6 +49,8 @@ public sealed class UtilityAi(
         while (steps < MaxSteps && CanAct(unit, ctx))
         {
             var rng = ctx.State.Rng.Fork($"ai:{ctx.State.TurnNumber}:{unit.Id.Value}:{steps++}");
+            if (Boost(unit, profile, ctx))
+                continue;
             var plan = new Planner(data, _difficulty, def, profile, ctx, unit, rng).Plan();
             var acted = plan is not null && Run(plan, unit, ctx);
             if (!acted && !Fallback(unit, ctx))
@@ -64,6 +66,40 @@ public sealed class UtilityAi(
         && unit is { IsAlive: true, Evacuated: false, ActionPoints: > 0 }
         && !unit.Statuses.Stunned
         && !unit.Statuses.IsDown;
+
+    /// <summary>
+    /// A Proxy with Overclock first boosts an adjacent robot that has used its AP and could shoot
+    /// a soldier it sees: it costs 1 AP and not the turn, and the engine lets the robot act again.
+    /// </summary>
+    private bool Boost(TacticalUnit unit, AiProfileDef profile, AiContext ctx)
+    {
+        if (profile.SupportWeight <= 0 || !unit.Abilities.Contains(AbilityRegistry.ProxyOverclock))
+            return false;
+        var soldiers = ctx
+            .State.Units.Where(u => u.Faction == Faction.Firewall && u.IsStanding)
+            .Where(ctx.State.EnemyVision.IsUnitVisible)
+            .ToList();
+        foreach (var ally in ctx.State.Units.Where(u => u.Faction == Faction.Meridian))
+        {
+            var cmd = new UseAbilityCommand(
+                unit.Id,
+                AbilityRegistry.ProxyOverclock,
+                Target.Unit(ally.Id)
+            );
+            if (
+                !ally.IsActive
+                || ally.ActionPoints != 0
+                || !soldiers.Any(s =>
+                    HitCalculator.Preview(ctx.State, ally, s, ShotContext.For(data, ally)).CanFire
+                )
+                || !ctx.Validate(cmd).IsValid
+            )
+                continue;
+            ctx.Execute(cmd);
+            return true;
+        }
+        return false;
+    }
 
     /// <summary>Executes the plan's move, then its action if it is still valid. True if any command ran.</summary>
     private static bool Run(Plan plan, TacticalUnit unit, AiContext ctx)
@@ -531,7 +567,7 @@ public sealed class UtilityAi(
             return new ShotValue(value, preview.HitChance);
         }
 
-        /// <summary>Suppression and Overclock: used from where the unit stands, and only if the engine allows them.</summary>
+        /// <summary>Suppression: used from where the unit stands, and only if the engine allows them.</summary>
         private (PlannedAction Action, double Value)? AbilityAction()
         {
             (PlannedAction, double)? best = null;
@@ -550,9 +586,6 @@ public sealed class UtilityAi(
             if (_p.SuppressWeight > 0 && _unit.Abilities.Contains("suppression"))
                 foreach (var soldier in _soldiers)
                     Offer("suppression", soldier, _p.SuppressWeight * BestAllyHit(soldier) / 100.0);
-            if (_p.SupportWeight > 0 && _unit.Abilities.Contains("proxy_overclock"))
-                foreach (var ally in _allies.Where(a => a.ActionPoints > 0 && HasShot(a)))
-                    Offer("proxy_overclock", ally, _p.SupportWeight);
             return best;
         }
 
@@ -565,10 +598,5 @@ public sealed class UtilityAi(
                 .Select(p => p.HitChance)
                 .DefaultIfEmpty(0)
                 .Max();
-
-        private bool HasShot(TacticalUnit shooter) =>
-            _soldiers.Any(s =>
-                HitCalculator.Preview(_state, shooter, s, ShotContext.For(_data, shooter)).CanFire
-            );
     }
 }

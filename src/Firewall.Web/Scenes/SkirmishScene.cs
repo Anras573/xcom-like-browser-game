@@ -18,18 +18,27 @@ namespace Firewall.Web.Scenes;
 /// the tactical HUD (#27). Click a soldier, the strip or Tab (soldiers with AP) to select, F
 /// re-centres, 1 to 9 use the ability bar, Backspace ends the turn, Esc cancels aiming or opens the
 /// pause menu. The mission ends on a Purge or a wipe (or Abort Mission) and moves on to the result
-/// screen.
+/// screen. The pods come from the encounter table of the chosen Force Level (#29). Debug keys: F6
+/// picks an enemy type, F7 its tier, F10 spawns it on the hovered tile (a Relay Node or a pod member).
 /// </summary>
-public sealed class SkirmishScene : SceneBase
+public sealed class SkirmishScene(int forceLevel = 2) : SceneBase
 {
     public const string MapId = "test-yard";
 
-    private static readonly IReadOnlyList<PodSpec> Pods =
+    // The test yard has three enemy spawns.
+    private const int PodCount = 3;
+
+    private readonly string[] _debugEnemies =
     [
-        new("Husk Swarm", ["husk", "husk", "husk"]),
-        new("Warden Patrol", ["warden", "warden"]),
-        new("Mixed Patrol", ["warden", "husk", "husk", "husk"]),
+        "husk",
+        "warden",
+        "proxy",
+        "enforcer",
+        "relay_node",
+        "cradle_guardian",
     ];
+    private int _debugEnemy;
+    private int _debugTier;
 
     private readonly TacticalCamera _camera = new();
     private readonly Dictionary<UnitId, UnitView> _views = [];
@@ -61,7 +70,7 @@ public sealed class SkirmishScene : SceneBase
 
     private const float ResultDelaySeconds = 2f;
 
-    public override string Name => "Skirmish";
+    public override string Name => $"Skirmish FL{forceLevel}";
 
     /// <summary>The soldier currently selected, if any.</summary>
     public TacticalUnit? Selected => _selected is { } id ? _state.Unit(id) : null;
@@ -77,7 +86,8 @@ public sealed class SkirmishScene : SceneBase
         var rng = new Pcg32Random(Ctx.Seeds.Next());
         _state = new TacticalState(map, rng);
         SquadDeployer.Deploy(_state, DebugSquad.Create(_state, Ctx.Data, rng.Fork("squad")));
-        PodSpawner.Spawn(_state, Ctx.Data, Pods, rng.Fork("pods"));
+        var pods = EncounterBuilder.Build(Ctx.Data, forceLevel, PodCount, rng.Fork("encounter"));
+        PodSpawner.Spawn(_state, Ctx.Data, pods, rng.Fork("pods"));
         _engine = new TacticalEngine(
             _state,
             Ctx.Data,
@@ -178,6 +188,12 @@ public sealed class SkirmishScene : SceneBase
             _fogEnabled = !_fogEnabled;
         if (Ctx.Input.WasKeyPressed(Keys.F8))
             DebugTeleportEnemy(tile);
+        if (Ctx.Input.WasKeyPressed(Keys.F6))
+            DebugPickEnemy(tier: false);
+        if (Ctx.Input.WasKeyPressed(Keys.F7))
+            DebugPickEnemy(tier: true);
+        if (Ctx.Input.WasKeyPressed(Keys.F10))
+            DebugSpawnEnemy(tile);
         if (Ctx.Input.WasKeyPressed(Keys.F9))
             Console.WriteLine(_engine.Log.ToJson());
 
@@ -249,6 +265,10 @@ public sealed class SkirmishScene : SceneBase
 
     private void SyncViews()
     {
+        // Summoned units join the view model during playback; they get a view the frame they appear.
+        foreach (var vu in _vm.Units.Values)
+            if (!_views.ContainsKey(vu.Id))
+                _views[vu.Id] = new UnitView(World, Ctx.Assets, Ctx.Data, vu);
         foreach (var (id, view) in _views)
         {
             var unit = view.Unit;
@@ -272,6 +292,7 @@ public sealed class SkirmishScene : SceneBase
         var size = Ctx.Render.CanvasSize;
         _floatersView.Sync(_vm.Floaters, _camera.PixelsPerTile(size.Y));
         _effects.Sync(_vm.Effects);
+        _effects.SyncSuppression(_vm.Units, _time, ViewVisible);
     }
 
     // What the view model shows is drawn when it is a friend, or an enemy the squad sees (or whose
@@ -437,6 +458,41 @@ public sealed class SkirmishScene : SceneBase
         if (_vm.Units.TryGetValue(enemy.Id, out var shown))
             shown.SnapTo(to);
         _state.RefreshVision();
+        InvalidateRange();
+    }
+
+    // Debug (F6 type, F7 tier): which enemy F10 spawns. Bosses and objects have no tiers.
+    private void DebugPickEnemy(bool tier)
+    {
+        if (tier)
+            _debugTier = (_debugTier + 1) % (Ctx.Data.Elites.Count + 1);
+        else
+            _debugEnemy = (_debugEnemy + 1) % _debugEnemies.Length;
+        Ctx.Ui.Toast($"Debug spawn (F10): {Ctx.Data.Enemies[DebugEnemyId()].Name}");
+    }
+
+    private string DebugEnemyId()
+    {
+        var id = _debugEnemies[_debugEnemy];
+        return _debugTier > 0 && EliteTransform.HasVariants(Ctx.Data.Enemies[id])
+            ? EliteTransform.VariantId(id, Ctx.Data.Elites[_debugTier - 1])
+            : id;
+    }
+
+    // Debug (F10): puts the chosen enemy, awake, on the hovered free tile.
+    private void DebugSpawnEnemy(GridPos? tile)
+    {
+        if (tile is not { } at || _state.IsOccupied(at) || Busy)
+            return;
+        var def = Ctx.Data.Enemies[DebugEnemyId()];
+        if (!_state.Map.IsWalkable(at) && def.Kind != EnemyKind.Object)
+            return;
+        var unit = PodSpawner.CreateUnit(_state, def, def.Name);
+        unit.Position = at;
+        _state.AddUnit(unit);
+        _state.RefreshVision();
+        var vu = new UnitVm(unit, def.Robot, UnitPresentation.InitialFacing(unit, _state));
+        _vm.Units[unit.Id] = vu;
         InvalidateRange();
     }
 
@@ -704,6 +760,7 @@ public sealed class SkirmishScene : SceneBase
             Abilities = HudSlots().Select(s => new HudAbility(s, SlotBlocked(s))).ToList(),
             ArmedAbility = _targeting?.AbilityId,
             Enemies = VisibleEnemies(),
+            Boss = ActiveBoss(),
             Objective = HudModel.ObjectiveText(_state, Ctx.Data, _engine.Objective, IsVisible),
             MissionName = "Skirmish: Test Yard",
             EndTurnBlocked = _engine.Validate(new EndTurnCommand()) is { IsValid: false } end
@@ -724,6 +781,24 @@ public sealed class SkirmishScene : SceneBase
             BannerStatic = !animated,
             Time = _time,
         };
+    }
+
+    // The first living boss the squad sees or that has been woken; its HP is the playback's.
+    private HudBoss? ActiveBoss()
+    {
+        foreach (var u in _state.Units)
+        {
+            if (
+                u is not { Faction: Faction.Meridian, IsOnMap: true, IsActive: true }
+                || Ctx.Data.Enemies[u.DefId].Behavior.Kind != AiKind.Boss
+                || !_vm.Units.TryGetValue(u.Id, out var shown)
+                || shown.Dead
+                || !ViewVisible(shown)
+            )
+                continue;
+            return new HudBoss(u.DisplayName, shown.Hp, shown.MaxHp);
+        }
+        return null;
     }
 
     private List<HudEnemy> VisibleEnemies() =>

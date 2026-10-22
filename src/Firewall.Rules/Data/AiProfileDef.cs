@@ -70,6 +70,6 @@ public sealed record AiProfileDef : IDef
     /// <summary>Value of suppressing, times the best hit chance an ally has on the target.</summary>
     public double SuppressWeight { get; init; }
 
-    /// <summary>Value of boosting an adjacent robot ally that has AP and a shot.</summary>
+    /// <summary>Value of boosting an adjacent robot ally that has used its AP and has a shot.</summary>
     public double SupportWeight { get; init; }
 }

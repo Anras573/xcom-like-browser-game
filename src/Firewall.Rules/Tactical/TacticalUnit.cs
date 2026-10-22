@@ -85,6 +85,15 @@ public sealed class TacticalUnit(UnitId id, Faction faction, string defId, strin
 
     public PodId? Pod { get; set; }
 
+    /// <summary>The unit that summoned this one (Relay Node, Cradle Guardian); counts against the summoner's cap.</summary>
+    public UnitId? SummonedBy { get; set; }
+
+    /// <summary>The HP-triggered summon (Cradle Guardian) already happened.</summary>
+    public bool HasSummoned { get; set; }
+
+    /// <summary>Cannot be stunned or hacked.</summary>
+    public bool ImmuneToStun { get; set; }
+
     /// <summary>Sprite set, such as <c>soldier1</c> or <c>zombie1</c>.</summary>
     public string AppearanceId { get; set; } = "";
 }

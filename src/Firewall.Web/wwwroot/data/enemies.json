@@ -27,7 +27,8 @@
     "podMax": 4,
     "abilities": [
       "melee_attack"
-    ]
+    ],
+    "banner": "HUSK SWARM"
   },
   {
     "id": "warden",
@@ -68,7 +69,8 @@
       }
     ],
     "podMin": 1,
-    "podMax": 4
+    "podMax": 4,
+    "banner": "WARDEN PATROL"
   },
   {
     "id": "proxy",
@@ -114,7 +116,8 @@
       }
     ],
     "podMin": 1,
-    "podMax": 4
+    "podMax": 4,
+    "banner": "PROXY CELL"
   },
   {
     "id": "enforcer",
@@ -160,7 +163,8 @@
       }
     ],
     "podMin": 1,
-    "podMax": 4
+    "podMax": 4,
+    "banner": "ENFORCER SQUAD"
   },
   {
     "id": "relay_node",
@@ -181,7 +185,8 @@
     "sprite": {
       "set": "robot1",
       "pose": "stand",
-      "scale": 1.0
+      "scale": 1.0,
+      "tint": "#40e0ff"
     },
     "kind": "Object",
     "robot": true,
@@ -189,7 +194,8 @@
     "summon": {
       "enemyId": "husk",
       "count": 1,
-      "everyTurns": 2
+      "everyTurns": 2,
+      "maxAlive": 6
     },
     "loot": [
       {
@@ -198,7 +204,8 @@
         "chancePercent": 100
       }
     ],
-    "podMin": 1
+    "podMin": 1,
+    "banner": "RELAY NODE"
   },
   {
     "id": "cradle_guardian",
@@ -235,8 +242,11 @@
     "summon": {
       "enemyId": "warden",
       "count": 2,
-      "belowHpPercent": 50
+      "belowHpPercent": 50,
+      "radius": 4
     },
-    "podMin": 1
+    "podMin": 1,
+    "banner": "CRADLE GUARDIAN",
+    "immuneToStun": true
   }
 ]

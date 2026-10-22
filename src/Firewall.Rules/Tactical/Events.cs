@@ -70,6 +70,18 @@ public sealed record StatusRemoved(UnitId Unit, StatusFlags Status) : GameEvent;
 public sealed record PodActivated(PodId Pod, string Name, GridPos At, IReadOnlyList<UnitId> Members)
     : GameEvent;
 
+/// <summary>A unit appeared mid-mission: a relay's Husk or the Guardian's Wardens. <paramref name="Source"/> summoned it.</summary>
+public sealed record UnitSpawned(
+    UnitId Unit,
+    string DefId,
+    string AppearanceId,
+    bool Robot,
+    GridPos At,
+    int Hp,
+    int Armor,
+    UnitId? Source
+) : GameEvent;
+
 public sealed record UnitScampered(UnitId Unit, IReadOnlyList<GridPos> Path) : GameEvent;
 
 public sealed record TileChanged(GridPos Pos, TileType From, TileType To) : GameEvent;

@@ -12,6 +12,9 @@ public sealed record HudAbility(AbilitySlot Slot, string? BlockedReason);
 /// <summary>A visible hostile in the indicator column; <paramref name="HitChance"/> is set while Shoot is armed.</summary>
 public sealed record HudEnemy(TacticalUnit Unit, string Name, int? HitChance, bool Targeted);
 
+/// <summary>The boss bar at the top of the screen: name and HP while the boss is active.</summary>
+public sealed record HudBoss(string Name, int Hp, int MaxHp);
+
 /// <summary>Everything the HUD shows this frame; the scene fills it from the rules state.</summary>
 public sealed class HudFrame
 {
@@ -20,6 +23,7 @@ public sealed class HudFrame
     public IReadOnlyList<HudAbility> Abilities { get; init; } = [];
     public string? ArmedAbility { get; init; }
     public IReadOnlyList<HudEnemy> Enemies { get; init; } = [];
+    public HudBoss? Boss { get; init; }
     public string Objective { get; init; } = "";
     public string MissionName { get; init; } = "";
     public string? EndTurnBlocked { get; init; }
@@ -95,6 +99,7 @@ public static class TacticalHud
         var result = new HudResult();
         DrawObjective(canvas, ui, f);
         DrawTopRight(canvas, ui, f, result);
+        DrawBoss(canvas, f);
         DrawEnemies(canvas, ui, f, result);
         DrawStrip(canvas, ui, f, result);
         DrawSoldierPanel(canvas, ui, f, result);
@@ -131,6 +136,26 @@ public static class TacticalHud
             f.MissionName,
             ui.Theme.Title
         );
+    }
+
+    // Top centre, under the objective row: the boss's name over a red HP bar.
+    private static void DrawBoss(ScreenCanvas canvas, HudFrame f)
+    {
+        if (f.Boss is not { } boss)
+            return;
+        var rect = new UiRect((UiSpace.LogicalWidth - 480f) / 2f, 64f, 480f, 34f);
+        canvas.FillRect(new Vector2(rect.X, rect.Y), new Vector2(rect.W, rect.H), DimFill);
+        var share = boss.MaxHp <= 0 ? 0f : Math.Clamp(boss.Hp / (float)boss.MaxHp, 0f, 1f);
+        var inner = new Vector2(rect.W - 8f, 10f);
+        var origin = new Vector2(rect.X + 4f, rect.Y + rect.H - 14f);
+        canvas.FillRect(origin, inner, new Vector4(0.2f, 0.05f, 0.05f, 0.9f));
+        canvas.FillRect(
+            origin,
+            new Vector2(inner.X * share, inner.Y),
+            new Vector4(0.9f, 0.2f, 0.18f, 1f)
+        );
+        var label = $"{boss.Name.ToUpperInvariant()}   {boss.Hp}/{boss.MaxHp}";
+        canvas.Text(label, new Vector2(rect.X + 10f, rect.Y + 2f), TextStyles.Small);
     }
 
     // ------------------------------------------------------------------ banner

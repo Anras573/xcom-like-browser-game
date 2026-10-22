@@ -54,6 +54,7 @@ public static class GameDataFiles
     public const string Names = "names.json";
     public const string Tiles = "tiles.json";
     public const string AiProfiles = "ai_profiles.json";
+    public const string Encounters = "encounters.json";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -73,6 +74,7 @@ public static class GameDataFiles
         Names,
         Tiles,
         AiProfiles,
+        Encounters,
     ];
 
     /// <summary>Map files under <c>data/maps/</c>, as paths relative to <c>data/</c>.</summary>
@@ -115,6 +117,7 @@ public sealed class GameData
             Nicknames = [],
         },
         [],
+        [],
         []
     );
 
@@ -134,7 +137,8 @@ public sealed class GameData
         IEnumerable<DistrictDef> districts,
         NameLists names,
         IEnumerable<TileDef> tiles,
-        IEnumerable<AiProfileDef> aiProfiles
+        IEnumerable<AiProfileDef> aiProfiles,
+        IEnumerable<ForceLevelDef> encounters
     )
     {
         Weapons = new(weapons);
@@ -143,8 +147,9 @@ public sealed class GameData
         Abilities = new(abilities);
         Classes = new(classes);
         Soldier = soldier;
-        Enemies = new(enemies);
         Elites = new(elites);
+        var baseEnemies = enemies.ToList();
+        Enemies = new(baseEnemies.Concat(EliteTransform.Variants(baseEnemies, Elites)));
         Research = new(research);
         Facilities = new(facilities);
         Workshop = new(workshop);
@@ -153,6 +158,7 @@ public sealed class GameData
         Names = names;
         Tiles = new(tiles);
         AiProfiles = new(aiProfiles);
+        Encounters = new(encounters);
     }
 
     public DefTable<WeaponDef> Weapons { get; }
@@ -161,6 +167,8 @@ public sealed class GameData
     public DefTable<AbilityDef> Abilities { get; }
     public DefTable<ClassDef> Classes { get; }
     public SoldierDef Soldier { get; }
+
+    /// <summary>The base enemies from <c>enemies.json</c> plus their generated elite variants (<see cref="EliteTransform"/>).</summary>
     public DefTable<EnemyDef> Enemies { get; }
     public DefTable<EliteDef> Elites { get; }
     public DefTable<ResearchDef> Research { get; }
@@ -171,6 +179,7 @@ public sealed class GameData
     public NameLists Names { get; }
     public DefTable<TileDef> Tiles { get; }
     public DefTable<AiProfileDef> AiProfiles { get; }
+    public DefTable<ForceLevelDef> Encounters { get; }
 
     /// <summary>The weapon of a class at a tier (1 = Ballistic, 2 = Coil, 3 = Arc).</summary>
     public WeaponDef Weapon(WeaponClass weaponClass, int tier) =>
@@ -207,7 +216,8 @@ public sealed class GameData
             Read(readFile, GameDataFiles.Districts, ctx.ListDistrictDef),
             Read(readFile, GameDataFiles.Names, ctx.NameLists),
             Read(readFile, GameDataFiles.Tiles, ctx.ListTileDef),
-            Read(readFile, GameDataFiles.AiProfiles, ctx.ListAiProfileDef)
+            Read(readFile, GameDataFiles.AiProfiles, ctx.ListAiProfileDef),
+            Read(readFile, GameDataFiles.Encounters, ctx.ListForceLevelDef)
         );
     }
 

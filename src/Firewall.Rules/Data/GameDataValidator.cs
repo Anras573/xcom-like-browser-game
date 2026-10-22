@@ -155,6 +155,31 @@ internal static class GameDataValidator
                 Err($"elite '{e.Id}': negative hp bonus");
         }
 
+        var levels = d.Encounters.Select(f => f.Level).ToHashSet();
+        for (var level = 1; level <= 10; level++)
+            if (!levels.Contains(level))
+                Err($"encounters: Force Level {level} has no entry");
+        foreach (var f in d.Encounters)
+        {
+            var p = $"encounters FL{f.Level}";
+            if (f.Level is < 1 or > 10)
+                Err($"{p}: Force Level must be 1-10");
+            if (f.Pods.Count == 0)
+                Err($"{p}: no pod templates");
+            foreach (var t in f.Pods)
+            {
+                if (t.Weight <= 0)
+                    Err($"{p}: pod weight {t.Weight} must be positive");
+                if (t.Units.Count == 0)
+                    Err($"{p}: pod has no units");
+                if (t.Tier < 0 || t.Tier > d.Elites.Count)
+                    Err($"{p}: pod tier {t.Tier} is out of range");
+                foreach (var id in t.Units)
+                    if (!d.Enemies.TryGet(id, out var e) || !EliteTransform.HasVariants(e))
+                        Err($"{p}: pod unit '{id}' is not a spawnable enemy");
+            }
+        }
+
         foreach (var r in d.Research)
         {
             var p = $"research '{r.Id}'";

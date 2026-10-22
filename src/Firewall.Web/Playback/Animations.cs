@@ -470,16 +470,102 @@ public sealed class StatusAnimation(UnitId unit, StatusFlags status, bool added)
         if (Unit(unit) is not { } u)
             return;
         u.Statuses.Set(status, added);
+        if (!added && status == StatusFlags.Suppressed)
+            u.SuppressedBy = null;
         if (!added || !Watched(u))
             return;
         var word = status switch
         {
             StatusFlags.Overwatch => "OVERWATCH",
             StatusFlags.Hunkered => "HUNKERED",
+            StatusFlags.Suppressed => "SUPPRESSED",
             _ => null,
         };
         if (word is not null)
             Vm.AddFloater(word, new Color(255, 214, 92), 20, u.Center + new Vector2(0f, 0.9f));
+    }
+}
+
+/// <summary>
+/// <see cref="AbilityUsed"/> of Suppression: the target's yellow line to the suppressor starts, and
+/// the camera frames the pair.
+/// </summary>
+public sealed class SuppressionAnimation(AbilityUsed used) : TimedAnimation
+{
+    public const float Seconds = 0.5f;
+
+    protected override void Begin()
+    {
+        if (
+            used.Target is not UnitTarget(var targetId)
+            || Unit(used.Unit) is not { } suppressor
+            || Unit(targetId) is not { } target
+        )
+            return;
+        target.SuppressedBy = suppressor.Id;
+        if (!Watched(suppressor) && !Watched(target))
+            return;
+        Duration = Seconds;
+        Ctx.Camera.Frame(suppressor.Center, target.Center);
+        Vm.AddFloater(
+            "SUPPRESSING",
+            new Color(255, 214, 92),
+            20,
+            suppressor.Center + new Vector2(0f, 0.9f)
+        );
+    }
+}
+
+/// <summary>
+/// <see cref="UnitSpawned"/>: a summoned unit fades in on its tile with a cyan flash. Its view is
+/// made by the scene once it is in the view model.
+/// </summary>
+public sealed class SpawnAnimation(UnitSpawned spawn) : TimedAnimation
+{
+    public const float Seconds = 0.5f;
+
+    private UnitVm? _unit;
+
+    protected override void Begin()
+    {
+        _unit = new UnitVm(spawn);
+        Vm.Units[spawn.Unit] = _unit;
+        if (!Ctx.IsTileVisible(spawn.At))
+        {
+            _unit.Alpha = 1f;
+            return;
+        }
+        Duration = Seconds;
+        _unit.ForceVisible = true;
+        Ctx.Camera.Focus(_unit.Center);
+        Vm.AddEffect(
+            new EffectVm(
+                EffectKind.FlashQuad,
+                _unit.Center,
+                _unit.Center,
+                Seconds,
+                new Color(90, 230, 255, 200)
+            )
+            {
+                Size = 1.4f,
+            }
+        );
+        Vm.AddFloater(
+            "SUMMONED",
+            new Color(90, 230, 255),
+            20,
+            _unit.Center + new Vector2(0f, 0.9f)
+        );
+    }
+
+    protected override void Tick(float t) => _unit!.Alpha = t / Seconds;
+
+    protected override void Finish()
+    {
+        if (_unit is null)
+            return;
+        _unit.Alpha = 1f;
+        _unit.ForceVisible = false;
     }
 }
 
@@ -530,6 +616,10 @@ public static class AnimationFactory
             UnitBleedingOut b => new BleedingOutAnimation(b),
             UnitStabilized s => new StabilizedAnimation(s),
             ReactionShotTriggered r => new ReactionAnimation(r),
+            UnitSpawned s => new SpawnAnimation(s),
+            AbilityUsed { AbilityId: SuppressionAbility.AbilityId } a => new SuppressionAnimation(
+                a
+            ),
             PodActivated p => new PodAnimation(p),
             PhaseStarted p => new PhaseAnimation(p),
             ExplosionAt x => new FlashAnimation(

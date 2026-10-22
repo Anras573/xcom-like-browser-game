@@ -167,7 +167,10 @@ public sealed partial class TacticalEngine
         }
         // Tile changes and ability effects can alter what is seen; steps already refreshed.
         if (State.Result is null)
+        {
+            Settle(sink);
             ActivatePodsThatSee(sink);
+        }
         if (State.Result is null && State.RefreshVision() is { } vision)
             sink.Add(vision);
         CheckMissionEnd(sink);
@@ -315,7 +318,14 @@ public sealed partial class TacticalEngine
         var def = _data.Abilities[cmd.AbilityId];
         _abilities.TryGet(def.Id, out var handler);
 
-        SpendAp(unit, def.EndsTurn ? unit.ActionPoints : def.ApCost, events);
+        // Twin Volley: shots don't end the turn, so 2 AP buys two shots.
+        var endsTurn =
+            def.EndsTurn
+            && !(
+                def.Id == AbilityRegistry.Shoot
+                && unit.Abilities.Contains(AbilityRegistry.DoubleShot)
+            );
+        SpendAp(unit, endsTurn ? unit.ActionPoints : def.ApCost, events);
         if (def.Cooldown > 0)
             unit.Cooldowns[def.Id] = def.Cooldown;
         events.Add(new AbilityUsed(unit.Id, def.Id, cmd.Target));
@@ -405,12 +415,38 @@ public sealed partial class TacticalEngine
         // Enemy phase
         State.Phase = TacticalPhase.Enemy;
         events.Add(new PhaseStarted(TacticalPhase.Enemy, State.TurnNumber));
-        foreach (var unit in State.Units.Where(IsEnemyActor).ToList())
+        // Everyone's AP is refilled first, so a bonus granted mid-phase (Overclock) is not wiped
+        // when the robot's own turn begins, and "has acted" means what it says.
+        // Overclockers go last: they can only boost a robot that has already acted.
+        var actors = State
+            .Units.Where(IsEnemyActor)
+            .OrderBy(u => u.Abilities.Contains(AbilityRegistry.ProxyOverclock) ? 1 : 0)
+            .ToList();
+        foreach (var unit in actors)
+            BeginUnitTurn(unit, events);
+        var first = events.Count;
+        foreach (var unit in actors)
         {
             if (State.Result is not null)
                 break;
-            BeginUnitTurn(unit, events);
             if (unit.IsAlive && !unit.Statuses.Stunned)
+                _ai.TakeTurn(unit, new AiContext(this, events));
+            CheckMissionEnd(events);
+        }
+
+        // A robot overclocked after its turn was over gets to spend the extra AP.
+        var boosted = events
+            .Skip(first)
+            .OfType<AbilityUsed>()
+            .Where(a => a.AbilityId == AbilityRegistry.ProxyOverclock && a.Target is UnitTarget)
+            .Select(a => State.Unit(((UnitTarget)a.Target).Id))
+            .Distinct()
+            .ToList();
+        foreach (var unit in boosted)
+        {
+            if (State.Result is not null)
+                break;
+            if (unit is { IsAlive: true, ActionPoints: > 0 } && !unit.Statuses.Stunned)
                 _ai.TakeTurn(unit, new AiContext(this, events));
             CheckMissionEnd(events);
         }
@@ -424,7 +460,7 @@ public sealed partial class TacticalEngine
         if (State.Result is not null)
             return;
 
-        // Environment phase: bleed-outs tick down (relay spawns and timers join with #33).
+        // Environment phase: bleed-outs tick down and relays spawn (timers join with #33).
         State.Phase = TacticalPhase.Environment;
         events.Add(new PhaseStarted(TacticalPhase.Environment, State.TurnNumber));
         foreach (var unit in State.Units.Where(u => u.IsOnMap && u.Statuses.IsBleedingOut))
@@ -438,6 +474,7 @@ public sealed partial class TacticalEngine
             unit.IsAlive = false;
             events.Add(new UnitKilled(unit.Id));
         }
+        RunRelays(events);
         CheckMissionEnd(events);
         if (State.Result is not null)
             return;
@@ -463,6 +500,7 @@ public sealed partial class TacticalEngine
         events.Add(new ApChanged(unit.Id, unit.ActionPoints));
 
         unit.Reactions.Clear();
+        Suppression.Release(State, unit.Id, events);
         ClearStatus(unit, StatusFlags.Overwatch, events);
         ClearStatus(unit, StatusFlags.Hunkered, events);
         if (stunned)
