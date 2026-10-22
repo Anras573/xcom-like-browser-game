@@ -94,12 +94,16 @@ public static class SoldierBuilder
     public static WeaponClass WeaponClassOf(GameData data, string? classId) =>
         classId is null ? data.Soldier.StartingWeaponClass : data.Classes[classId].WeaponClass;
 
-    /// <summary>The abilities a soldier of this spec has: the standard actions, the debug Stabilize, the automatic class ability and the picks.</summary>
+    /// <summary>The abilities a soldier of this spec has: the standard actions, Carry and Drop, the item abilities, the automatic class ability and the picks.</summary>
     public static IEnumerable<string> AbilitiesOf(GameData data, SoldierSpec spec)
     {
         foreach (var id in AbilityRegistry.StandardActions)
             yield return id;
-        yield return AbilityRegistry.DebugStabilize;
+        yield return AbilityRegistry.Carry;
+        yield return AbilityRegistry.Drop;
+        foreach (var id in spec.ItemIds)
+            if (data.Items[id].Kind != ItemKind.Passive)
+                yield return id;
         if (spec.ClassId is null)
             yield break;
         foreach (var tier in data.Classes[spec.ClassId].AbilityTree)

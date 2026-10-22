@@ -152,6 +152,12 @@ public static class UnitPresentation
         lines.Add($"HP {unit.Hp}/{unit.MaxHp}");
         if (unit.Armor > 0)
             lines.Add($"Armor {unit.Armor}");
+        if (unit.Statuses.Capturable)
+            lines.Add("Stunned: can be captured");
+        else if (unit.Statuses.Stunned)
+            lines.Add("Stunned");
+        if (unit.Carrying is { } carried)
+            lines.Add($"Carrying {carried.DisplayName}");
         return lines;
     }
 }

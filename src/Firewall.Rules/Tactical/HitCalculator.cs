@@ -169,6 +169,7 @@ public static class HitCalculator
                 ("Range", weapon.Def.RangeMod(attacker.Position.DistanceTo(target.Position)))
             );
         AddIfNonZero(breakdown, "Target Defense", -target.Defense);
+        AddIfNonZero(breakdown, "Smoke", -state.SmokeDefenseAt(target.Position));
 
         var flanked = false;
         if (!melee)
@@ -344,6 +345,8 @@ public static class HitCalculator
                 return "The target is not adjacent.";
             return null;
         }
+        if (attacker.Carrying is not null)
+            return $"{attacker.DisplayName} can't shoot while carrying.";
         if (attacker.Weapon is { } weapon)
         {
             if (weapon.Ammo < ctx.AmmoCost)

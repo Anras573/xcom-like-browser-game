@@ -35,6 +35,18 @@ internal static class StateHasher
             Add(ref h, s.State);
         }
 
+        Add(ref h, state.Smoke.Count);
+        foreach (var zone in state.Smoke)
+        {
+            Add(ref h, zone.TurnsLeft);
+            Add(ref h, zone.Defense);
+            foreach (var tile in zone.Tiles)
+            {
+                Add(ref h, tile.X);
+                Add(ref h, tile.Y);
+            }
+        }
+
         Add(ref h, state.Pods.Count);
         foreach (var pod in state.Pods)
         {
@@ -124,6 +136,7 @@ internal static class StateHasher
             Add(ref h, u.SummonedBy?.Value ?? -1);
             Add(ref h, u.HasSummoned);
             Add(ref h, u.ImmuneToStun);
+            Add(ref h, u.Carrying?.Id.Value ?? -1);
         }
         return h;
     }

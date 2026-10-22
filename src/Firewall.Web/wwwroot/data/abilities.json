@@ -60,15 +60,6 @@
     "icon": "icon.export"
   },
   {
-    "id": "debug_stabilize",
-    "name": "Stabilize (debug)",
-    "description": "Debug stand-in for the Medkit: stabilize an adjacent bleeding-out ally.",
-    "apCost": 1,
-    "endsTurn": false,
-    "targeting": "Ally",
-    "icon": "icon.plus"
-  },
-  {
     "id": "run_and_gun",
     "name": "Run & Gun",
     "description": "After a dash, gain {grantAp} AP that may only be used to shoot. Cooldown {cooldown} turns.",
@@ -433,5 +424,83 @@
     "parameters": {
       "shots": 2
     }
+  },
+  {
+    "id": "carry",
+    "name": "Carry",
+    "description": "Pick up an adjacent downed squadmate or a stunned, capturable Proxy. While carrying: -{mobilityPenalty} mobility and no shooting.",
+    "apCost": 1,
+    "endsTurn": false,
+    "targeting": "Unit",
+    "icon": "icon.import",
+    "parameters": {
+      "mobilityPenalty": 2
+    }
+  },
+  {
+    "id": "drop",
+    "name": "Drop",
+    "description": "Put the carried unit down on a free adjacent tile.",
+    "apCost": 1,
+    "endsTurn": false,
+    "targeting": "Self",
+    "icon": "icon.export"
+  },
+  {
+    "id": "frag_grenade",
+    "name": "Frag Grenade",
+    "description": "Throw at a tile in sight. Hits everything in the blast, friends included, ignoring cover. Breaks destructible cover and strips robot armor.",
+    "apCost": 1,
+    "endsTurn": false,
+    "targeting": "Tile",
+    "icon": "icon.exclamation"
+  },
+  {
+    "id": "smoke_grenade",
+    "name": "Smoke Grenade",
+    "description": "Throw at a tile in sight. Units in the cloud get +defense for 2 turns. Does not block sight.",
+    "apCost": 1,
+    "endsTurn": false,
+    "targeting": "Tile",
+    "icon": "icon.question"
+  },
+  {
+    "id": "lace_jammer",
+    "name": "Lace Jammer",
+    "description": "Throw at a tile in sight. Stuns every Husk in the radius for 1 turn.",
+    "apCost": 1,
+    "endsTurn": false,
+    "targeting": "Tile",
+    "icon": "icon.warning"
+  },
+  {
+    "id": "breach_charge",
+    "name": "Breach Charge",
+    "description": "Place on an adjacent tile. Damages everything around it and turns walls into rubble.",
+    "apCost": 1,
+    "endsTurn": false,
+    "targeting": "Tile",
+    "icon": "icon.gear"
+  },
+  {
+    "id": "medkit",
+    "name": "Medkit",
+    "description": "Heal an ally (or yourself), or stabilize a bleeding-out soldier.",
+    "apCost": 1,
+    "endsTurn": false,
+    "targeting": "Ally",
+    "icon": "icon.plus",
+    "parameters": {
+      "allowSelf": 1
+    }
+  },
+  {
+    "id": "arc_stunner",
+    "name": "Arc Stunner",
+    "description": "Melee a robot or Proxy. A Proxy at 60% HP or less is stunned for good and can be carried out alive.",
+    "apCost": 1,
+    "endsTurn": false,
+    "targeting": "Enemy",
+    "icon": "icon.power"
   }
 ]

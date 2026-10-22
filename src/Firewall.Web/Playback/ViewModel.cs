@@ -42,6 +42,7 @@ public sealed class UnitVm
         Statuses.Flags = unit.Statuses.Flags;
         Statuses.BleedingOutTurnsLeft = unit.Statuses.BleedingOutTurnsLeft;
         SuppressedBy = unit.Statuses.SuppressedBy;
+        CarriedBy = unit.CarriedBy?.Id;
     }
 
     /// <summary>A unit that appears mid-mission (<see cref="UnitSpawned"/>); it fades in from <see cref="Alpha"/> 0.</summary>
@@ -104,6 +105,9 @@ public sealed class UnitVm
 
     /// <summary>Drawn even if the squad cannot see the tile, while an animation shows what the unit does.</summary>
     public bool ForceVisible { get; set; }
+
+    /// <summary>The carrier while this unit is being carried; it is drawn on their shoulder.</summary>
+    public UnitId? CarriedBy { get; set; }
 
     /// <summary>Left the map (evacuated): the view goes away.</summary>
     public bool Removed { get; set; }
@@ -195,6 +199,9 @@ public sealed class ViewModel
     public IReadOnlyList<FloaterVm> Floaters => _floaters;
     public IReadOnlyList<EffectVm> Effects => _effects;
 
+    /// <summary>The smoke clouds showing, as the tiles each covers.</summary>
+    public List<IReadOnlyList<GridPos>> Smoke { get; } = [];
+
     public BannerVm? Banner { get; set; }
 
     /// <summary>The pod name shown while a pod wakes up.</summary>
@@ -203,9 +210,11 @@ public sealed class ViewModel
     public static ViewModel FromState(TacticalState state, GameData data)
     {
         var vm = new ViewModel();
+        foreach (var cloud in state.Smoke)
+            vm.Smoke.Add(cloud.Tiles);
         foreach (var unit in state.Units)
         {
-            if (!unit.IsOnMap && unit.IsAlive)
+            if (unit.Evacuated && unit.IsAlive)
                 continue;
             var robot = unit.Faction == Faction.Meridian && data.Enemies[unit.DefId].Robot;
             var vu = new UnitVm(unit, robot, UnitPresentation.InitialFacing(unit, state));

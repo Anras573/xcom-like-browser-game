@@ -44,7 +44,8 @@ public class MissionEndTests
             Weapon = new WeaponState(weapon, weapon.Clip),
         };
         unit.Abilities.UnionWith(AbilityRegistry.StandardActions);
-        unit.Abilities.Add(AbilityRegistry.DebugStabilize);
+        unit.Abilities.Add(AbilityRegistry.Medkit);
+        unit.Items.Add(new ItemState(AbilityRegistry.Medkit, 2));
         state.AddUnit(unit);
         return unit;
     }
@@ -260,21 +261,21 @@ public class MissionEndTests
     {
         var state = Yard();
         var downed = Rookie(state, 0);
-        var medic = Rookie(state, 1, 2);
+        var medic = Rookie(state, 1);
         var far = Rookie(state, 5);
         Enemy(state, "husk", 19, 2);
         var e = new TacticalEngine(state, Data);
         Assert.Contains(
-            "not bleeding out",
-            e.Validate(Use(medic, AbilityRegistry.DebugStabilize, downed)).Reason
+            "full health",
+            e.Validate(Use(medic, AbilityRegistry.Medkit, downed)).Reason
         );
         BleedOut(downed);
         Assert.Contains(
-            "not adjacent",
-            e.Validate(Use(far, AbilityRegistry.DebugStabilize, downed)).Reason
+            "within reach",
+            e.Validate(Use(far, AbilityRegistry.Medkit, downed)).Reason
         );
 
-        var events = e.Execute(Use(medic, AbilityRegistry.DebugStabilize, downed));
+        var events = e.Execute(Use(medic, AbilityRegistry.Medkit, downed));
 
         Assert.Contains(events, ev => ev is UnitStabilized(var id) && id == downed.Id);
         Assert.Equal(1, medic.ActionPoints);

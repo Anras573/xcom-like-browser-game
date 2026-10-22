@@ -61,6 +61,7 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
     private EffectsView _effects = null!;
     private TacticalUnit? _hover;
     private TargetingMode? _targeting;
+    private TileTargetingMode? _tileTargeting;
     private TargetReticleView _reticle = null!;
     private float _time;
 
@@ -100,8 +101,8 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
             new UtilityAi(Ctx.Data, timingLog: LogAiTiming)
         );
 
-        map.TileChanged += _ => InvalidateRange();
-        _tilemaps = MapTilemaps.Build(World, map, Ctx.Assets);
+        // The tiles change when playback shows the explosion, not when the command runs.
+        _tilemaps = MapTilemaps.Build(World, map, Ctx.Assets, follow: false);
         _shields = new CoverShieldsView(World, Ctx.Assets);
         _fog = new FogView(World, map.Width, map.Height);
         _reticle = new TargetReticleView(World, Ctx.Assets);
@@ -150,6 +151,7 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
     {
         _selected = unit.Id;
         _targeting = null;
+        _tileTargeting = null;
         InvalidateRange();
         _director.Cancel();
         _controller.FocusOn(UnitFocus(unit), instant ? 0f : 0.35f);
@@ -172,7 +174,7 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
         }
         if (Ctx.Bindings.WasPressed(GameAction.Cancel))
         {
-            if (_targeting is not null)
+            if (Aiming)
                 ExitTargeting();
             else
             {
@@ -183,7 +185,7 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
 
         var canvas = Ctx.Render.CanvasSize;
         _controller.Update(dt, canvas, Ctx.Ui.PointerOverUi);
-        if (_controller.RightClicked && _targeting is not null)
+        if (_controller.RightClicked && Aiming)
             ExitTargeting();
         var tile = Ctx.Ui.PointerOverUi ? null : PickTile(canvas);
         _hoverTile = tile;
@@ -210,7 +212,9 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
             Play(_engine.EndPlayerPhase());
         if (_autoSelect && !Busy)
             AutoSelect();
-        if (_targeting is not null && !Busy)
+        if (_tileTargeting is not null && !Busy)
+            UpdateTileTargeting();
+        else if (_targeting is not null && !Busy)
             UpdateTargeting();
         else if (soldiers.Count > 0 && !Busy)
         {
@@ -275,6 +279,14 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
         foreach (var vu in _vm.Units.Values)
             if (!_views.ContainsKey(vu.Id))
                 _views[vu.Id] = new UnitView(World, Ctx.Assets, Ctx.Data, vu);
+        // A carried unit rides on its carrier's shoulder.
+        foreach (var vu in _vm.Units.Values)
+            if (vu.CarriedBy is { } carrierId && _vm.Units.TryGetValue(carrierId, out var carrier))
+            {
+                vu.Tile = carrier.Tile;
+                vu.Center = carrier.Center + new Vector2(0.14f, -0.14f);
+                vu.ForceVisible = carrier.ForceVisible;
+            }
         foreach (var (id, view) in _views)
         {
             var unit = view.Unit;
@@ -289,7 +301,7 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
             var visible = ViewVisible(unit);
             view.Sync(
                 selected: id == _selected,
-                showOverlay: visible,
+                showOverlay: visible && unit.CarriedBy is null,
                 time: _time,
                 cover: id == _selected && !Busy ? StandingCover(_state.Unit(id)) : null,
                 visible: visible
@@ -329,40 +341,17 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
             Play(_engine.Execute(SelfCommand(abilityId)!));
     }
 
-    // An adjacent bleeding-out squadmate of the selected soldier, if any.
-    private TacticalUnit? StabilizeTarget() =>
-        Selected is not { } medic
-            ? null
-            : _state.Units.FirstOrDefault(u =>
-                u.Faction == Faction.Firewall
-                && u.IsOnMap
-                && u.Statuses.IsBleedingOut
-                && Math.Max(
-                    Math.Abs(u.Position.X - medic.Position.X),
-                    Math.Abs(u.Position.Y - medic.Position.Y)
-                ) == 1
-            );
-
-    private UseAbilityCommand? StabilizeCommand() =>
-        Selected is { } medic && StabilizeTarget() is { } patient
-            ? new UseAbilityCommand(
-                medic.Id,
-                AbilityRegistry.DebugStabilize,
-                Target.Unit(patient.Id)
-            )
-            : null;
-
-    private void Stabilize()
-    {
-        if (IsMoving)
-            return;
-        if (StabilizeCommand() is not { } cmd)
-            Ctx.Ui.Toast("No bleeding-out squadmate next to this soldier.");
-        else if (_engine.Validate(cmd) is { IsValid: false } bad)
-            Ctx.Ui.Toast(bad.Reason);
-        else
-            Play(_engine.Execute(cmd));
-    }
+    // Carry is on the bar only with someone to pick up next to the soldier.
+    private bool CarryAvailable(TacticalUnit unit) =>
+        unit.Carrying is null
+        && _state.Units.Any(u =>
+            u.IsOnMap
+            && CarryAbility.CanBeCarried(unit, u)
+            && Math.Max(
+                Math.Abs(u.Position.X - unit.Position.X),
+                Math.Abs(u.Position.Y - unit.Position.Y)
+            ) == 1
+        );
 
     // Evac is offered only while the selected soldier stands on an evac tile.
     private bool OnEvacTile => Selected is { } s && _state.Map.EvacTiles.Contains(s.Position);
@@ -393,9 +382,57 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
         FrameTarget();
     }
 
+    private bool Aiming => _targeting is not null || _tileTargeting is not null;
+
+    private TileTargetingMode? TryBeginTileTargeting(out string reason, string abilityId)
+    {
+        if (Selected is not { } user || IsMoving)
+        {
+            reason = "Select a soldier.";
+            return null;
+        }
+        return TileTargetingMode.TryBegin(_engine, user, abilityId, out reason);
+    }
+
+    private void BeginTileTargeting(string abilityId)
+    {
+        if (TryBeginTileTargeting(out var reason, abilityId) is not { } mode)
+        {
+            Ctx.Ui.Toast(reason);
+            return;
+        }
+        _tileTargeting = mode;
+    }
+
+    private void UpdateTileTargeting()
+    {
+        var mode = _tileTargeting!;
+        if (mode.IsStale)
+        {
+            ExitTargeting();
+            return;
+        }
+        var fire =
+            Ctx.Bindings.WasPressed(GameAction.Confirm)
+            || (_hoverTile is not null && !Ctx.Ui.PointerOverUi && Ctx.Clicks.ConsumeClick());
+        if (!fire || _hoverTile is not { } tile)
+            return;
+        var cmd = mode.CommandFor(tile);
+        if (!mode.CanTarget(tile) || _engine.Validate(cmd) is { IsValid: false })
+        {
+            Ctx.Ui.Toast(
+                _engine.Validate(cmd) is { IsValid: false } bad ? bad.Reason : "Out of range."
+            );
+            return;
+        }
+        _tileTargeting = null;
+        Play(_engine.Execute(cmd));
+    }
+
     private void ExitTargeting()
     {
         _targeting = null;
+        _tileTargeting = null;
         if (Selected is { } sel)
             _controller.FocusOn(UnitFocus(sel), 0.35f);
     }
@@ -426,16 +463,7 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
         }
         else if (Ctx.Bindings.WasPressed(GameAction.Confirm))
             Fire();
-        else if (
-            _hover is { } clicked
-            && (
-                mode.TargetsAllies
-                    ? clicked.Faction == Faction.Firewall
-                    : clicked.Faction != Faction.Firewall
-            )
-            && !Ctx.Ui.PointerOverUi
-            && Ctx.Clicks.ConsumeClick()
-        )
+        else if (_hover is { } clicked && !Ctx.Ui.PointerOverUi && Ctx.Clicks.ConsumeClick())
         {
             if (clicked.Id == mode.Current.Unit.Id)
                 Fire();
@@ -541,14 +569,17 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
     /// <summary>A move is playing back; input is locked until it ends.</summary>
     private bool IsMoving => _player.IsBusy;
 
+    private int _rangeMapVersion;
+
     private void InvalidateRange() => _range = null;
 
     // Computed on demand and kept until the selection, the state or the map changes.
     private MoveRangeOverlay? Range()
     {
-        if (_targeting is not null)
+        if (Aiming)
             return null;
-        if (_range is not null)
+        // The tiles decide what can be walked: a map that changed since (MapVersion) drops the range.
+        if (_range is not null && _rangeMapVersion == _state.MapVersion)
             return _range;
         if (
             Selected is not { IsAlive: true } unit
@@ -559,6 +590,7 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
             || !unit.IsStanding
         )
             return null;
+        _rangeMapVersion = _state.MapVersion;
         return _range = new MoveRangeOverlay(_engine.MoveRange(unit));
     }
 
@@ -589,6 +621,9 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
                     4f
                 );
                 break;
+            case TileChanged change:
+                _tilemaps?.Apply(new TileChange(change.Pos, change.From, change.To));
+                break;
             case UnitEvacuated evacuated:
                 Ctx.Ui.Toast($"{_state.Unit(evacuated.Unit).DisplayName} evacuated.");
                 break;
@@ -607,6 +642,7 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
     {
         InvalidateRange();
         _targeting = null;
+        _tileTargeting = null;
         _exhaustedTimer = -1f;
         _player.Enqueue(events);
         _autoSelect = true;
@@ -645,6 +681,12 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
     protected override void DrawWorld(WorldOverlay overlay)
     {
         DrawEvacZone(overlay);
+        DrawSmoke(overlay);
+        if (_tileTargeting is { } tileMode)
+        {
+            DrawTileTargeting(overlay, tileMode);
+            return;
+        }
         if (_targeting is { } mode)
         {
             DrawAimLine(overlay, mode);
@@ -672,6 +714,67 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
                 new Vector4(0.45f, 1f, 0.5f, 0.55f + 0.45f * pulse)
             );
         }
+    }
+
+    // Smoke clouds: a grey haze over their tiles that breathes a little.
+    private void DrawSmoke(WorldOverlay overlay)
+    {
+        var breath = 0.06f * MathF.Sin(_time * 1.5f);
+        foreach (var cloud in _vm.Smoke)
+        foreach (var tile in cloud)
+            overlay.FillTile(tile.X, tile.Y, new Vector4(0.78f, 0.8f, 0.84f, 0.38f + breath));
+    }
+
+    // The blast preview: the throw ring, the footprint under the cursor, who is hit and what breaks.
+    private void DrawTileTargeting(WorldOverlay overlay, TileTargetingMode mode)
+    {
+        var ring = new Vector4(0.25f, 0.65f, 1f, 0.9f);
+        foreach (var r in mode.RangeFill)
+            overlay.FillRect(r.Min, r.Size, ring with { W = 0.12f });
+        foreach (var r in mode.RangeOutline)
+            overlay.FillRect(r.Min, r.Size, ring);
+        if (BlastPreviewFor(mode) is not { } preview)
+            return;
+        foreach (var tile in preview.Tiles)
+            overlay.FillTile(tile.X, tile.Y, new Vector4(1f, 0.5f, 0.1f, 0.32f));
+        overlay.OutlineTile(preview.Center.X, preview.Center.Y, 0.06f, Vector4.One);
+        foreach (var victim in preview.Victims)
+            overlay.OutlineTile(
+                victim.Unit.Position.X,
+                victim.Unit.Position.Y,
+                0.08f,
+                victim.Friendly
+                    ? new Vector4(1f, 0.65f, 0.1f, 1f)
+                    : new Vector4(1f, 0.2f, 0.15f, 1f)
+            );
+        foreach (var change in preview.Breakage)
+            DrawCrack(overlay, change.Pos);
+    }
+
+    // The blast under the cursor, without the units the squad cannot see (the panel must not give them away).
+    private BlastPreview? BlastPreviewFor(TileTargetingMode mode) =>
+        mode.PreviewAt(_hoverTile) is { } preview
+            ? preview with
+            {
+                Victims = preview.Victims.Where(v => v.Friendly || IsVisible(v.Unit)).ToList(),
+            }
+            : null;
+
+    // A jagged crack across a tile that would break.
+    private static void DrawCrack(WorldOverlay overlay, GridPos tile)
+    {
+        var o = new Vector2(tile.X, tile.Y);
+        var color = new Vector4(1f, 0.95f, 0.75f, 0.95f);
+        Vector2[] points =
+        [
+            new(0.2f, 0.85f),
+            new(0.45f, 0.6f),
+            new(0.35f, 0.45f),
+            new(0.65f, 0.25f),
+            new(0.8f, 0.1f),
+        ];
+        for (var i = 1; i < points.Length; i++)
+            overlay.Line(o + points[i - 1], o + points[i], 0.05f, color);
     }
 
     // A dashed line from the shooter to the target.
@@ -703,6 +806,17 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
         var hud = TacticalHud.Draw(canvas, ui, BuildHud());
         ApplyHud(hud);
 
+        if (_tileTargeting is { } tileMode)
+        {
+            ItemPanel.Draw(
+                ui,
+                Ctx.Data.Abilities[tileMode.AbilityId].Name,
+                BlastPreviewFor(tileMode),
+                "Enter / click tile: use    Esc / RMB: cancel",
+                TacticalHud.AboveBar
+            );
+            DrawTileReason(canvas, ui, tileMode);
+        }
         if (_targeting is { } mode)
             ShotPanel.Draw(
                 canvas,
@@ -710,12 +824,14 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
                 mode.Current,
                 _state.Unit(mode.Shooter).Weapon,
                 mode.Candidates.Count,
-                TacticalHud.AboveBar
+                TacticalHud.AboveBar,
+                mode.AbilityId,
+                TargetDetail(mode)
             );
 
         if (_hover is { } unit)
             DrawTooltip(canvas, ui, unit);
-        else if (_targeting is null && !ui.PointerOverUi && !IsMoving)
+        else if (!Aiming && !ui.PointerOverUi && !IsMoving)
         {
             if (!DrawPreviewLabel(canvas, ui))
                 DrawMoveReason(canvas, ui);
@@ -741,25 +857,23 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
 
     private IReadOnlyList<AbilitySlot> HudSlots() =>
         Selected is { } unit
-            ? HudModel.AbilitySlots(unit, Ctx.Data, OnEvacTile, StabilizeCommand() is not null)
+            ? HudModel.AbilitySlots(unit, Ctx.Data, OnEvacTile, CarryAvailable(unit))
             : [];
 
     // Why the slot cannot be used right now; null when it can.
     private string? SlotBlocked(AbilitySlot slot)
     {
-        if (slot.AbilityId == AbilityRegistry.DebugStabilize)
-            return StabilizeCommand() is not { } cmd
-                    ? "No bleeding-out squadmate next to this soldier."
-                : IsMoving ? "Wait for the move to finish."
-                : _engine.Validate(cmd) is { IsValid: false } bad ? bad.Reason
-                : null;
         return Ctx.Data.Abilities[slot.AbilityId].Targeting switch
         {
             // Armed targeting can always be left again by pressing the button once more.
-            TargetingType.Enemy or TargetingType.Ally => _targeting is not null
+            TargetingType.Enemy or TargetingType.Ally or TargetingType.Unit => Aiming
             || TryBeginTargeting(out var reason, slot.AbilityId) is not null
                 ? null
                 : reason,
+            TargetingType.Tile => Aiming
+            || TryBeginTileTargeting(out var tileReason, slot.AbilityId) is not null
+                ? null
+                : tileReason,
             TargetingType.Self => SelfAbilityBlocked(slot.AbilityId),
             _ => "This ability is always on.",
         };
@@ -774,7 +888,7 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
             Squad = _state.Units.Where(u => u.Faction == Faction.Firewall).ToList(),
             Selected = Selected,
             Abilities = HudSlots().Select(s => new HudAbility(s, SlotBlocked(s))).ToList(),
-            ArmedAbility = _targeting?.AbilityId,
+            ArmedAbility = _targeting?.AbilityId ?? _tileTargeting?.AbilityId,
             Enemies = VisibleEnemies(),
             Boss = ActiveBoss(),
             Objective = HudModel.ObjectiveText(_state, Ctx.Data, _engine.Objective, IsVisible),
@@ -785,7 +899,7 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
             AbortBlocked =
                 _engine.Validate(new AbortMissionCommand()) is { IsValid: false } abort
                     ? abort.Reason
-                : _targeting is not null ? "Cancel targeting first."
+                : Aiming ? "Cancel targeting first."
                 : null,
             Busy = Busy,
             BannerText =
@@ -860,20 +974,22 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
     {
         if (Busy)
             return;
-        if (abilityId == AbilityRegistry.DebugStabilize)
-        {
-            Stabilize();
-            return;
-        }
         switch (Ctx.Data.Abilities[abilityId].Targeting)
         {
-            case TargetingType.Enemy or TargetingType.Ally:
+            case TargetingType.Enemy or TargetingType.Ally or TargetingType.Unit:
                 // The same button again cancels; another aimed ability swaps over.
-                var armed = _targeting?.AbilityId;
+                var armed = _targeting?.AbilityId ?? _tileTargeting?.AbilityId;
                 if (armed is not null)
                     ExitTargeting();
                 if (armed != abilityId)
                     BeginTargeting(abilityId);
+                break;
+            case TargetingType.Tile:
+                var armedTile = _targeting?.AbilityId ?? _tileTargeting?.AbilityId;
+                if (armedTile is not null)
+                    ExitTargeting();
+                if (armedTile != abilityId)
+                    BeginTileTargeting(abilityId);
                 break;
             case TargetingType.Self:
                 UseSelfAbility(abilityId);
@@ -987,6 +1103,44 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
         var width = canvas.Measure(text, TextStyles.Tooltip);
         canvas.Text(text, at - new Vector2(width / 2f, 8f), TextStyles.Tooltip);
         return true;
+    }
+
+    // What the armed ability does to the current target, for the plain panel (Medkit, Carry).
+    private string? TargetDetail(TargetingMode mode)
+    {
+        var user = _state.Unit(mode.Shooter);
+        var target = mode.Current.Unit;
+        switch (mode.AbilityId)
+        {
+            case AbilityRegistry.Medkit:
+                if (target.Statuses.IsBleedingOut)
+                    return SoldierPerks.MedkitReviveHp(Ctx.Data, user.Abilities) > 0
+                        ? $"Stands up at {SoldierPerks.MedkitReviveHp(Ctx.Data, user.Abilities)} HP"
+                        : "Stabilizes (stays down)";
+                var heal = SoldierPerks.MedkitHeal(
+                    Ctx.Data,
+                    user.Abilities,
+                    Ctx.Data.Items[AbilityRegistry.Medkit]
+                );
+                return $"Heals {Math.Min(heal, target.MaxHp - target.Hp)} HP";
+            case AbilityRegistry.Carry:
+                return $"Pick up {target.DisplayName}: -{CarryAbility.Penalty(Ctx.Data.Abilities[AbilityRegistry.Carry])} mobility, no shooting";
+            default:
+                return null;
+        }
+    }
+
+    // Why the item cannot go on the hovered tile, next to the cursor.
+    private void DrawTileReason(ScreenCanvas canvas, UiContext ui, TileTargetingMode mode)
+    {
+        if (_hoverTile is not { } tile || ui.PointerOverUi || mode.CanTarget(tile))
+            return;
+        var reason = _engine.Validate(mode.CommandFor(tile)).Reason;
+        if (reason.Length == 0)
+            return;
+        var width = canvas.Measure(reason, TextStyles.Tooltip);
+        var x = MathF.Min(ui.Mouse.X + 18f, ui.Space.CanvasRect.Right - width - 4f);
+        canvas.Text(reason, new Vector2(x, ui.Mouse.Y + 18f), TextStyles.Tooltip);
     }
 
     // Why a move to the hovered tile is not allowed, next to the cursor.

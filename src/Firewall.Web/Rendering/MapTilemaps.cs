@@ -23,8 +23,11 @@ public sealed class MapTilemaps : IDisposable
     private readonly Entity[] _entities;
     private readonly World _world;
 
-    private MapTilemaps(World world, TacticalMap map, AssetRegistry registry)
+    private readonly bool _follow;
+
+    private MapTilemaps(World world, TacticalMap map, AssetRegistry registry, bool follow)
     {
+        _follow = follow;
         _world = world;
         _map = map;
         _registry = registry;
@@ -51,17 +54,28 @@ public sealed class MapTilemaps : IDisposable
             );
             RefreshProps(x, y);
         }
-        map.TileChanged += OnTileChanged;
+        if (follow)
+            map.TileChanged += Apply;
     }
 
-    public static MapTilemaps Build(World world, TacticalMap map, AssetRegistry registry) =>
-        new(world, map, registry);
+    /// <summary>
+    /// Builds the tilemaps. With <paramref name="follow"/> (the default) they redraw the moment the
+    /// map changes; without it the owner calls <see cref="Apply"/> when playback reaches the change,
+    /// so a wall can fall when the explosion is shown and not before.
+    /// </summary>
+    public static MapTilemaps Build(
+        World world,
+        TacticalMap map,
+        AssetRegistry registry,
+        bool follow = true
+    ) => new(world, map, registry, follow);
 
     public Tilemap Props => _props;
 
     public void Dispose()
     {
-        _map.TileChanged -= OnTileChanged;
+        if (_follow)
+            _map.TileChanged -= Apply;
         foreach (var e in _entities)
             _world.DestroyEntity(e);
     }
@@ -79,7 +93,8 @@ public sealed class MapTilemaps : IDisposable
 
     private int IndexOrEmpty(string? frame) => frame is null ? Tilemap.EmptyTile : Index(frame);
 
-    private void OnTileChanged(TileChange change)
+    /// <summary>Redraws the changed tile and the neighbours whose look depends on it.</summary>
+    public void Apply(TileChange change)
     {
         var (x, y) = (change.Pos.X, change.Pos.Y);
         var row = MapTiling.RowOf(y, _map.Height);

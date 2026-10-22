@@ -29,8 +29,11 @@ public sealed class TargetingMode
 
     public string AbilityId { get; }
 
-    /// <summary>True when the ability is aimed at squadmates (Overclock) rather than hostiles.</summary>
+    /// <summary>True when the ability is aimed at squadmates (Overclock, Medkit) rather than hostiles.</summary>
     public bool TargetsAllies { get; private init; }
+
+    /// <summary>True when any unit will do (Carry: a downed squadmate or a stunned Proxy).</summary>
+    public bool TargetsAnyUnit { get; private init; }
 
     /// <summary>Never empty; sorted by hit chance (descending), then distance, then id.</summary>
     public IReadOnlyList<TargetCandidate> Candidates { get; }
@@ -82,6 +85,7 @@ public sealed class TargetingMode
             return new TargetingMode(shooter.Id, abilityId, candidates)
             {
                 TargetsAllies = AimsAtAllies(engine, abilityId),
+                TargetsAnyUnit = AimsAtAnyUnit(engine, abilityId),
             };
         }
         // The nearest unit gives the most useful reason: no AP, out of ammo, no LOS, ... Units the
@@ -96,10 +100,12 @@ public sealed class TargetingMode
             )
             .ToList();
         reason =
-            reasons.FirstOrDefault(r => !r.EndsWith("is not a robot."))
+            reasons.FirstOrDefault(r => !r.Contains("is not a robot"))
             ?? (reasons.Count > 0 ? "No robot in sight." : null)
             ?? (
-                AimsAtAllies(engine, abilityId) ? "No squadmate to target." : "No enemies in sight."
+                AimsAtAnyUnit(engine, abilityId) ? "Nobody to pick up."
+                : AimsAtAllies(engine, abilityId) ? "No squadmate to target."
+                : "No enemies in sight."
             );
         return null;
     }
@@ -123,6 +129,14 @@ public sealed class TargetingMode
     private static bool AimsAtAllies(TacticalEngine engine, string abilityId) =>
         engine.Data.Abilities.TryGet(abilityId, out var def) && def.Targeting == TargetingType.Ally;
 
+    private static bool AimsAtAnyUnit(TacticalEngine engine, string abilityId) =>
+        engine.Data.Abilities.TryGet(abilityId, out var def) && def.Targeting == TargetingType.Unit;
+
+    // The Medkit can be used on its own user.
+    private static bool AllowsSelf(TacticalEngine engine, string abilityId) =>
+        engine.Data.Abilities.TryGet(abilityId, out var def)
+        && def.Parameters.GetValueOrDefault("allowSelf") > 0;
+
     // The units worth asking the engine about: hostiles in view, or the other squadmates.
     private static IEnumerable<TacticalUnit> Possible(
         TacticalEngine engine,
@@ -130,15 +144,19 @@ public sealed class TargetingMode
         Func<TacticalUnit, bool> isVisible,
         string abilityId
     ) =>
-        AimsAtAllies(engine, abilityId)
+        AimsAtAnyUnit(engine, abilityId)
+            ? engine.State.Units.Where(u => u.IsOnMap && u.Id != user.Id && isVisible(u))
+        : AimsAtAllies(engine, abilityId)
             ? engine.State.Units.Where(u =>
-                u.IsOnMap && u.Faction == user.Faction && u.Id != user.Id
-            )
-            : engine.State.Units.Where(u =>
                 u.IsOnMap
-                && !u.Statuses.IsDown
-                && u.Faction != user.Faction
-                && u.Faction != Faction.Neutral
-                && isVisible(u)
-            );
+                && u.Faction == user.Faction
+                && (u.Id != user.Id || AllowsSelf(engine, abilityId))
+            )
+        : engine.State.Units.Where(u =>
+            u.IsOnMap
+            && !u.Statuses.IsDown
+            && u.Faction != user.Faction
+            && u.Faction != Faction.Neutral
+            && isVisible(u)
+        );
 }

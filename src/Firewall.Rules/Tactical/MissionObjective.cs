@@ -21,14 +21,14 @@ public interface IMissionObjective
     ObjectiveStatus Evaluate(TacticalState state);
 }
 
-/// <summary>Purge: succeeds once no hostile unit is left alive. Map objects don't count.</summary>
+/// <summary>Purge: succeeds once no hostile unit is left alive (a captured Proxy that was evacuated is gone). Map objects don't count.</summary>
 public sealed class PurgeObjective(GameData data) : IMissionObjective
 {
     public string Description => "Purge: eliminate all hostiles.";
 
     public ObjectiveStatus Evaluate(TacticalState state) =>
         state.Units.Any(u =>
-            u is { Faction: Faction.Meridian, IsAlive: true }
+            u is { Faction: Faction.Meridian, IsAlive: true, Evacuated: false }
             && data.Enemies[u.DefId].Kind == EnemyKind.Unit
         )
             ? ObjectiveStatus.InProgress

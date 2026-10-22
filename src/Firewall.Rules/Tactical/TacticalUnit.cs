@@ -43,7 +43,20 @@ public sealed class TacticalUnit(UnitId id, Faction faction, string defId, strin
 
     /// <summary>The soldier's rank (bleed-out chance); Rookie for enemies.</summary>
     public Rank Rank { get; set; }
-    public GridPos Position { get; set; }
+
+    private GridPos _position;
+
+    /// <summary>Where the unit stands; a unit it carries moves with it.</summary>
+    public GridPos Position
+    {
+        get => _position;
+        set
+        {
+            _position = value;
+            if (Carrying is { } carried)
+                carried._position = value;
+        }
+    }
 
     public int Hp { get; set; }
     public int MaxHp { get; set; }
@@ -77,8 +90,14 @@ public sealed class TacticalUnit(UnitId id, Faction faction, string defId, strin
     /// <summary>Left the map through the evac zone; still alive, but no longer on the map.</summary>
     public bool Evacuated { get; set; }
 
-    /// <summary>Alive and still on the map: it occupies its tile, can be seen and can be shot.</summary>
-    public bool IsOnMap => IsAlive && !Evacuated;
+    /// <summary>The unit this one carries (Carry, #31); it rides on the carrier's tile.</summary>
+    public TacticalUnit? Carrying { get; set; }
+
+    /// <summary>Who carries this unit; a carried unit is not on the map by itself.</summary>
+    public TacticalUnit? CarriedBy { get; set; }
+
+    /// <summary>Alive and still on the map by itself: it occupies its tile, can be seen and can be shot. A carried unit is with its carrier.</summary>
+    public bool IsOnMap => IsAlive && !Evacuated && CarriedBy is null;
 
     /// <summary>On the map and not down: still in the fight.</summary>
     public bool IsStanding => IsOnMap && !Statuses.IsDown;

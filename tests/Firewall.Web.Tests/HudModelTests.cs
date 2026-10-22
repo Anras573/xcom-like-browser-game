@@ -25,14 +25,13 @@ public class HudModelTests
             ActionPoints = ap,
         };
         unit.Abilities.UnionWith(AbilityRegistry.StandardActions);
-        unit.Abilities.Add(AbilityRegistry.DebugStabilize);
         return unit;
     }
 
     [Fact]
     public void BarStartsWithTheFourStandardActionsInOrder()
     {
-        var slots = HudModel.AbilitySlots(Soldier(1), Data, onEvacTile: false, canStabilize: false);
+        var slots = HudModel.AbilitySlots(Soldier(1), Data, onEvacTile: false);
         Assert.Equal(
             [
                 AbilityRegistry.Shoot,
@@ -47,14 +46,48 @@ public class HudModelTests
     }
 
     [Fact]
-    public void EvacAndStabilizeAppearOnlyWhenTheyApply()
+    public void EvacAppearsOnlyOnTheEvacTile()
     {
-        var slots = HudModel.AbilitySlots(Soldier(1), Data, onEvacTile: true, canStabilize: true);
+        var slots = HudModel.AbilitySlots(Soldier(1), Data, onEvacTile: true);
+        Assert.Equal([AbilityRegistry.Evac], slots.Skip(4).Select(s => s.AbilityId));
+        Assert.Equal(5, slots[4].Slot);
+    }
+
+    [Fact]
+    public void ItemsFollowTheStandardActionsWithTheirChargesAndCarryComesAfter()
+    {
+        var unit = Soldier(1);
+        unit.Abilities.UnionWith([AbilityRegistry.Carry, AbilityRegistry.Drop]);
+        unit.Abilities.UnionWith([AbilityRegistry.Medkit, AbilityRegistry.FragGrenade]);
+        unit.Items.Add(new ItemState(AbilityRegistry.FragGrenade, 1));
+        unit.Items.Add(new ItemState(AbilityRegistry.Medkit, 2));
+
+        var slots = HudModel.AbilitySlots(unit, Data, onEvacTile: false);
+
         Assert.Equal(
-            [AbilityRegistry.Evac, AbilityRegistry.DebugStabilize],
+            [AbilityRegistry.FragGrenade, AbilityRegistry.Medkit, AbilityRegistry.Carry],
             slots.Skip(4).Select(s => s.AbilityId)
         );
-        Assert.Equal(5, slots[4].Slot);
+        Assert.Equal(1, slots[4].Charges);
+        Assert.Equal(2, slots[5].Charges);
+        Assert.Null(slots[6].Charges);
+        Assert.Contains("Charges", HudModel.AbilityTooltip(slots[5], null));
+    }
+
+    [Fact]
+    public void DropReplacesCarryWhileCarrying()
+    {
+        var unit = Soldier(1);
+        unit.Abilities.UnionWith([AbilityRegistry.Carry, AbilityRegistry.Drop]);
+        unit.Carrying = Soldier(2);
+
+        var ids = HudModel
+            .AbilitySlots(unit, Data, onEvacTile: false)
+            .Select(s => s.AbilityId)
+            .ToList();
+
+        Assert.Contains(AbilityRegistry.Drop, ids);
+        Assert.DoesNotContain(AbilityRegistry.Carry, ids);
     }
 
     [Fact]
@@ -64,7 +97,7 @@ public class HudModelTests
         unit.Abilities.Add("sentinel"); // passive
         unit.Abilities.Add("rapid_fire");
         var ids = HudModel
-            .AbilitySlots(unit, Data, onEvacTile: false, canStabilize: false)
+            .AbilitySlots(unit, Data, onEvacTile: false)
             .Select(s => s.AbilityId)
             .ToList();
         Assert.Contains("rapid_fire", ids);
@@ -77,14 +110,14 @@ public class HudModelTests
     {
         var unit = Soldier(1);
         unit.Cooldowns[AbilityRegistry.Overwatch] = 2;
-        var slots = HudModel.AbilitySlots(unit, Data, false, false);
+        var slots = HudModel.AbilitySlots(unit, Data, false);
         Assert.Equal(2, slots[1].Cooldown);
     }
 
     [Fact]
     public void TooltipExplainsWhyAnAbilityIsDisabled()
     {
-        var slot = HudModel.AbilitySlots(Soldier(1), Data, false, false)[0];
+        var slot = HudModel.AbilitySlots(Soldier(1), Data, false)[0];
         var tip = HudModel.AbilityTooltip(slot, "No AP left.");
         Assert.Contains("No AP left.", tip);
         Assert.Contains("[1]", tip);

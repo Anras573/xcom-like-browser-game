@@ -65,7 +65,7 @@
   {
     "id": "breach_charge",
     "name": "Breach Charge",
-    "description": "5 damage, radius 1. Can destroy walls (# becomes rubble).",
+    "description": "5 damage, radius 1. Placed on an adjacent tile. Can destroy walls (# becomes rubble).",
     "kind": "Grenade",
     "charges": 1,
     "parameters": {
@@ -73,7 +73,8 @@
       "radius": 1,
       "destroysWalls": 1,
       "destroysCover": 1,
-      "range": 10
+      "range": 1,
+      "minRange": 1
     }
   },
   {

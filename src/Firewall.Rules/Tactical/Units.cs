@@ -48,6 +48,17 @@ public sealed class Pod(PodId id, string name, GridPos spawn)
 /// <summary>What a mission asks of <see cref="PodSpawner"/>: a pod's name and its members' enemy ids.</summary>
 public sealed record PodSpec(string Name, IReadOnlyList<string> EnemyIds);
 
+/// <summary>A smoke cloud (Smoke Grenade): units on its tiles get <see cref="Defense"/> until it has gone.</summary>
+public sealed class SmokeZone(IReadOnlyList<GridPos> tiles, int turnsLeft, int defense)
+{
+    public IReadOnlyList<GridPos> Tiles { get; } = tiles;
+
+    /// <summary>Environment phases the cloud has left.</summary>
+    public int TurnsLeft { get; set; } = turnsLeft;
+
+    public int Defense { get; } = defense;
+}
+
 [Flags]
 public enum StatusFlags
 {
@@ -58,6 +69,8 @@ public enum StatusFlags
     Stunned = 1 << 3,
     Stabilized = 1 << 4,
     Smoked = 1 << 5,
+
+    /// <summary>A Proxy the Arc Stunner took down: stunned for the rest of the mission and fit to be carried out.</summary>
     Capturable = 1 << 6,
 
     /// <summary>Takes extra damage from every source for the rest of the mission (Rupture).</summary>

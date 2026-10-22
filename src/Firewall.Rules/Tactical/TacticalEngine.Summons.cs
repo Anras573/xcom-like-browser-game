@@ -9,6 +9,7 @@ public sealed partial class TacticalEngine
     private void Settle(List<GameEvent> events)
     {
         Suppression.Sweep(State, events);
+        ReleaseCarried(events);
         foreach (var unit in State.Units.ToList())
         {
             if (
@@ -21,6 +22,27 @@ public sealed partial class TacticalEngine
                 continue;
             unit.HasSummoned = true;
             Summon(unit, summon, events);
+        }
+    }
+
+    /// <summary>
+    /// A carrier who died or went down puts their load on a free tile next to them; a carried unit
+    /// that died is let go the same way.
+    /// </summary>
+    private void ReleaseCarried(List<GameEvent> events)
+    {
+        foreach (var carrier in State.Units.Where(u => u.Carrying is not null).ToList())
+        {
+            var carried = carrier.Carrying!;
+            if (carrier.IsStanding && carried.IsAlive)
+                continue;
+            var at = DropAbility.DropTile(State, carrier.Position) ?? carrier.Position;
+            CarryAbility.Release(
+                carrier,
+                at,
+                CarryAbility.Penalty(_data.Abilities[AbilityRegistry.Carry]),
+                events
+            );
         }
     }
 

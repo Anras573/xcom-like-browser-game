@@ -45,8 +45,19 @@ public sealed class AbilityRegistry
     public const string HunkerDown = "hunker_down";
     public const string Evac = "evac";
 
-    /// <summary>Debug stand-in for the Medkit (#31): stabilizes an adjacent bleeding-out ally.</summary>
-    public const string DebugStabilize = "debug_stabilize";
+    /// <summary>Pick up an adjacent downed squadmate or a capturable Proxy.</summary>
+    public const string Carry = "carry";
+
+    /// <summary>Put the carried unit down.</summary>
+    public const string Drop = "drop";
+
+    // Utility items (#31): the ability of an item has the item's id.
+    public const string FragGrenade = "frag_grenade";
+    public const string SmokeGrenade = "smoke_grenade";
+    public const string LaceJammer = "lace_jammer";
+    public const string BreachCharge = "breach_charge";
+    public const string Medkit = "medkit";
+    public const string ArcStunner = "arc_stunner";
 
     /// <summary>The Proxy's Overclock: +1 AP to an adjacent robot that has acted.</summary>
     public const string ProxyOverclock = "proxy_overclock";
@@ -63,7 +74,7 @@ public sealed class AbilityRegistry
 
     private readonly Dictionary<string, IAbilityHandler> _handlers = new(StringComparer.Ordinal);
 
-    /// <summary>The handlers implemented so far: the standard actions, the debug Stabilize, the enemy abilities and every active class ability.</summary>
+    /// <summary>The handlers implemented so far: the standard actions, Carry and Drop, the item abilities, the enemy abilities and every active class ability.</summary>
     public static AbilityRegistry CreateDefault()
     {
         var registry = new AbilityRegistry();
@@ -73,7 +84,14 @@ public sealed class AbilityRegistry
         registry.Register(Reload, new ReloadAbility());
         registry.Register(HunkerDown, new HunkerDownAbility());
         registry.Register(Evac, new EvacAbility());
-        registry.Register(DebugStabilize, new DebugStabilizeAbility());
+        registry.Register(Carry, new CarryAbility());
+        registry.Register(Drop, new DropAbility());
+        registry.Register(FragGrenade, new ExplosiveAbility());
+        registry.Register(BreachCharge, new ExplosiveAbility());
+        registry.Register(SmokeGrenade, new SmokeAbility());
+        registry.Register(LaceJammer, new LaceJammerAbility());
+        registry.Register(Medkit, new MedkitAbility());
+        registry.Register(ArcStunner, new ArcStunnerAbility());
         registry.Register(SuppressionAbility.AbilityId, new SuppressionAbility());
         registry.Register(ProxyOverclock, new OverclockAbility());
 
