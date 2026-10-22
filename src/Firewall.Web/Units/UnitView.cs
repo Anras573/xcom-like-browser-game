@@ -60,7 +60,7 @@ public sealed class UnitView
         world.AddComponent(_ring, new AnimationState(ring.FrameIndex));
         world.AddComponent(_ring, RenderLayers.Of(RenderLayers.Highlights));
 
-        _icons = new Entity[4];
+        _icons = new Entity[5];
         for (var i = 0; i < _icons.Length; i++)
         {
             _icons[i] = world.CreateEntity();
@@ -91,7 +91,7 @@ public sealed class UnitView
         var frameName = scrap
             ? "decal.corpse_scrap"
             : UnitPresentation.BodyFrame(unit, _enemy, unit.ReloadSeconds > 0f);
-        var color = visible ? BodyColor(unit) : Hidden;
+        var color = visible ? BodyColor(unit, time) : Hidden;
         if (frameName != _frameName || !_bodyColorSet || !SameColor(color, _bodyColor))
         {
             _frameName = frameName;
@@ -134,9 +134,19 @@ public sealed class UnitView
     }
 
     // The tint the unit's own sprite has, darkened for corpses, pulled toward a flash, faded.
-    private Color BodyColor(UnitVm unit)
+    private Color BodyColor(UnitVm unit, float time)
     {
         var baseTint = _tint ?? Color.White;
+        // A map object (the Relay Node) pulses its tint so it reads as live.
+        if (_enemy is { Kind: EnemyKind.Object })
+        {
+            var k = UnitPresentation.RelayPulse(time);
+            baseTint = new Color(
+                (byte)(baseTint.R * k),
+                (byte)(baseTint.G * k),
+                (byte)(baseTint.B * k)
+            );
+        }
         float Channel(byte c, byte flash) =>
             (c * unit.Brightness * (1f - unit.FlashAmount) + flash * unit.FlashAmount) / 255f;
         byte ToByte(float v) => (byte)Math.Clamp((int)MathF.Round(v * 255f), 0, 255);
@@ -215,10 +225,22 @@ public sealed class UnitView
             var rowWidth = names.Count * IconSize;
             var x = centerX - rowWidth / 2f + i * IconSize + IconSize / 2f;
             // Bleeding out pulses red so it reads at a glance.
-            var tint =
-                names[i] == "status.bleeding"
-                    ? new Color(255, 70, 70, (byte)(255 * UnitPresentation.BleedPulseAlpha(time)))
-                    : (Color?)null;
+            var tint = names[i] switch
+            {
+                "status.bleeding" => new Color(
+                    255,
+                    70,
+                    70,
+                    (byte)(255 * UnitPresentation.BleedPulseAlpha(time))
+                ),
+                "status.suppressed" => new Color(
+                    255,
+                    214,
+                    92,
+                    (byte)(255 * UnitPresentation.BleedPulseAlpha(time))
+                ),
+                _ => (Color?)null,
+            };
             _world.AddComponent(_icons[i], frame.ToSpriteSheet(tint));
             _world.AddComponent(_icons[i], new AnimationState(frame.FrameIndex));
             _world.AddComponent(

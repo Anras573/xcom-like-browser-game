@@ -1,0 +1,391 @@
+[
+  {
+    "level": 1,
+    "pods": [
+      {
+        "weight": 3,
+        "units": [
+          "husk",
+          "husk",
+          "husk"
+        ]
+      },
+      {
+        "weight": 2,
+        "units": [
+          "warden",
+          "warden"
+        ]
+      }
+    ]
+  },
+  {
+    "level": 2,
+    "pods": [
+      {
+        "weight": 3,
+        "units": [
+          "husk",
+          "husk",
+          "husk"
+        ]
+      },
+      {
+        "weight": 3,
+        "units": [
+          "warden",
+          "warden"
+        ]
+      },
+      {
+        "weight": 1,
+        "units": [
+          "husk",
+          "husk",
+          "husk",
+          "husk"
+        ]
+      }
+    ]
+  },
+  {
+    "level": 3,
+    "pods": [
+      {
+        "weight": 3,
+        "units": [
+          "warden",
+          "warden",
+          "proxy"
+        ]
+      },
+      {
+        "weight": 2,
+        "units": [
+          "husk",
+          "husk",
+          "husk",
+          "husk"
+        ]
+      },
+      {
+        "weight": 2,
+        "units": [
+          "warden",
+          "warden",
+          "warden"
+        ]
+      }
+    ]
+  },
+  {
+    "level": 4,
+    "pods": [
+      {
+        "weight": 3,
+        "units": [
+          "warden",
+          "warden",
+          "proxy"
+        ]
+      },
+      {
+        "weight": 2,
+        "units": [
+          "proxy",
+          "warden",
+          "husk",
+          "husk"
+        ]
+      },
+      {
+        "weight": 2,
+        "units": [
+          "husk",
+          "husk",
+          "husk",
+          "husk"
+        ]
+      },
+      {
+        "weight": 1,
+        "units": [
+          "enforcer",
+          "warden"
+        ]
+      }
+    ]
+  },
+  {
+    "level": 5,
+    "pods": [
+      {
+        "weight": 3,
+        "units": [
+          "enforcer",
+          "warden",
+          "warden"
+        ]
+      },
+      {
+        "weight": 3,
+        "units": [
+          "proxy",
+          "proxy",
+          "warden"
+        ]
+      },
+      {
+        "weight": 2,
+        "units": [
+          "husk",
+          "husk",
+          "husk",
+          "husk"
+        ]
+      },
+      {
+        "weight": 1,
+        "units": [
+          "warden",
+          "warden",
+          "warden"
+        ]
+      }
+    ]
+  },
+  {
+    "level": 6,
+    "pods": [
+      {
+        "weight": 3,
+        "units": [
+          "enforcer",
+          "warden",
+          "warden"
+        ]
+      },
+      {
+        "weight": 2,
+        "units": [
+          "proxy",
+          "proxy",
+          "warden"
+        ]
+      },
+      {
+        "weight": 2,
+        "units": [
+          "enforcer",
+          "proxy",
+          "warden"
+        ]
+      },
+      {
+        "weight": 1,
+        "units": [
+          "husk",
+          "husk",
+          "husk",
+          "husk"
+        ]
+      }
+    ]
+  },
+  {
+    "level": 7,
+    "pods": [
+      {
+        "weight": 3,
+        "units": [
+          "enforcer",
+          "warden",
+          "warden"
+        ]
+      },
+      {
+        "weight": 2,
+        "units": [
+          "proxy",
+          "proxy",
+          "warden"
+        ]
+      },
+      {
+        "weight": 2,
+        "units": [
+          "warden",
+          "warden"
+        ],
+        "tier": 1
+      },
+      {
+        "weight": 2,
+        "units": [
+          "proxy",
+          "warden",
+          "husk",
+          "husk"
+        ],
+        "tier": 1
+      },
+      {
+        "weight": 1,
+        "units": [
+          "husk",
+          "husk",
+          "husk",
+          "husk"
+        ],
+        "tier": 1
+      }
+    ]
+  },
+  {
+    "level": 8,
+    "pods": [
+      {
+        "weight": 2,
+        "units": [
+          "enforcer",
+          "warden",
+          "warden"
+        ]
+      },
+      {
+        "weight": 2,
+        "units": [
+          "enforcer",
+          "enforcer",
+          "warden"
+        ]
+      },
+      {
+        "weight": 3,
+        "units": [
+          "warden",
+          "warden",
+          "proxy"
+        ],
+        "tier": 1
+      },
+      {
+        "weight": 3,
+        "units": [
+          "enforcer",
+          "warden",
+          "warden"
+        ],
+        "tier": 1
+      },
+      {
+        "weight": 1,
+        "units": [
+          "proxy",
+          "proxy",
+          "warden"
+        ],
+        "tier": 1
+      }
+    ]
+  },
+  {
+    "level": 9,
+    "pods": [
+      {
+        "weight": 2,
+        "units": [
+          "enforcer",
+          "enforcer",
+          "warden"
+        ]
+      },
+      {
+        "weight": 2,
+        "units": [
+          "enforcer",
+          "warden",
+          "warden"
+        ],
+        "tier": 1
+      },
+      {
+        "weight": 3,
+        "units": [
+          "proxy",
+          "proxy",
+          "warden"
+        ],
+        "tier": 1
+      },
+      {
+        "weight": 3,
+        "units": [
+          "enforcer",
+          "warden",
+          "warden"
+        ],
+        "tier": 2
+      },
+      {
+        "weight": 1,
+        "units": [
+          "warden",
+          "warden",
+          "warden"
+        ],
+        "tier": 2
+      }
+    ]
+  },
+  {
+    "level": 10,
+    "pods": [
+      {
+        "weight": 1,
+        "units": [
+          "enforcer",
+          "enforcer",
+          "warden"
+        ],
+        "tier": 1
+      },
+      {
+        "weight": 2,
+        "units": [
+          "enforcer",
+          "warden",
+          "warden"
+        ],
+        "tier": 2
+      },
+      {
+        "weight": 2,
+        "units": [
+          "proxy",
+          "proxy",
+          "warden"
+        ],
+        "tier": 2
+      },
+      {
+        "weight": 3,
+        "units": [
+          "enforcer",
+          "enforcer",
+          "warden"
+        ],
+        "tier": 2
+      },
+      {
+        "weight": 1,
+        "units": [
+          "enforcer",
+          "enforcer",
+          "proxy"
+        ],
+        "tier": 2
+      }
+    ]
+  }
+]

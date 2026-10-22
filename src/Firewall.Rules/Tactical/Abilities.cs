@@ -39,6 +39,12 @@ public sealed class AbilityRegistry
     /// <summary>Debug stand-in for the Medkit (#31): stabilizes an adjacent bleeding-out ally.</summary>
     public const string DebugStabilize = "debug_stabilize";
 
+    /// <summary>The Proxy's Overclock: +1 AP to an adjacent robot that has acted.</summary>
+    public const string ProxyOverclock = "proxy_overclock";
+
+    /// <summary>Passive (Cradle Guardian's Twin Volley): shooting doesn't end the turn.</summary>
+    public const string DoubleShot = "double_shot";
+
     /// <summary>Passive: reaction shots can crit.</summary>
     public const string Sentinel = "sentinel";
 
@@ -59,6 +65,8 @@ public sealed class AbilityRegistry
         registry.Register(HunkerDown, new HunkerDownAbility());
         registry.Register(Evac, new EvacAbility());
         registry.Register(DebugStabilize, new DebugStabilizeAbility());
+        registry.Register(SuppressionAbility.AbilityId, new SuppressionAbility());
+        registry.Register(ProxyOverclock, new OverclockAbility());
         return registry;
     }
 

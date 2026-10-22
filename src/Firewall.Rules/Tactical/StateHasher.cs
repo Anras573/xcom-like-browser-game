@@ -20,6 +20,7 @@ internal static class StateHasher
             Add(ref h, (int)state.Map[new GridPos(x, y)]);
 
         Add(ref h, state.TurnNumber);
+        Add(ref h, state.Convergence);
         Add(ref h, (int)state.Phase);
         Add(ref h, state.Result is { } r ? (int)r.Outcome : -1);
         Add(ref h, state.Objective.MissionId);
@@ -107,6 +108,10 @@ internal static class StateHasher
             Add(ref h, u.IsActive);
             Add(ref h, u.Pod?.Value ?? -1);
             Add(ref h, u.AppearanceId);
+            Add(ref h, u.Statuses.SuppressedBy?.Value ?? -1);
+            Add(ref h, u.SummonedBy?.Value ?? -1);
+            Add(ref h, u.HasSummoned);
+            Add(ref h, u.ImmuneToStun);
         }
         return h;
     }

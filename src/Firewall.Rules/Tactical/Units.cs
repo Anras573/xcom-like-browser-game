@@ -71,6 +71,9 @@ public sealed class StatusSet
 
     public int BleedingOutTurnsLeft { get; set; }
 
+    /// <summary>Who suppressed this unit; the suppression ends when that unit's next turn starts or it goes down.</summary>
+    public UnitId? SuppressedBy { get; set; }
+
     public bool IsBleedingOut => BleedingOutTurnsLeft > 0;
 
     /// <summary>Bleeding out or stabilized: on the map, but out of the fight for this mission.</summary>

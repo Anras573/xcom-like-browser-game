@@ -48,32 +48,57 @@ public static class PodSpawner
             {
                 var def = data.Enemies[spec.EnemyIds[m]];
                 counts[def.Id] = counts.GetValueOrDefault(def.Id) + 1;
-                var unit = new TacticalUnit(
-                    state.NextUnitId(),
-                    Faction.Meridian,
-                    def.Id,
-                    $"{def.Name} {(char)('A' + counts[def.Id] - 1)}"
-                )
-                {
-                    Position = free[m],
-                    Hp = def.Hp,
-                    MaxHp = def.Hp,
-                    Aim = def.Aim,
-                    Mobility = def.Mobility,
-                    Defense = def.Defense,
-                    Armor = def.Armor,
-                    Sight = def.Sight,
-                    IsActive = false,
-                    Pod = podId,
-                    AppearanceId = def.Sprite.Set,
-                };
-                unit.Statuses.Set(StatusFlags.Capturable, def.Capturable);
-                foreach (var ability in def.Abilities)
-                    unit.Abilities.Add(ability);
+                var unit = CreateUnit(state, def, $"{def.Name} {(char)('A' + counts[def.Id] - 1)}");
+                unit.Position = free[m];
+                unit.IsActive = false;
+                unit.Pod = podId;
                 state.AddUnit(unit);
                 created[^1].Members.Add(unit.Id);
             }
         }
         return created;
+    }
+
+    /// <summary>
+    /// Puts an object enemy (the Relay Node) on every objective (<c>O</c>) tile of the map. Objects
+    /// are not in a pod and are active from the start.
+    /// </summary>
+    public static IReadOnlyList<TacticalUnit> SpawnObjects(
+        TacticalState state,
+        GameData data,
+        string enemyId
+    )
+    {
+        var def = data.Enemies[enemyId];
+        var created = new List<TacticalUnit>();
+        foreach (var tile in state.Map.Objectives)
+        {
+            var unit = CreateUnit(state, def, def.Name);
+            unit.Position = tile;
+            state.AddUnit(unit);
+            created.Add(unit);
+        }
+        return created;
+    }
+
+    /// <summary>A new enemy unit for <paramref name="def"/>, not yet added to the state or placed on the map.</summary>
+    public static TacticalUnit CreateUnit(TacticalState state, EnemyDef def, string name)
+    {
+        var unit = new TacticalUnit(state.NextUnitId(), Faction.Meridian, def.Id, name)
+        {
+            Hp = def.Hp,
+            MaxHp = def.Hp,
+            Aim = def.Aim,
+            Mobility = def.Mobility,
+            Defense = def.Defense,
+            Armor = def.Armor,
+            Sight = def.Sight,
+            AppearanceId = def.Sprite.Set,
+            ImmuneToStun = def.ImmuneToStun,
+        };
+        unit.Statuses.Set(StatusFlags.Capturable, def.Capturable);
+        foreach (var ability in def.Abilities)
+            unit.Abilities.Add(ability);
+        return unit;
     }
 }

@@ -41,6 +41,22 @@ public sealed class UnitVm
         Armor = unit.Armor;
         Statuses.Flags = unit.Statuses.Flags;
         Statuses.BleedingOutTurnsLeft = unit.Statuses.BleedingOutTurnsLeft;
+        SuppressedBy = unit.Statuses.SuppressedBy;
+    }
+
+    /// <summary>A unit that appears mid-mission (<see cref="UnitSpawned"/>); it fades in from <see cref="Alpha"/> 0.</summary>
+    public UnitVm(UnitSpawned spawn)
+    {
+        Id = spawn.Unit;
+        Faction = Faction.Meridian;
+        DefId = spawn.DefId;
+        AppearanceId = spawn.AppearanceId;
+        Robot = spawn.Robot;
+        Tile = spawn.At;
+        Center = TileCenter(spawn.At);
+        Hp = MaxHp = spawn.Hp;
+        Armor = spawn.Armor;
+        Alpha = 0f;
     }
 
     public UnitId Id { get; }
@@ -63,6 +79,9 @@ public sealed class UnitVm
     public int MaxHp { get; set; }
     public int Armor { get; set; }
     public StatusSet Statuses { get; } = new();
+
+    /// <summary>Who holds this unit suppressed; the yellow line is drawn from there.</summary>
+    public UnitId? SuppressedBy { get; set; }
 
     /// <summary>Opacity of the body, 0 to 1.</summary>
     public float Alpha { get; set; } = 1f;

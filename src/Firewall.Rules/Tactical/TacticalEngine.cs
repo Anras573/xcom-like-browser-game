@@ -167,7 +167,10 @@ public sealed partial class TacticalEngine
         }
         // Tile changes and ability effects can alter what is seen; steps already refreshed.
         if (State.Result is null)
+        {
+            Settle(sink);
             ActivatePodsThatSee(sink);
+        }
         if (State.Result is null && State.RefreshVision() is { } vision)
             sink.Add(vision);
         CheckMissionEnd(sink);
@@ -315,7 +318,14 @@ public sealed partial class TacticalEngine
         var def = _data.Abilities[cmd.AbilityId];
         _abilities.TryGet(def.Id, out var handler);
 
-        SpendAp(unit, def.EndsTurn ? unit.ActionPoints : def.ApCost, events);
+        // Twin Volley: shots don't end the turn, so 2 AP buys two shots.
+        var endsTurn =
+            def.EndsTurn
+            && !(
+                def.Id == AbilityRegistry.Shoot
+                && unit.Abilities.Contains(AbilityRegistry.DoubleShot)
+            );
+        SpendAp(unit, endsTurn ? unit.ActionPoints : def.ApCost, events);
         if (def.Cooldown > 0)
             unit.Cooldowns[def.Id] = def.Cooldown;
         events.Add(new AbilityUsed(unit.Id, def.Id, cmd.Target));
@@ -424,7 +434,7 @@ public sealed partial class TacticalEngine
         if (State.Result is not null)
             return;
 
-        // Environment phase: bleed-outs tick down (relay spawns and timers join with #33).
+        // Environment phase: bleed-outs tick down and relays spawn (timers join with #33).
         State.Phase = TacticalPhase.Environment;
         events.Add(new PhaseStarted(TacticalPhase.Environment, State.TurnNumber));
         foreach (var unit in State.Units.Where(u => u.IsOnMap && u.Statuses.IsBleedingOut))
@@ -438,6 +448,7 @@ public sealed partial class TacticalEngine
             unit.IsAlive = false;
             events.Add(new UnitKilled(unit.Id));
         }
+        RunRelays(events);
         CheckMissionEnd(events);
         if (State.Result is not null)
             return;
@@ -463,6 +474,7 @@ public sealed partial class TacticalEngine
         events.Add(new ApChanged(unit.Id, unit.ActionPoints));
 
         unit.Reactions.Clear();
+        Suppression.Release(State, unit.Id, events);
         ClearStatus(unit, StatusFlags.Overwatch, events);
         ClearStatus(unit, StatusFlags.Hunkered, events);
         if (stunned)

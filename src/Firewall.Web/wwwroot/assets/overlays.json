@@ -16,6 +16,7 @@
     "status.overwatch": 10,
     "status.hunker": 11,
     "status.bleeding": 12,
+    "status.suppressed": 9,
     "decal.corpse_scrap": 13
   }
 }

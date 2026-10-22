@@ -29,6 +29,9 @@ public sealed class TacticalState(TacticalMap map, IRandom rng, string missionId
     public IRandom Rng { get; } = rng;
     public ObjectiveState Objective { get; } = new(missionId);
     public int TurnNumber { get; set; } = 1;
+
+    /// <summary>The campaign's Convergence: summoned enemies use the elite tier it unlocks (§5.6).</summary>
+    public int Convergence { get; set; }
     public TacticalPhase Phase { get; set; } = TacticalPhase.Player;
 
     /// <summary>Null while the mission is running.</summary>

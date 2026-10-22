@@ -1,4 +1,5 @@
 using System.Numerics;
+using Firewall.Rules.Tactical;
 using Firewall.Web.Assets;
 using Firewall.Web.Playback;
 using Yaeger.ECS;
@@ -37,6 +38,52 @@ public sealed class EffectsView(World world, AssetRegistry assets)
                 assets.Flipbook("fx.flash").First.ToSpriteSheet(Hidden)
             );
             world.AddComponent(_flashes[i], new Transform2D(Vector2.Zero, 0f, Vector2.Zero));
+        }
+    }
+
+    private readonly List<Entity> _lines = [];
+
+    /// <summary>
+    /// A pulsing yellow line from each suppressor to the unit it holds down, drawn while both ends
+    /// are visible.
+    /// </summary>
+    public void SyncSuppression(
+        IReadOnlyDictionary<UnitId, UnitVm> units,
+        float time,
+        Func<UnitVm, bool> visible
+    )
+    {
+        var used = 0;
+        foreach (var target in units.Values)
+        {
+            if (
+                target is not { Dead: false, SuppressedBy: { } by }
+                || !target.Statuses.Suppressed
+                || !units.TryGetValue(by, out var source)
+            )
+                continue;
+            if (!visible(target) || !visible(source))
+                continue;
+            var delta = target.Center - source.Center;
+            var length = delta.Length();
+            if (length < 0.01f)
+                continue;
+            var entity = Take(_lines, used++);
+            var alpha = (byte)(255 * Units.UnitPresentation.SuppressionPulse(time));
+            world.AddComponent(entity, new Sprite("", new Color(255, 214, 92, alpha)));
+            world.AddComponent(
+                entity,
+                new Transform2D(
+                    (source.Center + target.Center) / 2f,
+                    MathF.Atan2(delta.Y, delta.X),
+                    new Vector2(length, 0.07f)
+                )
+            );
+        }
+        for (var i = used; i < _lines.Count; i++)
+        {
+            world.AddComponent(_lines[i], new Sprite("", Hidden));
+            world.AddComponent(_lines[i], new Transform2D(Vector2.Zero, 0f, Vector2.Zero));
         }
     }
 

@@ -31,6 +31,7 @@ namespace Firewall.Rules.Data;
 [JsonSerializable(typeof(NameLists))]
 [JsonSerializable(typeof(List<TileDef>))]
 [JsonSerializable(typeof(List<AiProfileDef>))]
+[JsonSerializable(typeof(List<ForceLevelDef>))]
 [JsonSerializable(typeof(Tactical.MapFile))]
 [JsonSerializable(typeof(Pcg32State))]
 public sealed partial class RulesJsonContext : JsonSerializerContext;

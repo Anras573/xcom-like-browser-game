@@ -6,7 +6,7 @@
     "hp": 2,
     "aim": 5,
     "armor": 0,
-    "tint": "#a060e0",
+    "tint": "#b48cff",
     "lootMultiplier": 1.5
   },
   {
@@ -16,7 +16,7 @@
     "hp": 4,
     "aim": 10,
     "armor": 1,
-    "tint": "#e060a0",
+    "tint": "#ff5a5a",
     "lootMultiplier": 1.5
   }
 ]

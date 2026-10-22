@@ -37,5 +37,7 @@ public static class DebugScenes
         Register("Picking test", () => new PickingTestScene());
         Register("Map Viewer", () => new MapViewerScene());
         Register("Skirmish", () => new SkirmishScene());
+        foreach (var level in new[] { 1, 3, 5, 7, 9, 10 })
+            Register($"Skirmish FL{level}", () => new SkirmishScene(level));
     }
 }
