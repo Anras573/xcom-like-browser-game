@@ -18,6 +18,7 @@ public class EnemyRosterTests
     {
         var rows = Enumerable.Range(0, 9).Select(_ => new string('.', 24)).ToArray();
         rows[4] = rows[4][..12] + "O" + rows[4][13..];
+        rows[4] = rows[4][..20] + "e" + rows[4][21..];
         var map = MapParser.Parse(
             new MapFile
             {
@@ -214,6 +215,54 @@ public class EnemyRosterTests
         Assert.Equal(2, events.OfType<ShotResolved>().Count(s => s.Attacker == warden.Id));
         Assert.Equal(0, warden.ActionPoints);
         Assert.NotNull(soldier);
+    }
+
+    [Fact]
+    public void AProxyListedFirstInARealPodStillOverclocksItsWarden()
+    {
+        // FL5's [proxy, proxy, warden]: the Proxies come first in unit order.
+        var template = Data.Encounters["5"]
+            .Pods.First(p => p.Units.SequenceEqual(["proxy", "proxy", "warden"]));
+        var boosted = 0;
+        for (ulong seed = 0; seed < 20; seed++)
+        {
+            var state = Yard(seed);
+            Soldier(state, 14, 4, hp: 100);
+            var pod = PodSpawner
+                .Spawn(
+                    state,
+                    Data,
+                    [EncounterBuilder.ToSpec(Data, template)],
+                    new Pcg32Random(seed)
+                )
+                .Single();
+            pod.Active = true;
+            foreach (var id in pod.Members)
+                state.Unit(id).IsActive = true;
+            var warden = state.Unit(pod.Members[2]);
+            var engine = new TacticalEngine(state, Data, new UtilityAi(Data));
+
+            var events = engine.EndPlayerPhase();
+
+            if (events.OfType<AbilityUsed>().All(a => a.AbilityId != "proxy_overclock"))
+                continue;
+            boosted++;
+            Assert.True(events.OfType<ShotResolved>().Count(s => s.Attacker == warden.Id) >= 2);
+        }
+        Assert.True(boosted >= 1, "Overclock was never used.");
+    }
+
+    [Fact]
+    public void ADormantRobotCannotBeOverclocked()
+    {
+        var state = Yard();
+        Soldier(state, 0, 0);
+        var proxy = Enemy(state, "proxy", 5, 4);
+        var warden = Enemy(state, "warden", 6, 4, ap: 0);
+        warden.IsActive = false;
+        var engine = EnemyPhase(state);
+
+        Assert.False(Use(engine, proxy, "proxy_overclock", warden).IsValid);
     }
 
     [Fact]

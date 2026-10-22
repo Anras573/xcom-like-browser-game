@@ -87,7 +87,8 @@ public sealed class UtilityAi(
                 Target.Unit(ally.Id)
             );
             if (
-                ally.ActionPoints != 0
+                !ally.IsActive
+                || ally.ActionPoints != 0
                 || !soldiers.Any(s =>
                     HitCalculator.Preview(ctx.State, ally, s, ShotContext.For(data, ally)).CanFire
                 )

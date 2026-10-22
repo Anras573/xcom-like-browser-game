@@ -417,7 +417,11 @@ public sealed partial class TacticalEngine
         events.Add(new PhaseStarted(TacticalPhase.Enemy, State.TurnNumber));
         // Everyone's AP is refilled first, so a bonus granted mid-phase (Overclock) is not wiped
         // when the robot's own turn begins, and "has acted" means what it says.
-        var actors = State.Units.Where(IsEnemyActor).ToList();
+        // Overclockers go last: they can only boost a robot that has already acted.
+        var actors = State
+            .Units.Where(IsEnemyActor)
+            .OrderBy(u => u.Abilities.Contains(AbilityRegistry.ProxyOverclock) ? 1 : 0)
+            .ToList();
         foreach (var unit in actors)
             BeginUnitTurn(unit, events);
         var first = events.Count;

@@ -16,7 +16,7 @@ public sealed class OverclockAbility : IAbilityHandler
             return ValidationResult.Fail("Overclock needs another unit.");
         if (!ctx.Data.Enemies.TryGet(target.DefId, out var def) || !def.Robot)
             return ValidationResult.Fail($"{target.DisplayName} is not a robot.");
-        if (!target.IsStanding || target.Statuses.Stunned)
+        if (!target.IsStanding || !target.IsActive || target.Statuses.Stunned)
             return ValidationResult.Fail($"{target.DisplayName} cannot act.");
         if (!IsWithin(ctx.User.Position, target.Position, (int)ctx.Def.Parameters["range"]))
             return ValidationResult.Fail($"{target.DisplayName} is not adjacent.");
