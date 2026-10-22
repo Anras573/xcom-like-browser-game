@@ -175,6 +175,68 @@ public class EnemyRosterTests
         Assert.False(Use(engine, proxy, "proxy_overclock", proxy).IsValid);
     }
 
+    // Warden shoots, then the Proxy overclocks it; the second Warden turn is the engine's doing.
+    private sealed class ScriptedAi : IAiController
+    {
+        public void TakeTurn(TacticalUnit unit, AiContext ctx)
+        {
+            var soldier = ctx.State.Units.First(u => u.Faction == Faction.Firewall);
+            if (unit.DefId == "proxy")
+            {
+                var warden = ctx.State.Units.First(u => u.DefId == "warden");
+                var overclock = new UseAbilityCommand(
+                    unit.Id,
+                    "proxy_overclock",
+                    Target.Unit(warden.Id)
+                );
+                if (ctx.Validate(overclock).IsValid)
+                    ctx.Execute(overclock);
+                return;
+            }
+            var shoot = new UseAbilityCommand(unit.Id, "shoot", Target.Unit(soldier.Id));
+            while (unit.ActionPoints > 0 && ctx.Validate(shoot).IsValid)
+                ctx.Execute(shoot);
+        }
+    }
+
+    [Fact]
+    public void AnOverclockedRobotSpendsTheExtraApInARealEnemyPhase()
+    {
+        var state = Yard();
+        var soldier = Soldier(state, 3, 4, hp: 100);
+        var warden = Enemy(state, "warden", 10, 4, ap: 0);
+        Enemy(state, "proxy", 10, 5, ap: 0);
+        var engine = new TacticalEngine(state, Data, new ScriptedAi());
+
+        var events = engine.EndPlayerPhase();
+
+        Assert.Single(events.OfType<AbilityUsed>(), a => a.AbilityId == "proxy_overclock");
+        Assert.Equal(2, events.OfType<ShotResolved>().Count(s => s.Attacker == warden.Id));
+        Assert.Equal(0, warden.ActionPoints);
+        Assert.NotNull(soldier);
+    }
+
+    [Fact]
+    public void TheAiOverclocksAnAdjacentRobotThatHasUsedItsAp()
+    {
+        for (ulong seed = 0; seed < 20; seed++)
+        {
+            var state = Yard(seed);
+            Soldier(state, 3, 4, hp: 100);
+            var warden = Enemy(state, "warden", 10, 4, ap: 0);
+            var proxy = Enemy(state, "proxy", 10, 5);
+            var engine = EnemyPhase(state);
+            var events = new List<GameEvent>();
+
+            new UtilityAi(Data).TakeTurn(proxy, new AiContext(engine, events));
+
+            Assert.Contains(
+                events.OfType<AbilityUsed>(),
+                a => a.AbilityId == "proxy_overclock" && a.Target == Target.Unit(warden.Id)
+            );
+        }
+    }
+
     // ------------------------------------------------------------------ Suppression
 
     [Fact]

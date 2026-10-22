@@ -415,12 +415,34 @@ public sealed partial class TacticalEngine
         // Enemy phase
         State.Phase = TacticalPhase.Enemy;
         events.Add(new PhaseStarted(TacticalPhase.Enemy, State.TurnNumber));
-        foreach (var unit in State.Units.Where(IsEnemyActor).ToList())
+        // Everyone's AP is refilled first, so a bonus granted mid-phase (Overclock) is not wiped
+        // when the robot's own turn begins, and "has acted" means what it says.
+        var actors = State.Units.Where(IsEnemyActor).ToList();
+        foreach (var unit in actors)
+            BeginUnitTurn(unit, events);
+        var first = events.Count;
+        foreach (var unit in actors)
         {
             if (State.Result is not null)
                 break;
-            BeginUnitTurn(unit, events);
             if (unit.IsAlive && !unit.Statuses.Stunned)
+                _ai.TakeTurn(unit, new AiContext(this, events));
+            CheckMissionEnd(events);
+        }
+
+        // A robot overclocked after its turn was over gets to spend the extra AP.
+        var boosted = events
+            .Skip(first)
+            .OfType<AbilityUsed>()
+            .Where(a => a.AbilityId == AbilityRegistry.ProxyOverclock && a.Target is UnitTarget)
+            .Select(a => State.Unit(((UnitTarget)a.Target).Id))
+            .Distinct()
+            .ToList();
+        foreach (var unit in boosted)
+        {
+            if (State.Result is not null)
+                break;
+            if (unit is { IsAlive: true, ActionPoints: > 0 } && !unit.Statuses.Stunned)
                 _ai.TakeTurn(unit, new AiContext(this, events));
             CheckMissionEnd(events);
         }
