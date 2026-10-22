@@ -24,22 +24,29 @@ public sealed class PauseOverlayScene : SceneBase
         var body = ui.Panel(
             new UiRect(
                 (UiSpace.LogicalWidth - 360) / 2f,
-                (UiSpace.LogicalHeight - 200) / 2f,
+                (UiSpace.LogicalHeight - 252) / 2f,
                 360,
-                200
+                252
             ),
             "Paused"
         );
         if (ui.Button(new UiRect(body.X, body.Y, body.W, 40), "Resume", ButtonStyle.Primary))
             Ctx.Scenes.Pop();
-        if (ui.Button(new UiRect(body.X, body.Y + 52, body.W, 40), "Leave scene"))
+        if (
+            ui.Button(
+                new UiRect(body.X, body.Y + 52, body.W, 40),
+                $"Playback speed: {Ctx.Playback.Label}"
+            )
+        )
+            Ctx.Playback.Cycle();
+        if (ui.Button(new UiRect(body.X, body.Y + 104, body.W, 40), "Leave scene"))
         {
             Ctx.Scenes.Pop();
             Ctx.Scenes.Pop();
         }
         ui.Label(
             new UiRect(body.X, body.Bottom - 20, body.W, 20),
-            "Esc: resume",
+            "Esc: resume. Hold Space in combat for 4x.",
             ui.Theme.Small,
             TextAlignment.Center
         );
