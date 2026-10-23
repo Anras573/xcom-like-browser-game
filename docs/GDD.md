@@ -126,6 +126,9 @@ Late-campaign **elite variants** reuse the same sprites with a tint (for example
 | `E` | evac zone (floor) | ✔ | – | – | – |
 | `O` | objective (relay node, terminal, ...) | ✘ | full | ✘ | depends on mission |
 
+#### Procedural maps
+Mission maps are assembled from hand-authored 10×10 **blocks** per biome (`data/blocks/<biome>/*.json`, same glyphs as map files): a player block on an edge of the grid, objective blocks (Sabotage, Rescue) at least two blocks away, and weighted random generic blocks elsewhere (never the same block in adjacent cells). Blocks are rotated and mirrored at random. Urban maps always get a 2-tile road strip between block rows and/or columns, suburban maps half the time, industrial maps rarely. A 1-tile wall border surrounds the map, so a 3×3 grid is 32×32. Enemy spawns keep a path distance of at least 14 from every player spawn and are spread apart. A layout that fails validation (everything mutually reachable) is retried up to 20 times, then replaced by a handcrafted fallback map.
+
 ### 4.2 Turn structure
 - The **player phase** comes first: every soldier has **2 action points (AP)**. Then comes the **enemy phase**: every activated enemy acts, and inactive pods patrol.
 - Moving within the **blue range** (path cost ≤ Mobility) costs 1 AP.

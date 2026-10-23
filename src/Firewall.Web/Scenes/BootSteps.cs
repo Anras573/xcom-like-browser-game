@@ -1,4 +1,5 @@
 using Firewall.Rules.Data;
+using Firewall.Rules.Tactical;
 using Firewall.Web.Assets;
 using Firewall.Web.Rendering;
 using Yaeger.Browser;
@@ -55,6 +56,17 @@ public static class BootSteps
                         maps.Add(new MapSource(data.LoadMap(json).Id, json));
                     }
                     ctx.MapSources = maps;
+
+                    var blockJson = new Dictionary<string, string>();
+                    foreach (var file in GameDataFiles.Blocks)
+                        blockJson[file] = await http.GetStringAsync($"data/{file}");
+                    var blocks = BlockLibrary.Load(f => blockJson[f], GameDataFiles.Blocks);
+                    var blockErrors = blocks.Validate(data.Tiles);
+                    if (blockErrors.Count > 0)
+                        throw new InvalidDataException(
+                            "Map blocks are invalid:\n" + string.Join('\n', blockErrors)
+                        );
+                    ctx.Blocks = blocks;
                     ctx.Install(registry!, data);
                 }
             ),

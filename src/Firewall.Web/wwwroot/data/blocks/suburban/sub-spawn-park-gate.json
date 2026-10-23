@@ -1,0 +1,19 @@
+{
+  "id": "sub-spawn-park-gate",
+  "biome": "suburban",
+  "size": [10, 10],
+  "tags": ["spawn-player"],
+  "weight": 1.0,
+  "rows": [
+    "T........T",
+    ".bb....bb.",
+    "..........",
+    ".PP.......",
+    ".PP..c.c..",
+    "........EE",
+    ".T......EE",
+    "..bb..bb..",
+    "..........",
+    "T.b....b.T"
+  ]
+}
