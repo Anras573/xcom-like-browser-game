@@ -11,6 +11,8 @@ public sealed class OverwatchAbility : IAbilityHandler
 {
     public ValidationResult Validate(AbilityContext ctx)
     {
+        if (ctx.User.Carrying is not null)
+            return ValidationResult.Fail($"{ctx.User.DisplayName} can't shoot while carrying.");
         if (ctx.User.Weapon is not { } weapon)
             return ValidationResult.Ok;
         if (weapon.Ammo < 1)

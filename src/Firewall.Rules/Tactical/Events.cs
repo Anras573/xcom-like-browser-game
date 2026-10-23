@@ -116,7 +116,9 @@ public sealed record UnitScampered(UnitId Unit, IReadOnlyList<GridPos> Path) : G
 
 public sealed record TileChanged(GridPos Pos, TileType From, TileType To) : GameEvent;
 
-public sealed record ExplosionAt(GridPos Pos, int Radius) : GameEvent;
+/// <param name="Tiles">The tiles of the blast when it has an exact shape (pods in it wake); null for a plain circle of <paramref name="Radius"/>.</param>
+public sealed record ExplosionAt(GridPos Pos, int Radius, IReadOnlyList<GridPos>? Tiles = null)
+    : GameEvent;
 
 public sealed record VisibilityChanged(
     IReadOnlyList<UnitId> NewlyVisibleEnemies,

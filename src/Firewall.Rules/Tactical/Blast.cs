@@ -27,12 +27,16 @@ public static class Blast
         return tiles;
     }
 
-    /// <summary>The units standing in the blast (carried ones are with their carrier), by id.</summary>
+    /// <summary>The units standing in the blast, and whoever they carry, by id.</summary>
     public static IEnumerable<TacticalUnit> Units(TacticalState state, IReadOnlyList<GridPos> tiles)
     {
         var set = tiles.ToHashSet();
         return state
-            .Units.Where(u => u.IsOnMap && set.Contains(u.Position))
+            .Units.Where(u =>
+                u.IsOnMap && set.Contains(u.Position)
+                || u is { IsAlive: true, Evacuated: false, CarriedBy: { IsOnMap: true } carrier }
+                    && set.Contains(carrier.Position)
+            )
             .OrderBy(u => u.Id.Value);
     }
 

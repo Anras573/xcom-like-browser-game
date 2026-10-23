@@ -74,9 +74,15 @@ public sealed partial class TacticalEngine
                 ExplosionAt blast => State.Pods.Where(p =>
                     p.Members.Any(m =>
                         State.Unit(m) is { IsOnMap: true } unit
-                        && LosTracer.InRange(blast.Pos, unit.Position, blast.Radius)
+                        && (
+                            blast.Tiles?.Contains(unit.Position)
+                            ?? LosTracer.InRange(blast.Pos, unit.Position, blast.Radius)
+                        )
                     )
                 ),
+                // A grenade that stuns a sleeping member is noticed all the same (Lace Jammer).
+                StatusAdded { Status: StatusFlags.Stunned } stun
+                    when State.Unit(stun.Unit).Pod is { } stunned => [PodById(stunned)],
                 _ => [],
             };
             foreach (var pod in hit.ToList())
@@ -129,7 +135,7 @@ public sealed partial class TacticalEngine
         State.EnemyVision.Recompute();
         foreach (var member in members)
         {
-            if (!member.IsStanding || State.Result is not null)
+            if (!member.IsStanding || member.Statuses.Stunned || State.Result is not null)
                 continue;
             if (PlanScamper(member) is { } path)
                 Walk(member, path, segment => new UnitScampered(member.Id, segment), events);
@@ -222,7 +228,8 @@ public sealed partial class TacticalEngine
     // regroup around it. Real moves: they run the step hooks, so overwatch and sight apply.
     private void PatrolPod(Pod pod, List<GameEvent> events)
     {
-        var members = LivingMembers(pod);
+        // A stunned member stays where it is; the rest go on without it.
+        var members = LivingMembers(pod).Where(m => !m.Statuses.Stunned).ToList();
         if (members.Count == 0)
             return;
         var leader = members[0];

@@ -263,12 +263,24 @@ public class ItemTests
             picks: ["shredder", "grenadier", "mayhem"],
             items: "frag_grenade"
         );
+        var zoner = Soldier(
+            state,
+            1,
+            3,
+            classId: "gunner",
+            picks: ["shredder", "danger_zone", "mayhem"],
+            items: "frag_grenade"
+        );
         var e = Engine(state);
 
         var preview = e.PreviewBlast(gunner, "frag_grenade", new GridPos(8, 2))!;
+        var wide = e.PreviewBlast(zoner, "frag_grenade", new GridPos(8, 2))!;
 
         Assert.Equal(3 + 1 + 2, preview.Damage);
         Assert.Equal(2, gunner.Items[0].Charges);
+        Assert.Equal(1.5, preview.Radius);
+        Assert.Equal(2.5, wide.Radius);
+        Assert.Equal(3 + 2, wide.Damage);
     }
 
     [Fact]
@@ -429,8 +441,11 @@ public class ItemTests
         Assert.False(warden.Statuses.Stunned);
         Assert.Equal(2, events.OfType<StatusAdded>().Count(s => s.Status == StatusFlags.Stunned));
         // Stunned for one turn: the stun wears off when its owner's turn comes round.
+        near.ActionPoints = 2;
         e.EndPlayerPhase();
         Assert.False(near.Statuses.Stunned);
+        Assert.True(near.Perks.LostTurnToStun);
+        Assert.False(far.Perks.LostTurnToStun);
     }
 
     // ------------------------------------------------------------------ medkit
@@ -612,18 +627,23 @@ public class ItemTests
     [Fact]
     public void ArcStunnerUsesTheHitCalculatorWithSeventyBaseAimAndIgnoresCover()
     {
-        var state = Board(["..........", "....c.....", ".........."]);
-        var soldier = Soldier(state, 3, 1, items: "arc_stunner");
+        var state = Board(["..........", "..........", ".........."]);
+        state.Map.SetTile(new GridPos(4, 0), TileType.SmallCrate);
+        var soldier = Soldier(state, 3, 0, items: "arc_stunner");
         soldier.Aim = 10; // not the soldier's aim: the item's 70
         var proxy = Enemy(state, "proxy", 4, 1, hp: 5);
         proxy.Hp = 3;
-        // Move the crate away from the picture: the preview is melee anyway.
         var e = Engine(state);
-        state.Map.SetTile(new GridPos(4, 1), TileType.Floor);
 
         var preview = e.PreviewShot(soldier, proxy, "arc_stunner")!;
 
+        // A shot would be covered by the crate south of the Proxy; the stunner is melee.
+        Assert.Contains(
+            HitCalculator.Preview(state, soldier, proxy, ShotContext.Default).Breakdown,
+            b => b.Label == "Half Cover"
+        );
         Assert.Equal(70 - proxy.Defense, preview.HitChance);
+        Assert.DoesNotContain(preview.Breakdown, b => b.Label.Contains("Cover"));
         Assert.True(preview.CanFire);
     }
 
@@ -888,5 +908,155 @@ public class ItemTests
         }
 
         Assert.Equal(Run(), Run());
+    }
+
+    [Fact]
+    public void SmokeIsPartOfTheStateHash()
+    {
+        var state = Board(Open());
+        Soldier(state, 1);
+        Enemy(state, "husk", 9);
+        var before = state.StateHash();
+
+        state.AddSmoke([new GridPos(4, 2)], 2, 20);
+
+        Assert.NotEqual(before, state.StateHash());
+    }
+
+    // ------------------------------------------------------------------ review fixes
+
+    private static TacticalUnit Sleeping(TacticalState state, string defId, int x, int y = 2)
+    {
+        var husk = Enemy(state, defId, x, y);
+        var podId = state.AddPod("Test pod", husk.Position);
+        state.Pods.Single(p => p.Id == podId).Members.Add(husk.Id);
+        husk.Pod = podId;
+        husk.IsActive = false;
+        return husk;
+    }
+
+    [Fact]
+    public void ARupturedTargetTakesTheExtraDamageFromExplosivesAndThePreviewSaysSo()
+    {
+        var state = Board(Open());
+        var thrower = Soldier(state, 1, items: "frag_grenade");
+        var husk = Enemy(state, "husk", 6, hp: 5);
+        husk.Statuses.Set(StatusFlags.Ruptured);
+        var e = Engine(state);
+
+        var preview = e.PreviewBlast(thrower, "frag_grenade", new GridPos(6, 2))!;
+        var victim = Assert.Single(preview.Victims);
+        Assert.Equal(6, victim.Damage);
+        Assert.True(victim.Kills);
+
+        e.Execute(Throw(thrower, "frag_grenade", 6));
+        Assert.False(husk.IsAlive);
+    }
+
+    [Fact]
+    public void ARupturedRobotTakesTheExtraDamageFromTheArcStunner()
+    {
+        var state = Board(Open());
+        var soldier = Soldier(state, 3, items: "arc_stunner");
+        var warden = Enemy(state, "warden", 4, hp: 10);
+        warden.Armor = 0;
+        warden.Statuses.Set(StatusFlags.Ruptured);
+        var e = Engine(state);
+        Assert.Equal(5, e.PreviewShot(soldier, warden, "arc_stunner")!.DamageMax);
+
+        e.Execute(On(soldier, "arc_stunner", warden));
+
+        Assert.Equal(5, warden.Hp);
+    }
+
+    [Fact]
+    public void AFragOnlyWakesPodsWithAMemberInsideTheBlast()
+    {
+        var state = Board(Open());
+        var thrower = Soldier(state, 1, items: "frag_grenade");
+        var outside = Sleeping(state, "husk", 12);
+        outside.Sight = 3; // too short-sighted to notice the squad on its own // two tiles straight out from the impact at x = 10
+        var e = Engine(state);
+
+        e.Execute(Throw(thrower, "frag_grenade", 10));
+
+        Assert.False(state.Pods.Single().Active);
+        Assert.False(outside.IsActive);
+        Assert.Equal(outside.Hp, outside.MaxHp);
+    }
+
+    [Fact]
+    public void AJammedSleepingHuskWakesItsPodButNeverMovesWhileStunned()
+    {
+        var state = Board(Open());
+        var thrower = Soldier(state, 1, items: "lace_jammer");
+        var jammed = Sleeping(state, "husk", 9);
+        var other = Enemy(state, "husk", 10);
+        state.Pods.Single().Members.Add(other.Id);
+        other.Pod = jammed.Pod;
+        other.IsActive = false;
+        var e = Engine(state);
+
+        var events = e.Execute(Throw(thrower, "lace_jammer", 9));
+
+        Assert.True(state.Pods.Single().Active);
+        Assert.True(jammed.Statuses.Stunned);
+        Assert.Equal(new GridPos(9, 2), jammed.Position);
+        Assert.DoesNotContain(
+            events,
+            ev => ev is UnitScampered { Unit: var id } && id == jammed.Id
+        );
+        e.EndPlayerPhase();
+        Assert.False(jammed.Statuses.Stunned);
+    }
+
+    [Fact]
+    public void ADormantStunnedMemberDoesNotPatrol()
+    {
+        var state = Board(Open());
+        Soldier(state, 20, 4);
+        var sleeper = Sleeping(state, "husk", 10);
+        sleeper.Statuses.Set(StatusFlags.Stunned);
+        var e = Engine(state);
+
+        e.EndPlayerPhase();
+
+        Assert.Equal(new GridPos(10, 2), sleeper.Position);
+    }
+
+    [Fact]
+    public void OverwatchIsRefusedWhileCarrying()
+    {
+        var state = Board(Open());
+        var carrier = Soldier(state, 3);
+        var downed = Soldier(state, 4);
+        Down(downed);
+        Enemy(state, "husk", 20);
+        var e = Engine(state);
+        e.Execute(On(carrier, "carry", downed));
+
+        Assert.Contains("carrying", e.Validate(Self(carrier, "overwatch")).Reason);
+    }
+
+    [Fact]
+    public void AGrenadeAlsoHitsWhoeverIsCarriedByAUnitInTheBlast()
+    {
+        var state = Board(Open());
+        var thrower = Soldier(state, 1, items: "frag_grenade");
+        var carrier = Soldier(state, 6);
+        var downed = Soldier(state, 7);
+        Down(downed);
+        Enemy(state, "husk", 20);
+        var e = Engine(state);
+        e.Execute(On(carrier, "carry", downed));
+        Assert.False(downed.IsOnMap);
+
+        var preview = e.PreviewBlast(thrower, "frag_grenade", new GridPos(6, 2))!;
+        Assert.Equal(2, preview.Victims.Count);
+        e.Execute(Throw(thrower, "frag_grenade", 6));
+
+        Assert.False(downed.IsAlive);
+        Assert.Null(carrier.Carrying);
+        Assert.Equal(27, carrier.Hp);
     }
 }

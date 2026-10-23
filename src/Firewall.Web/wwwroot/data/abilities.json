@@ -453,7 +453,7 @@
     "apCost": 1,
     "endsTurn": false,
     "targeting": "Tile",
-    "icon": "icon.exclamation"
+    "icon": "icon.star"
   },
   {
     "id": "smoke_grenade",
@@ -480,7 +480,7 @@
     "apCost": 1,
     "endsTurn": false,
     "targeting": "Tile",
-    "icon": "icon.gear"
+    "icon": "icon.wrench"
   },
   {
     "id": "medkit",

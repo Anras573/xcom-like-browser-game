@@ -93,7 +93,8 @@ public static class ShotPanel
         var y = left.Y + 84f;
         if (attack)
         {
-            canvas.Text($"Crit {p.CritChance}%", new Vector2(left.X, y), TextStyles.Body);
+            if (!stunner)
+                canvas.Text($"Crit {p.CritChance}%", new Vector2(left.X, y), TextStyles.Body);
             canvas.Text(
                 stunner && p.DamageMax == 0 ? "Capture: stunned for good"
                     : p.DamageMin == p.DamageMax ? $"Damage {p.DamageMax}"

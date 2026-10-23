@@ -91,12 +91,16 @@ public abstract class ThrownItemAbility : IAbilityHandler, ITilePreview
         var check = Validate(ctx);
         var damage = Damage(ctx);
         var victims = Victims(ctx, tiles)
-            .Select(u => new BlastVictim(
-                u,
-                u.Faction == ctx.User.Faction,
-                damage,
-                damage > 0 && (u.Statuses.IsDown || u.Hp <= damage)
-            ))
+            .Select(u =>
+            {
+                var hurt = DamageTo(ctx, u);
+                return new BlastVictim(
+                    u,
+                    u.Faction == ctx.User.Faction,
+                    hurt,
+                    hurt > 0 && (u.Statuses.IsDown || u.Hp <= hurt)
+                );
+            })
             .ToList();
         return new BlastPreview(
             Center(ctx),
@@ -113,6 +117,9 @@ public abstract class ThrownItemAbility : IAbilityHandler, ITilePreview
     public abstract void Execute(AbilityContext ctx);
 
     protected virtual int Damage(AbilityContext ctx) => 0;
+
+    /// <summary>What the blast does to <paramref name="unit"/> (the base damage plus what makes it vulnerable).</summary>
+    protected virtual int DamageTo(AbilityContext ctx, TacticalUnit unit) => Damage(ctx);
 
     protected virtual IEnumerable<TacticalUnit> Victims(
         AbilityContext ctx,
@@ -143,6 +150,15 @@ public sealed class ExplosiveAbility : ThrownItemAbility
         (int)ItemUse.Item(ctx).Parameters.GetValueOrDefault("damage")
         + SoldierPerks.ExplosiveDamageBonus(ctx.Data, ctx.User.Abilities);
 
+    protected override int DamageTo(AbilityContext ctx, TacticalUnit unit) =>
+        Damage(ctx) + RuptureBonus(ctx, unit);
+
+    /// <summary>A Ruptured target takes extra damage from every source.</summary>
+    internal static int RuptureBonus(AbilityContext ctx, TacticalUnit unit) =>
+        unit.Statuses.Ruptured
+            ? SoldierPerks.IntParam(ctx.Data, SoldierPerks.Rupture, "damage", 3)
+            : 0;
+
     protected override IEnumerable<TacticalUnit> Victims(
         AbilityContext ctx,
         IReadOnlyList<GridPos> tiles
@@ -168,9 +184,9 @@ public sealed class ExplosiveAbility : ThrownItemAbility
         var plan = Preview(ctx);
         var item = ItemUse.Item(ctx);
         var shred = (int)item.Parameters.GetValueOrDefault("armorShred");
-        ctx.Events.Add(new ExplosionAt(plan.Center, (int)Math.Ceiling(plan.Radius)));
+        ctx.Events.Add(new ExplosionAt(plan.Center, (int)Math.Ceiling(plan.Radius), plan.Tiles));
         foreach (var victim in plan.Victims)
-            Hurt(ctx, victim.Unit, plan.Damage, shred);
+            Hurt(ctx, victim.Unit, victim.Damage, shred);
         foreach (var change in plan.Breakage)
         {
             ctx.State.Map.SetTile(change.Pos, change.New);
@@ -181,8 +197,6 @@ public sealed class ExplosiveAbility : ThrownItemAbility
     private static void Hurt(AbilityContext ctx, TacticalUnit unit, int damage, int shred)
     {
         var user = ctx.User;
-        if (unit.Statuses.Ruptured)
-            damage += SoldierPerks.IntParam(ctx.Data, SoldierPerks.Rupture, "damage", 3);
         var hostile = unit.Faction != user.Faction && unit.Faction != Faction.Neutral;
         var wasDown = unit.Statuses.IsDown;
         var hpBefore = unit.Hp;
@@ -327,9 +341,10 @@ public sealed class ArcStunnerAbility : IAbilityHandler, IAbilityPreview
     {
         var preview = HitCalculator.Preview(ctx.State, ctx.User, target, Shot(ctx));
         var check = Validate(ctx with { Target = Target.Unit(target.Id) });
-        var damage = Captures(ctx, target) ? 0 : RobotDamage(ctx);
+        var damage = Captures(ctx, target) ? 0 : RobotDamage(ctx, target);
         return preview with
         {
+            CritBreakdown = [],
             DamageMin = damage,
             DamageMax = damage,
             CritChance = 0,
@@ -361,8 +376,9 @@ public sealed class ArcStunnerAbility : IAbilityHandler, IAbilityPreview
             : ValidationResult.Ok;
     }
 
-    private static int RobotDamage(AbilityContext ctx) =>
-        (int)ItemUse.Item(ctx).Parameters.GetValueOrDefault("robotDamage", 2);
+    private static int RobotDamage(AbilityContext ctx, TacticalUnit target) =>
+        (int)ItemUse.Item(ctx).Parameters.GetValueOrDefault("robotDamage", 2)
+        + ExplosiveAbility.RuptureBonus(ctx, target);
 
     /// <summary>The Proxy is hurt enough to be taken alive.</summary>
     private static bool Captures(AbilityContext ctx, TacticalUnit target) =>
@@ -389,7 +405,7 @@ public sealed class ArcStunnerAbility : IAbilityHandler, IAbilityPreview
         }
         user.Stats.Hits++;
         var capture = Captures(ctx, target);
-        var damage = capture ? 0 : RobotDamage(ctx);
+        var damage = capture ? 0 : RobotDamage(ctx, target);
         ctx.Events.Add(
             new ShotResolved(user.Id, target.Id, preview.HitChance, true, false, damage)
         );
