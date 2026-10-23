@@ -52,16 +52,19 @@ public static class ShotPanel
         TargetCandidate target,
         WeaponState? weapon,
         int candidateCount,
-        float bottomMargin = Margin
+        float bottomMargin = Margin,
+        string? abilityId = null,
+        string? detail = null
     )
     {
         if (target.Preview is not { } p)
         {
-            DrawPlain(ui, target, candidateCount, bottomMargin);
+            DrawPlain(ui, target, candidateCount, bottomMargin, detail);
             return;
         }
-        // A hack has a chance but no damage.
-        var attack = p.DamageMax > 0;
+        // A hack has a chance but no damage; the Arc Stunner has damage, or a capture instead.
+        var stunner = abilityId == AbilityRegistry.ArcStunner;
+        var attack = p.DamageMax > 0 || stunner;
         var rows = p.Breakdown.Count + (p.CritBreakdown.Count > 0 ? 1 + p.CritBreakdown.Count : 0);
         var rect = Rect(rows, bottomMargin);
         var title =
@@ -90,14 +93,17 @@ public static class ShotPanel
         var y = left.Y + 84f;
         if (attack)
         {
-            canvas.Text($"Crit {p.CritChance}%", new Vector2(left.X, y), TextStyles.Body);
+            if (!stunner)
+                canvas.Text($"Crit {p.CritChance}%", new Vector2(left.X, y), TextStyles.Body);
             canvas.Text(
-                $"Damage {p.DamageMin}-{p.DamageMax}",
+                stunner && p.DamageMax == 0 ? "Capture: stunned for good"
+                    : p.DamageMin == p.DamageMax ? $"Damage {p.DamageMax}"
+                    : $"Damage {p.DamageMin}-{p.DamageMax}",
                 new Vector2(left.X, y + 22f),
                 TextStyles.Body
             );
         }
-        if (attack && weapon is not null)
+        if (attack && !stunner && weapon is not null)
             canvas.Text(
                 $"Ammo {weapon.Ammo}/{weapon.Def.Clip}",
                 new Vector2(left.X, y + 44f),
@@ -119,8 +125,9 @@ public static class ShotPanel
         }
 
         canvas.Text(
-            attack
-                ? "Enter / Space / click target: fire    Tab: next target    Esc / RMB: cancel"
+            stunner ? "Enter / Space / click target: stun    Tab: next target    Esc / RMB: cancel"
+                : attack
+                    ? "Enter / Space / click target: fire    Tab: next target    Esc / RMB: cancel"
                 : "Enter / Space / click target: hack    Tab: next target    Esc / RMB: cancel",
             new Vector2(content.X, rect.Bottom - 26f),
             TextStyles.Small
@@ -132,22 +139,30 @@ public static class ShotPanel
         UiContext ui,
         TargetCandidate target,
         int candidateCount,
-        float bottomMargin
+        float bottomMargin,
+        string? detail
     )
     {
+        var height = detail is null ? 100f : 124f;
         var rect = new UiRect(
             (UiSpace.LogicalWidth - Width) / 2f,
-            UiSpace.LogicalHeight - 100f - bottomMargin,
+            UiSpace.LogicalHeight - height - bottomMargin,
             Width,
-            100f
+            height
         );
         var title =
             candidateCount > 1
                 ? $"{target.Unit.DisplayName}   ({candidateCount} targets, Tab to cycle)"
                 : target.Unit.DisplayName;
         var content = ui.Panel(rect, title);
+        var y = content.Y + 8f;
+        if (detail is not null)
+        {
+            ui.Label(new UiRect(content.X, y, content.W, 24f), detail, ui.Theme.Body);
+            y += 24f;
+        }
         ui.Label(
-            new UiRect(content.X, content.Y + 8f, content.W, 24f),
+            new UiRect(content.X, y, content.W, 24f),
             "Enter / Space / click target: use    Tab: next target    Esc / RMB: cancel",
             ui.Theme.Small
         );

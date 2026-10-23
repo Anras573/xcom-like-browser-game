@@ -110,8 +110,14 @@ public sealed record MissionResult(
             soldiers,
             enemiesKilled,
             loot,
-            // Capturing Proxies comes with the Arc Stunner (#31).
-            [],
+            // Capturable enemies (Proxies) carried out through evac, as enemy ids.
+            state
+                .Units.Where(u =>
+                    u is { Faction: Faction.Meridian, IsAlive: true, Evacuated: true }
+                    && u.Statuses.Capturable
+                )
+                .Select(u => u.DefId)
+                .ToList(),
             mvp
         );
     }

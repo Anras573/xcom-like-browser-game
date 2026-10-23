@@ -31,6 +31,9 @@ public enum TargetingType
     Enemy,
     Ally,
     Tile,
+
+    /// <summary>Any unit on the map, friend or foe (Carry).</summary>
+    Unit,
 }
 
 public enum ItemKind

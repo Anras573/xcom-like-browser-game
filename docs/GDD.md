@@ -275,8 +275,16 @@ Rookies carry a Rifle and have no abilities.
 | Smoke Grenade | +20 defense to units in radius 1.5 for 2 turns | 1 |
 | Arc Stunner | Melee, 70 % base hit. A Proxy at ≤ 60 % HP becomes **Stunned (capturable)**. A robot takes 2 damage and is stunned for 1 turn. | 1 |
 | Lace Jammer | Grenade: stuns Husks in radius 2 for 1 turn | 1 |
-| Breach Charge | 5 damage, radius 1. Can destroy walls (`#` → rubble). | 1 |
+| Breach Charge | 5 damage, radius 1, placed on an adjacent tile. Can destroy walls (`#` → rubble); walls on the map edge are exempt. | 1 |
 | Targeting Scope | Passive +10 aim | – |
+
+Item rules:
+- Every item use costs 1 AP and doesn't end the turn. Thrown items are aimed at a **tile** and need LOS to the tile, not to a unit.
+- Explosives never miss, ignore cover and hit friendlies too. Their damage is flat (armor doesn't soak it); each robot hit loses 1 armor. A downed soldier caught in a blast dies. Radius, charges and damage take the Gunner and Tech bonuses of §5.2.
+- Blasts break destructible tiles directly: half cover and windows become floor, a big crate becomes a small crate. Only a Breach Charge destroys walls.
+- Smoke lasts 2 environment phases, doesn't stack on one unit and doesn't block LOS.
+- The Arc Stunner's capture only happens on a hit at ≤ 60 % HP; the Proxy then stays stunned until the mission ends and can be **carried**. A hit on a healthier Proxy does 2 damage and a 1-turn stun.
+- **Carry** (1 AP) picks up an adjacent bleeding-out or stabilized squadmate, or a captured Proxy. The carrier has −2 mobility and can't shoot until **Drop** (1 AP, onto a free adjacent tile). A carried soldier keeps bleeding out. If the carrier goes down, the load is dropped next to them. Evac extracts the carrier and the load; a Proxy that is evacuated counts as captured.
 
 ### 5.6 Enemies
 | Enemy | HP | Aim | Dmg | Mob | Def | Armor | Sight | Behaviour |

@@ -96,7 +96,6 @@ public static class PodSpawner
             AppearanceId = def.Sprite.Set,
             ImmuneToStun = def.ImmuneToStun,
         };
-        unit.Statuses.Set(StatusFlags.Capturable, def.Capturable);
         foreach (var ability in def.Abilities)
             unit.Abilities.Add(ability);
         return unit;

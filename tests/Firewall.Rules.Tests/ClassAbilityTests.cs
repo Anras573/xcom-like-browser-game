@@ -1201,7 +1201,7 @@ public class ClassAbilityTests
         Assert.Equal(WeaponClass.Rifle, unit.Weapon!.Def.Class);
         Assert.Empty(
             unit.Abilities.Except(AbilityRegistry.StandardActions)
-                .Except([AbilityRegistry.DebugStabilize])
+                .Except([AbilityRegistry.Carry, AbilityRegistry.Drop])
         );
     }
 

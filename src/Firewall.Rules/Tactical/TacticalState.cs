@@ -24,8 +24,15 @@ public sealed class TacticalState(TacticalMap map, IRandom rng, string missionId
     private int _nextPodId = 1;
     private VisibilityMap? _playerVision;
     private VisibilityMap? _enemyVision;
+    private readonly List<SmokeZone> _smoke = [];
 
     public TacticalMap Map { get; } = map;
+
+    /// <summary>
+    /// Counts tile changes (<see cref="TacticalMap.TileChanged"/>). Anything derived from the tiles
+    /// (render caches, cover profiles, move ranges) compares against it to know it is stale.
+    /// </summary>
+    public int MapVersion => Map.Version;
     public IRandom Rng { get; } = rng;
     public ObjectiveState Objective { get; } = new(missionId);
     public int TurnNumber { get; set; } = 1;
@@ -41,6 +48,35 @@ public sealed class TacticalState(TacticalMap map, IRandom rng, string missionId
     public IReadOnlyList<TacticalUnit> Units => _units;
 
     public IReadOnlyList<Pod> Pods => _pods;
+
+    /// <summary>Smoke clouds still up (Smoke Grenade, #31).</summary>
+    public IReadOnlyList<SmokeZone> Smoke => _smoke;
+
+    /// <summary>Puts a cloud on <paramref name="tiles"/> that lasts <paramref name="turns"/> environment phases.</summary>
+    public SmokeZone AddSmoke(IReadOnlyList<GridPos> tiles, int turns, int defense)
+    {
+        var zone = new SmokeZone(tiles, turns, defense);
+        _smoke.Add(zone);
+        return zone;
+    }
+
+    /// <summary>The defense a unit gets on <paramref name="pos"/> from smoke (0 outside it); clouds do not stack.</summary>
+    public int SmokeDefenseAt(GridPos pos) =>
+        _smoke.Where(z => z.Tiles.Contains(pos)).Select(z => z.Defense).DefaultIfEmpty(0).Max();
+
+    /// <summary>Ends one environment phase of every cloud and returns the ones that dissipated.</summary>
+    public List<SmokeZone> TickSmoke()
+    {
+        var gone = new List<SmokeZone>();
+        foreach (var zone in _smoke.ToList())
+        {
+            if (--zone.TurnsLeft > 0)
+                continue;
+            _smoke.Remove(zone);
+            gone.Add(zone);
+        }
+        return gone;
+    }
 
     /// <summary>Veteran: patrolling pods drift toward the squad (GDD §4.8). Set by the mission setup.</summary>
     public bool PodsDriftToSquad { get; set; }

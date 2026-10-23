@@ -67,6 +67,9 @@ public sealed class TacticalMap
     /// <summary><c>O</c> glyphs; the tiles stay <see cref="TileType.Objective"/>.</summary>
     public IReadOnlyList<GridPos> Objectives { get; }
 
+    /// <summary>Counts <see cref="SetTile"/> changes; <see cref="TacticalState.MapVersion"/> is this.</summary>
+    public int Version { get; private set; }
+
     /// <summary>Raised by <see cref="SetTile"/>, e.g. when a tile is destroyed.</summary>
     public event Action<TileChange>? TileChanged;
 
@@ -102,6 +105,7 @@ public sealed class TacticalMap
             return;
         _tiles[pos.Y * Width + pos.X] = type;
         _blocksLos[pos.Y * Width + pos.X] = Def(type).BlocksLos;
+        Version++;
         TileChanged?.Invoke(new TileChange(pos, old, type));
     }
 }

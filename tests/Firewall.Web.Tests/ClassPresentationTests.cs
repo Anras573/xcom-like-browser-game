@@ -182,13 +182,17 @@ public class ClassPresentationTests
         foreach (var cls in Data.Classes)
         {
             var unit = Soldier(Yard(), cls.Id, 0);
-            var slots = HudModel.AbilitySlots(unit, Data, onEvacTile: true, canStabilize: true);
+            var slots = HudModel.AbilitySlots(unit, Data, onEvacTile: true);
             Assert.True(
                 slots.Count <= HudModel.MaxSlots,
                 $"{cls.Id} has {slots.Count} abilities for the bar"
             );
+            // Drop only shows while carrying.
             Assert.Equal(
-                unit.Abilities.Count(a => Data.Abilities[a].Targeting != TargetingType.Passive),
+                unit.Abilities.Count(a =>
+                    Data.Abilities[a].Targeting != TargetingType.Passive
+                    && a != AbilityRegistry.Drop
+                ),
                 slots.Count
             );
         }
@@ -198,7 +202,7 @@ public class ClassPresentationTests
     public void ActiveClassAbilitiesGetSlotsWithIconsAndFilledInText()
     {
         var unit = Soldier(Yard(), "breacher", 0);
-        var slots = HudModel.AbilitySlots(unit, Data, false, false);
+        var slots = HudModel.AbilitySlots(unit, Data, false);
 
         var runAndGun = Assert.Single(slots, s => s.AbilityId == "run_and_gun");
         Assert.Equal("icon.forward", runAndGun.Icon);

@@ -14,7 +14,7 @@ public readonly record struct LastKnown(GridPos Position, int Turn);
 /// What one faction sees (GDD §4.4): per tile unexplored / explored / visible, and which hostile
 /// units are in view. Shared by the whole faction. <see cref="Recompute"/> is cheap to call after
 /// every step: each viewer's visible tiles are cached by position and sight, and the cache is
-/// dropped when a tile changes.
+/// dropped when <see cref="TacticalState.MapVersion"/> moves.
 /// </summary>
 public sealed class VisibilityMap
 {
@@ -22,6 +22,7 @@ public sealed class VisibilityMap
     private readonly TileVisibility[] _tiles;
     private readonly Dictionary<(GridPos Pos, int Sight), GridPos[]> _cache = [];
     private readonly Dictionary<UnitId, LastKnown> _lastKnown = [];
+    private int _cacheVersion;
     private HashSet<UnitId> _visibleEnemies = [];
 
     public VisibilityMap(TacticalState state, Faction faction)
@@ -29,7 +30,6 @@ public sealed class VisibilityMap
         _state = state;
         Faction = faction;
         _tiles = new TileVisibility[state.Map.Width * state.Map.Height];
-        state.Map.TileChanged += _ => _cache.Clear();
     }
 
     public Faction Faction { get; }
@@ -103,6 +103,12 @@ public sealed class VisibilityMap
 
     private GridPos[] VisibleFrom(GridPos origin, int sight)
     {
+        // The sight lines depend on the tiles: a changed map (MapVersion) drops them all.
+        if (_cacheVersion != _state.MapVersion)
+        {
+            _cache.Clear();
+            _cacheVersion = _state.MapVersion;
+        }
         if (_cache.TryGetValue((origin, sight), out var cached))
             return cached;
         var map = _state.Map;

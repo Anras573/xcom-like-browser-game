@@ -585,6 +585,120 @@ public sealed class StabilizedAnimation(UnitStabilized stabilized) : TimedAnimat
 }
 
 /// <summary>
+/// <see cref="AbilityUsed"/> of a thrown item: a short streak from the thrower to the tile, and the
+/// camera frames the pair so the explosion that follows is in view.
+/// </summary>
+public sealed class ThrowAnimation(AbilityUsed used, TileTarget target) : TimedAnimation
+{
+    public const float Seconds = 0.25f;
+
+    private static readonly Color Streak = new(255, 220, 120);
+
+    protected override void Begin()
+    {
+        if (Unit(used.Unit) is not { } thrower)
+            return;
+        var to = UnitVm.TileCenter(target.Pos);
+        if (thrower.IsHostile && !Ctx.IsTileVisible(target.Pos) && !Watched(thrower))
+            return;
+        Vm.AddEffect(
+            new EffectVm(EffectKind.Tracer, thrower.Center, to, Seconds, Streak) { Size = 0.08f }
+        );
+        Ctx.Camera.Frame(thrower.Center, to);
+        Duration = Seconds;
+    }
+}
+
+/// <summary><see cref="UnitHealed"/>: the HP comes back with a green "+N".</summary>
+public sealed class HealedAnimation(UnitHealed healed) : TimedAnimation
+{
+    protected override void Begin()
+    {
+        if (Unit(healed.Unit) is not { } u)
+            return;
+        u.Hp = healed.HpAfter;
+        Vm.AddFloater(
+            $"+{healed.Amount}",
+            new Color(120, 230, 140),
+            22,
+            u.Center + new Vector2(0f, 0.9f)
+        );
+    }
+}
+
+/// <summary><see cref="UnitRevived"/>: a bleeding-out soldier gets back on their feet.</summary>
+public sealed class RevivedAnimation(UnitRevived revived) : TimedAnimation
+{
+    protected override void Begin()
+    {
+        if (Unit(revived.Unit) is not { } u)
+            return;
+        // The fall (BleedingOutAnimation) turned the body a quarter turn; undo it.
+        if (u.Statuses.IsDown)
+            u.Rotation -= MathF.PI / 2f;
+        u.Statuses.BleedingOutTurnsLeft = 0;
+        u.Statuses.Set(StatusFlags.Stabilized, false);
+        u.Hp = revived.Hp;
+        Vm.AddFloater("REVIVED", new Color(120, 230, 140), 20, u.Center + new Vector2(0f, 0.9f));
+    }
+}
+
+/// <summary><see cref="UnitCarried"/> and <see cref="UnitDropped"/>: who rides on whom.</summary>
+public sealed class CarryAnimation(UnitId carrier, UnitId carried, GridPos? at) : TimedAnimation
+{
+    protected override void Begin()
+    {
+        if (Unit(carried) is not { } load)
+            return;
+        if (at is { } tile)
+        {
+            load.CarriedBy = null;
+            load.SnapTo(tile);
+            return;
+        }
+        load.CarriedBy = carrier;
+        if (Unit(carrier) is { } by)
+            Vm.AddFloater(
+                "CARRYING",
+                new Color(120, 230, 140),
+                20,
+                by.Center + new Vector2(0f, 0.9f)
+            );
+    }
+}
+
+/// <summary><see cref="SmokeCreated"/> and <see cref="SmokeExpired"/>: the cloud appears or thins out.</summary>
+public sealed class SmokeAnimation(IReadOnlyList<GridPos> tiles, bool created) : TimedAnimation
+{
+    protected override void Begin()
+    {
+        if (created)
+            Vm.Smoke.Add(tiles);
+        else
+            Vm.Smoke.RemoveAll(s => s.SequenceEqual(tiles));
+    }
+}
+
+/// <summary><see cref="TileChanged"/>: a flash, and the tilemaps redraw the tile when playback gets here.</summary>
+public sealed class TileChangedAnimation(TileChanged change) : TimedAnimation
+{
+    protected override void Begin()
+    {
+        Ctx.SceneEvent(change);
+        if (!Ctx.IsTileVisible(change.Pos))
+            return;
+        var center = UnitVm.TileCenter(change.Pos);
+        Vm.AddEffect(
+            new EffectVm(EffectKind.FlashQuad, center, center, 0.15f, new Color(255, 255, 255, 160))
+            {
+                Size = 1f,
+            }
+        );
+        Duration = 0.15f;
+    }
+}
+
+/// <summary>
 /// <see cref="AbilityTriggered"/>: the ability's name as floating text over the unit ("RUN &amp; GUN",
 /// "IN THE ZONE", "HACKED"). Hostile units only show it while the squad watches them.
 /// </summary>
@@ -646,7 +760,14 @@ public static class AnimationFactory
                 new Color(255, 170, 60, 200),
                 0.3f
             ),
-            TileChanged t => new FlashAnimation(t.Pos, 1f, new Color(255, 255, 255, 160), 0.15f),
+            TileChanged t => new TileChangedAnimation(t),
+            AbilityUsed { Target: TileTarget tile } a => new ThrowAnimation(a, tile),
+            UnitHealed h => new HealedAnimation(h),
+            UnitRevived r => new RevivedAnimation(r),
+            UnitCarried c => new CarryAnimation(c.Carrier, c.Carried, null),
+            UnitDropped d => new CarryAnimation(d.Carrier, d.Carried, d.At),
+            SmokeCreated s => new SmokeAnimation(s.Tiles, true),
+            SmokeExpired s => new SmokeAnimation(s.Tiles, false),
             AbilityTriggered t => new CalloutAnimation(t),
             UnitSuppressed s => new UnitEditAnimation(s.Unit, (u, _) => u.SuppressedBy = s.By),
             StatusAdded a => new StatusAnimation(a.Unit, a.Status, true),

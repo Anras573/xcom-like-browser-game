@@ -140,6 +140,45 @@ public sealed partial class TacticalEngine
             )
             : null;
 
+    /// <summary>
+    /// What <paramref name="abilityId"/> (a thrown item) would do if <paramref name="user"/> aimed it
+    /// at <paramref name="tile"/>, or null when it is not a tile-targeted item.
+    /// </summary>
+    public BlastPreview? PreviewBlast(TacticalUnit user, string abilityId, GridPos tile) =>
+        _abilities.TryGet(abilityId, out var handler)
+        && handler is ITilePreview previewer
+        && _data.Abilities.TryGet(abilityId, out var def)
+            ? previewer.Preview(
+                MakeContext(user, Target.Tile(tile), def, State.Rng.Fork("validate"), [])
+            )
+            : null;
+
+    /// <summary>The tiles <paramref name="user"/> can throw <paramref name="abilityId"/> at right now (range and line of sight), Y then X.</summary>
+    public IReadOnlyList<GridPos> ThrowableTiles(TacticalUnit user, string abilityId)
+    {
+        var tiles = new List<GridPos>();
+        if (!_data.Items.TryGet(abilityId, out var item))
+            return tiles;
+        var reach = (int)Math.Ceiling(item.Parameters.GetValueOrDefault("range", 10));
+        var map = State.Map;
+        for (
+            var y = Math.Max(0, user.Position.Y - reach);
+            y <= Math.Min(map.Height - 1, user.Position.Y + reach);
+            y++
+        )
+        for (
+            var x = Math.Max(0, user.Position.X - reach);
+            x <= Math.Min(map.Width - 1, user.Position.X + reach);
+            x++
+        )
+        {
+            var pos = new GridPos(x, y);
+            if (Validate(new UseAbilityCommand(user.Id, abilityId, Target.Tile(pos))).IsValid)
+                tiles.Add(pos);
+        }
+        return tiles;
+    }
+
     internal IReadOnlyList<GameEvent> ExecuteInternal(
         ICommand cmd,
         List<GameEvent> sink,
@@ -308,6 +347,12 @@ public sealed partial class TacticalEngine
                 if (def.Targeting == TargetingType.Ally && !friendly)
                     return ValidationResult.Fail($"{def.Name} needs an allied target.");
                 return ValidationResult.Ok;
+            case TargetingType.Unit:
+                return
+                    target is UnitTarget(var anyId)
+                    && State.Units.Any(u => u.Id == anyId && u.IsOnMap)
+                    ? ValidationResult.Ok
+                    : ValidationResult.Fail("That target is not valid.");
             case TargetingType.Tile:
                 return target is TileTarget tile && State.Map.InBounds(tile.Pos)
                     ? ValidationResult.Ok
@@ -574,7 +619,12 @@ public sealed partial class TacticalEngine
         // Environment phase: bleed-outs tick down and relays spawn (timers join with #33).
         State.Phase = TacticalPhase.Environment;
         events.Add(new PhaseStarted(TacticalPhase.Environment, State.TurnNumber));
-        foreach (var unit in State.Units.Where(u => u.IsOnMap && u.Statuses.IsBleedingOut))
+        // A carried soldier keeps bleeding out: the race to the evac zone is the point.
+        foreach (
+            var unit in State.Units.Where(u =>
+                u is { IsAlive: true, Evacuated: false } && u.Statuses.IsBleedingOut
+            )
+        )
         {
             unit.Statuses.BleedingOutTurnsLeft--;
             if (unit.Statuses.BleedingOutTurnsLeft > 0)
@@ -585,6 +635,8 @@ public sealed partial class TacticalEngine
             unit.IsAlive = false;
             events.Add(new UnitKilled(unit.Id));
         }
+        foreach (var cloud in State.TickSmoke())
+            events.Add(new SmokeExpired(cloud.Tiles));
         RunRelays(events);
         CheckMissionEnd(events);
         if (State.Result is not null)
@@ -620,7 +672,8 @@ public sealed partial class TacticalEngine
         Suppression.Release(State, unit.Id, events);
         ClearStatus(unit, StatusFlags.Overwatch, events);
         ClearStatus(unit, StatusFlags.Hunkered, events);
-        if (stunned)
+        // A captured Proxy stays stunned until the mission ends.
+        if (stunned && !unit.Statuses.Capturable)
             ClearStatus(unit, StatusFlags.Stunned, events);
 
         foreach (var id in unit.Cooldowns.Keys.Order(StringComparer.Ordinal).ToList())

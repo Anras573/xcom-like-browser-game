@@ -11,6 +11,8 @@ public sealed class OverwatchAbility : IAbilityHandler
 {
     public ValidationResult Validate(AbilityContext ctx)
     {
+        if (ctx.User.Carrying is not null)
+            return ValidationResult.Fail($"{ctx.User.DisplayName} can't shoot while carrying.");
         if (ctx.User.Weapon is not { } weapon)
             return ValidationResult.Ok;
         if (weapon.Ammo < 1)
@@ -92,35 +94,17 @@ public sealed class EvacAbility : IAbilityHandler
     /// <summary>Takes <paramref name="unit"/> off the map. Abort Mission uses it too.</summary>
     public static void Evacuate(TacticalUnit unit, List<GameEvent> events)
     {
-        // Carried units (a stabilized squadmate, a stunned Proxy) leave with their carrier in #31.
         Casualties.StandDown(unit, events);
         unit.Evacuated = true;
         events.Add(new UnitEvacuated(unit.Id));
-    }
-}
-
-/// <summary>
-/// Debug stand-in for the Medkit (#31): 1 AP, stabilizes an adjacent bleeding-out ally. They stop
-/// bleeding out but stay down for the rest of the mission. Emits <see cref="UnitStabilized"/>.
-/// </summary>
-public sealed class DebugStabilizeAbility : IAbilityHandler
-{
-    public ValidationResult Validate(AbilityContext ctx)
-    {
-        var target = ctx.State.Unit(((UnitTarget)ctx.Target).Id);
-        if (!target.Statuses.IsBleedingOut)
-            return ValidationResult.Fail($"{target.DisplayName} is not bleeding out.");
-        var (a, b) = (target.Position, ctx.User.Position);
-        return Math.Max(Math.Abs(a.X - b.X), Math.Abs(a.Y - b.Y)) == 1
-            ? ValidationResult.Ok
-            : ValidationResult.Fail($"{target.DisplayName} is not adjacent.");
-    }
-
-    public void Execute(AbilityContext ctx)
-    {
-        var target = ctx.State.Unit(((UnitTarget)ctx.Target).Id);
-        target.Statuses.BleedingOutTurnsLeft = 0;
-        target.Statuses.Set(StatusFlags.Stabilized);
-        ctx.Events.Add(new UnitStabilized(target.Id));
+        // A carried unit (a stabilized squadmate, a stunned Proxy) leaves with the carrier.
+        if (unit.Carrying is { } carried)
+        {
+            unit.Carrying = null;
+            carried.CarriedBy = null;
+            carried.Evacuated = true;
+            carried.Position = unit.Position;
+            events.Add(new UnitEvacuated(carried.Id));
+        }
     }
 }

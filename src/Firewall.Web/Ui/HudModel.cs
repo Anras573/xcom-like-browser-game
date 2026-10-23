@@ -14,7 +14,8 @@ public sealed record AbilitySlot(
     int Cooldown,
     int Slot,
     GameAction? Key,
-    string Icon = "icon.star"
+    string Icon = "icon.star",
+    int? Charges = null
 )
 {
     public string HotkeyLabel => Slot.ToString();
@@ -73,13 +74,14 @@ public static class HudModel
 
     /// <summary>
     /// The soldier's ability bar: the four standard actions in a fixed order, then Evac (on an evac
-    /// tile), Stabilize (beside a bleeding-out squadmate) and the other active abilities, up to nine.
+    /// tile), Drop (while carrying), the utility items in the order they were packed, Carry (when
+    /// someone next to the soldier can be picked up) and the other active abilities, up to nine.
     /// </summary>
     public static IReadOnlyList<AbilitySlot> AbilitySlots(
         TacticalUnit unit,
         GameData data,
         bool onEvacTile,
-        bool canStabilize
+        bool carryAvailable = true
     )
     {
         var ids = new List<string>();
@@ -88,12 +90,21 @@ public static class HudModel
                 ids.Add(id);
         if (onEvacTile && unit.Abilities.Contains(AbilityRegistry.Evac))
             ids.Add(AbilityRegistry.Evac);
-        if (canStabilize && unit.Abilities.Contains(AbilityRegistry.DebugStabilize))
-            ids.Add(AbilityRegistry.DebugStabilize);
+        if (unit.Carrying is not null && unit.Abilities.Contains(AbilityRegistry.Drop))
+            ids.Add(AbilityRegistry.Drop);
+        foreach (var item in unit.Items)
+            if (unit.Abilities.Contains(item.ItemId) && !ids.Contains(item.ItemId))
+                ids.Add(item.ItemId);
+        if (
+            carryAvailable
+            && unit.Carrying is null
+            && unit.Abilities.Contains(AbilityRegistry.Carry)
+        )
+            ids.Add(AbilityRegistry.Carry);
         foreach (var id in unit.Abilities.OrderBy(a => a, StringComparer.Ordinal))
             if (
                 !ids.Contains(id)
-                && id is not (AbilityRegistry.Evac or AbilityRegistry.DebugStabilize)
+                && id is not (AbilityRegistry.Evac or AbilityRegistry.Drop or AbilityRegistry.Carry)
                 && data.Abilities.TryGet(id, out var def)
                 && def.Targeting != TargetingType.Passive
             )
@@ -114,7 +125,8 @@ public static class HudModel
                     unit.Cooldowns.GetValueOrDefault(id),
                     slot,
                     KeyForSlot(slot),
-                    def.Icon ?? "icon.star"
+                    def.Icon ?? "icon.star",
+                    unit.Items.FirstOrDefault(i => i.ItemId == id)?.Charges
                 )
             );
         }
@@ -165,6 +177,8 @@ public static class HudModel
             $"Cost: [c=#ffb000]{slot.ApCost} AP[/c]"
                 + (slot.Cooldown > 0 ? $"   Cooldown: [c=#ffb000]{slot.Cooldown}[/c] turns" : ""),
         };
+        if (slot.Charges is { } charges)
+            lines.Add($"Charges: [c=#ffb000]{charges}[/c]");
         lines.AddRange(Wrap(slot.Description, 44));
         if (blockedReason is not null)
             lines.Add($"[c=#ff4d4d]{blockedReason}[/c]");

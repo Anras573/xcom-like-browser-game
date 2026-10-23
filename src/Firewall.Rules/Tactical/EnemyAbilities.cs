@@ -58,6 +58,8 @@ public sealed class SuppressionAbility : IAbilityHandler
         var target = ctx.State.Unit(((UnitTarget)ctx.Target).Id);
         if (!target.IsStanding)
             return ValidationResult.Fail($"{target.DisplayName} is down.");
+        if (ctx.User.Carrying is not null)
+            return ValidationResult.Fail($"{ctx.User.DisplayName} can't shoot while carrying.");
         var ammo = (int)ctx.Def.Parameters.GetValueOrDefault("ammo");
         if (ctx.User.Weapon is { } weapon && weapon.Ammo < ammo)
             return ValidationResult.Fail(weapon.Ammo == 0 ? "Out of ammo." : "Not enough ammo.");

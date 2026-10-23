@@ -56,6 +56,24 @@ public sealed record UnitBleedingOut(UnitId Unit, int Turns) : GameEvent;
 
 public sealed record UnitStabilized(UnitId Unit) : GameEvent;
 
+/// <summary>A medkit healed the unit; <paramref name="HpAfter"/> is its HP now.</summary>
+public sealed record UnitHealed(UnitId Unit, int Amount, int HpAfter) : GameEvent;
+
+/// <summary>A medkit (Revive) brought a bleeding-out soldier back on their feet at <paramref name="Hp"/>.</summary>
+public sealed record UnitRevived(UnitId Unit, int Hp) : GameEvent;
+
+/// <summary>The carrier picked the unit up (Carry); it rides with them until <see cref="UnitDropped"/> or evac.</summary>
+public sealed record UnitCarried(UnitId Carrier, UnitId Carried) : GameEvent;
+
+/// <summary>The carried unit was put down on <paramref name="At"/> (Drop, or the carrier fell).</summary>
+public sealed record UnitDropped(UnitId Carrier, UnitId Carried, GridPos At) : GameEvent;
+
+/// <summary>A smoke cloud appeared on <paramref name="Tiles"/>.</summary>
+public sealed record SmokeCreated(IReadOnlyList<GridPos> Tiles, int Turns) : GameEvent;
+
+/// <summary>A smoke cloud dissipated.</summary>
+public sealed record SmokeExpired(IReadOnlyList<GridPos> Tiles) : GameEvent;
+
 /// <summary>The unit left the map through the evac zone.</summary>
 public sealed record UnitEvacuated(UnitId Unit) : GameEvent;
 
@@ -98,7 +116,9 @@ public sealed record UnitScampered(UnitId Unit, IReadOnlyList<GridPos> Path) : G
 
 public sealed record TileChanged(GridPos Pos, TileType From, TileType To) : GameEvent;
 
-public sealed record ExplosionAt(GridPos Pos, int Radius) : GameEvent;
+/// <param name="Tiles">The tiles of the blast when it has an exact shape (pods in it wake); null for a plain circle of <paramref name="Radius"/>.</param>
+public sealed record ExplosionAt(GridPos Pos, int Radius, IReadOnlyList<GridPos>? Tiles = null)
+    : GameEvent;
 
 public sealed record VisibilityChanged(
     IReadOnlyList<UnitId> NewlyVisibleEnemies,
