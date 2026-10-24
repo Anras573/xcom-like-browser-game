@@ -1,0 +1,19 @@
+{
+  "id": "sub-objective-gazebo",
+  "biome": "suburban",
+  "size": [10, 10],
+  "tags": ["objective"],
+  "weight": 1.0,
+  "rows": [
+    "T........T",
+    "..bbbbbb..",
+    "..b....b..",
+    "..b.cc.b..",
+    ".....O....",
+    "..b.cc.b..",
+    "..b....b..",
+    "..bbbbbb..",
+    "..........",
+    "T........T"
+  ]
+}

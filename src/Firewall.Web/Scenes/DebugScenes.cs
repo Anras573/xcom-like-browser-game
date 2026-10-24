@@ -36,6 +36,7 @@ public static class DebugScenes
         Register("Text test", () => new TextTestScene());
         Register("Picking test", () => new PickingTestScene());
         Register("Map Viewer", () => new MapViewerScene());
+        Register("Map Generator", () => new MapGeneratorScene());
         Register("Skirmish", () => new SkirmishScene());
         Register("Skirmish: squad builder", () => new SquadBuilderScene());
         foreach (var level in new[] { 1, 3, 5, 7, 9, 10 })
