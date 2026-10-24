@@ -109,4 +109,30 @@ public sealed partial class TacticalEngine
             );
         }
     }
+
+    /// <summary>
+    /// Rescue: a civilian becomes controllable (2 AP, move and evac) once a soldier ends a move
+    /// next to them. Civilians are not in a pod; they just stand until reached.
+    /// </summary>
+    private void RecruitCivilians(List<GameEvent> events)
+    {
+        if (State.Phase != TacticalPhase.Player)
+            return;
+        var soldiers = State.Units.Where(IsOperationalSoldier).ToList();
+        foreach (
+            var civilian in State
+                .Units.Where(u =>
+                    Civilians.IsCivilian(u) && u is { Controllable: false, IsStanding: true }
+                )
+                .ToList()
+        )
+        {
+            if (!soldiers.Exists(s => Chebyshev(s.Position, civilian.Position) <= 1))
+                continue;
+            civilian.Controllable = true;
+            civilian.ActionPoints = ApPerTurn;
+            events.Add(new CivilianJoined(civilian.Id));
+            events.Add(new ApChanged(civilian.Id, civilian.ActionPoints));
+        }
+    }
 }

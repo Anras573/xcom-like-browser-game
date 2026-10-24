@@ -37,9 +37,9 @@ public static class DebugScenes
         Register("Picking test", () => new PickingTestScene());
         Register("Map Viewer", () => new MapViewerScene());
         Register("Map Generator", () => new MapGeneratorScene());
-        Register("Skirmish", () => new SkirmishScene());
+        Register("Skirmish", () => new SkirmishMenuScene());
         Register("Skirmish: squad builder", () => new SquadBuilderScene());
         foreach (var level in new[] { 1, 3, 5, 7, 9, 10 })
-            Register($"Skirmish FL{level}", () => new SkirmishScene(level));
+            Register($"Skirmish FL{level}", () => SkirmishScene.TestYard(level));
     }
 }

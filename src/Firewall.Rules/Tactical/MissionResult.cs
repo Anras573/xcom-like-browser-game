@@ -64,16 +64,29 @@ public sealed record MissionResult(
     IReadOnlyDictionary<string, int> EnemiesKilled,
     Loot LootCollected,
     IReadOnlyList<string> Captured,
-    UnitId? Mvp
+    UnitId? Mvp,
+    IReadOnlyList<ObjectiveOutcome>? ObjectiveOutcomes = null,
+    int CiviliansSaved = 0,
+    int CiviliansLost = 0
 )
 {
+    /// <summary>The primary objective and any bonus, each achieved or not; a lone primary when the mission has no bonus.</summary>
+    public IReadOnlyList<ObjectiveOutcome> Objectives { get; } =
+        ObjectiveOutcomes
+        ?? [new ObjectiveOutcome("primary", true, Outcome == MissionOutcome.Success)];
+
     /// <summary>
     /// Reads the final state. Soldiers who evacuated survived. On success everyone still on the
     /// map is recovered: the downed count as wounded, the killed as recovered bodies. On failure the
     /// downed die and anyone else left on the map is MIA; on an abort everyone left behind is MIA.
     /// Loot rolls on its own stream and only on success.
     /// </summary>
-    public static MissionResult Build(TacticalState state, GameData data, MissionOutcome outcome)
+    public static MissionResult Build(
+        TacticalState state,
+        GameData data,
+        MissionOutcome outcome,
+        IMissionObjective? objective = null
+    )
     {
         var soldiers = state
             .Units.Where(u => u.Faction == Faction.Firewall)
@@ -118,7 +131,10 @@ public sealed record MissionResult(
                 )
                 .Select(u => u.DefId)
                 .ToList(),
-            mvp
+            mvp,
+            objective?.Outcomes(state, outcome),
+            Civilians.Saved(state),
+            Civilians.Lost(state)
         );
     }
 

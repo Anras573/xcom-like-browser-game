@@ -72,6 +72,7 @@ internal static class StateHasher
             Add(ref h, (int)u.Rank);
             Add(ref h, u.Position.X);
             Add(ref h, u.Position.Y);
+            Add(ref h, u.Controllable);
             Add(ref h, u.Hp);
             Add(ref h, u.MaxHp);
             Add(ref h, u.Aim);

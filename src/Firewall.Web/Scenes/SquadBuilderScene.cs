@@ -11,9 +11,10 @@ namespace Firewall.Web.Scenes;
 /// <summary>
 /// "Skirmish: squad builder" (#30): pick each soldier's class, rank and ability choices, plus their
 /// weapon tier, armor and items, then start a Skirmish with them. The main way to try the classes.
-/// Esc goes back to the debug menu.
+/// Opened from the Skirmish menu with its model, it only edits that squad and Esc or "Done" goes
+/// back; on its own it starts a test-yard Skirmish. Esc goes back to the debug menu.
 /// </summary>
-public sealed class SquadBuilderScene : SceneBase
+public sealed class SquadBuilderScene(SquadBuilderModel? model = null) : SceneBase
 {
     private const float ColumnWidth = 300f;
     private const float Gap = 10f;
@@ -29,7 +30,7 @@ public sealed class SquadBuilderScene : SceneBase
 
     protected override void OnEnter()
     {
-        _model = SquadBuilderModel.Default(Ctx.Data);
+        _model = model ?? SquadBuilderModel.Default(Ctx.Data);
         // The builder only reads stats; any one-tile map will do for the throwaway state.
         var map = MapParser.Parse(
             new MapFile
@@ -92,11 +93,16 @@ public sealed class SquadBuilderScene : SceneBase
         if (
             ui.Button(
                 new UiRect(left + total - 220f, y, 220f, 40f),
-                "Start Skirmish",
+                model is null ? "Start Skirmish" : "Done",
                 ButtonStyle.Primary
             )
         )
-            Ctx.Scenes.Replace(new SkirmishScene(_forceLevel, _model.Specs.ToList()));
+        {
+            if (model is null)
+                Ctx.Scenes.Replace(SkirmishScene.TestYard(_forceLevel, _model.Specs.ToList()));
+            else
+                Ctx.Scenes.Pop();
+        }
         ui.Label(
             new UiRect(left + 220f, y, total - 460f, 40f),
             "Esc: back",

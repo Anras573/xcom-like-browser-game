@@ -77,6 +77,9 @@ public sealed record SmokeExpired(IReadOnlyList<GridPos> Tiles) : GameEvent;
 /// <summary>The unit left the map through the evac zone.</summary>
 public sealed record UnitEvacuated(UnitId Unit) : GameEvent;
 
+/// <summary>A soldier reached a civilian: they can be moved and evacuated from now on (Rescue).</summary>
+public sealed record CivilianJoined(UnitId Civilian) : GameEvent;
+
 public sealed record ReactionShotTriggered(UnitId Shooter, UnitId Mover) : GameEvent;
 
 // Equipment and status

@@ -35,6 +35,9 @@ public sealed class TacticalState(TacticalMap map, IRandom rng, string missionId
     public int MapVersion => Map.Version;
     public IRandom Rng { get; } = rng;
     public ObjectiveState Objective { get; } = new(missionId);
+
+    /// <summary>The mission's goal as set up by <see cref="MissionSetup"/>; the engine plays Purge when null.</summary>
+    public IMissionObjective? Rule { get; set; }
     public int TurnNumber { get; set; } = 1;
 
     /// <summary>The campaign's Convergence: summoned enemies use the elite tier it unlocks (§5.6).</summary>

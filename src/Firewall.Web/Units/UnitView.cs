@@ -28,6 +28,9 @@ public sealed class UnitView
     private static readonly Color ArmorPip = new(165, 175, 190);
     private static readonly Color Hidden = new(255, 255, 255, 0);
 
+    // Civilians wear the grey-tinted look of GDD §3.
+    private static readonly Color CivilianTint = new(165, 170, 180);
+
     private readonly World _world;
     private readonly AssetRegistry _assets;
     private readonly EnemyDef? _enemy;
@@ -48,7 +51,10 @@ public sealed class UnitView
         _assets = assets;
         Unit = unit;
         _enemy = unit.IsHostile ? data.Enemies[unit.DefId] : null;
-        _tint = UnitPresentation.ParseTint(_enemy?.Sprite.Tint);
+        _tint =
+            unit.DefId == Civilians.DefId
+                ? CivilianTint
+                : UnitPresentation.ParseTint(_enemy?.Sprite.Tint);
         _scale = (float)(_enemy?.Sprite.Scale ?? 1.0);
 
         _body = world.CreateEntity();
