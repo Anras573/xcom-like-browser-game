@@ -62,6 +62,12 @@ public sealed class MapGenerator(
     /// <summary>Enemy spawns keep at least this path distance (tiles) from every player spawn.</summary>
     public const int MinSpawnDistance = 14;
 
+    /// <summary>Spawns invented on plain floor stay this many tiles from the map edge, so pods don't start pinned against the border.</summary>
+    public const int SpawnEdgeMargin = 3;
+
+    /// <summary>Enemy spawns are at least this many tiles apart.</summary>
+    public const int MinPodSpacing = 6;
+
     public const int RoadWidth = 2;
 
     /// <summary>Blocks away from the player block that objective blocks must be (Manhattan, in cells).</summary>
@@ -360,6 +366,10 @@ public sealed class MapGenerator(
                     && !map.PlayerSpawns.Contains(pos)
                     && !map.EvacTiles.Contains(pos)
                     && Far(pos)
+                    && pos.X >= SpawnEdgeMargin
+                    && pos.Y >= SpawnEdgeMargin
+                    && pos.X < map.Width - SpawnEdgeMargin
+                    && pos.Y < map.Height - SpawnEdgeMargin
                 )
                     open.Add(pos);
             }
@@ -374,6 +384,11 @@ public sealed class MapGenerator(
         candidates.RemoveAll(chosen.Contains);
         while (chosen.Count < count && candidates.Count > 0)
         {
+            candidates.RemoveAll(c =>
+                chosen.Any(o => SquaredDistance(o, c) < MinPodSpacing * MinPodSpacing)
+            );
+            if (candidates.Count == 0)
+                break;
             var best = 0;
             if (chosen.Count > 0)
             {

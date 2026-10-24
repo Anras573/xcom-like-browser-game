@@ -17,6 +17,9 @@ public sealed class TacticalCameraController(
 )
 {
     public const float MinZoom = 0.5f;
+
+    /// <summary>The lowest zoom the player can reach; scenes that show whole large maps may lower it.</summary>
+    public float MinZoomFactor { get; set; } = MinZoom;
     public const float MaxZoom = 2f;
     public const float EdgeScrollPixels = 12f;
     public const float DragThresholdPixels = 6f;
@@ -58,7 +61,7 @@ public sealed class TacticalCameraController(
     /// <summary>Sets the zoom target (and snaps to it); clamped to the allowed range.</summary>
     public void SetZoom(float factor)
     {
-        _targetZoom = Math.Clamp(factor, MinZoom, MaxZoom);
+        _targetZoom = Math.Clamp(factor, MinZoomFactor, MaxZoom);
         camera.TilesVisibleVertically = TacticalCamera.DefaultTilesVisibleVertically / _targetZoom;
     }
 
@@ -192,13 +195,13 @@ public sealed class TacticalCameraController(
         if (inCanvas && !pointerOverUi && input.ScrollDelta != 0f)
             _targetZoom = Math.Clamp(
                 _targetZoom * MathF.Exp(-input.ScrollDelta * ZoomPerScrollPixel),
-                MinZoom,
+                MinZoomFactor,
                 MaxZoom
             );
         if (bindings.IsDown(GameAction.ZoomIn))
-            _targetZoom = Math.Clamp(_targetZoom * (1f + 1.5f * deltaTime), MinZoom, MaxZoom);
+            _targetZoom = Math.Clamp(_targetZoom * (1f + 1.5f * deltaTime), MinZoomFactor, MaxZoom);
         if (bindings.IsDown(GameAction.ZoomOut))
-            _targetZoom = Math.Clamp(_targetZoom / (1f + 1.5f * deltaTime), MinZoom, MaxZoom);
+            _targetZoom = Math.Clamp(_targetZoom / (1f + 1.5f * deltaTime), MinZoomFactor, MaxZoom);
 
         var current = ZoomFactor;
         if (MathF.Abs(current - _targetZoom) < 1e-4f)

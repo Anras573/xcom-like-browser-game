@@ -52,7 +52,9 @@ public sealed class MapGeneratorScene : SceneBase
     protected override void OnEnter()
     {
         _controller = new TacticalCameraController(_camera, Ctx.Input, Ctx.Bindings);
-        _controller.SetZoom(TacticalCameraController.MinZoom);
+        // Maps with road strips and 4x4 grids are over 40 tiles tall.
+        _controller.MinZoomFactor = 0.25f;
+        _controller.SetZoom(0.25f);
         if (Ctx.MapSources.Count == 0)
             throw new InvalidOperationException("No maps were loaded; the fallback needs one.");
         _generator = new MapGenerator(

@@ -347,7 +347,7 @@ public class MapGeneratorTests
         for (var i = 0; i < map.EnemySpawns.Count; i++)
         for (var j = i + 1; j < map.EnemySpawns.Count; j++)
             Assert.True(
-                map.EnemySpawns[i].DistanceTo(map.EnemySpawns[j]) >= 5,
+                map.EnemySpawns[i].DistanceTo(map.EnemySpawns[j]) >= MapGenerator.MinPodSpacing,
                 $"{label}: spawns {map.EnemySpawns[i]} and {map.EnemySpawns[j]} are too close"
             );
     }
@@ -487,6 +487,34 @@ public class MapGeneratorTests
                 var result = generator.GenerateDetailed(p, new Pcg32Random((ulong)(seed + 1000)));
                 Assert.False(result.FellBack);
             }
+    }
+
+    [Fact]
+    public void GenericBlocksAuthorEnemySpawnTiles()
+    {
+        foreach (var block in Blocks.All.Where(b => b.Tags.Contains(BlockTag.Generic)))
+            Assert.True(
+                block.Rows.Sum(r => r.Count(c => c == 'e')) >= 2,
+                $"{block.Id} needs 'e' tiles"
+            );
+    }
+
+    [Theory]
+    [InlineData(Biome.Industrial)]
+    [InlineData(Biome.Urban)]
+    [InlineData(Biome.Suburban)]
+    public void EnemySpawnsStayAwayFromTheBorderAndCorners(Biome biome)
+    {
+        var generator = Generator();
+        for (var seed = 0; seed < 200; seed++)
+        {
+            var map = generator.Generate(Params(biome), new Pcg32Random((ulong)seed));
+            foreach (var s in map.EnemySpawns)
+                Assert.True(
+                    s.X >= 3 && s.Y >= 3 && s.X < map.Width - 3 && s.Y < map.Height - 3,
+                    $"{biome} seed {seed}: spawn {s} hugs the border"
+                );
+        }
     }
 
     [Fact]
