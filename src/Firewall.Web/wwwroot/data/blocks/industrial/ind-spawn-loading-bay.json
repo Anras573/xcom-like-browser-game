@@ -1,0 +1,19 @@
+{
+  "id": "ind-spawn-loading-bay",
+  "biome": "industrial",
+  "size": [10, 10],
+  "tags": ["spawn-player"],
+  "weight": 1.0,
+  "rows": [
+    "#CC.PPPP.#",
+    "#c........",
+    "...cc...C.",
+    ".C.....C..",
+    "...EE.....",
+    "...EE..cc.",
+    ".c........",
+    "........C.",
+    "#.cc.C....",
+    "##......##"
+  ]
+}

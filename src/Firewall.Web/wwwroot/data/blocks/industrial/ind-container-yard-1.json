@@ -1,0 +1,19 @@
+{
+  "id": "ind-container-yard-1",
+  "biome": "industrial",
+  "size": [10, 10],
+  "tags": ["generic"],
+  "weight": 1.0,
+  "rows": [
+    "##.......#",
+    ".C.CC.CC.c",
+    ".C......C.",
+    "...c..c...",
+    ".CC....CC.",
+    "..e.......",
+    "...cC.c...",
+    ".CC..e...c",
+    ".C..CC.C..",
+    "#........#"
+  ]
+}

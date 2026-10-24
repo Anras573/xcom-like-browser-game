@@ -1,4 +1,5 @@
 using Firewall.Rules.Data;
+using Firewall.Rules.Tactical;
 using Firewall.Web.Assets;
 using Firewall.Web.Input;
 using Firewall.Web.Playback;
@@ -71,6 +72,9 @@ public sealed class SceneContext(
 
     /// <summary>The shipped map files, as loaded by the boot scene; parse with <c>Data.LoadMap</c>.</summary>
     public IReadOnlyList<MapSource> MapSources { get; set; } = [];
+
+    /// <summary>The authored blocks the procedural map generator assembles maps from.</summary>
+    public BlockLibrary Blocks { get; set; } = BlockLibrary.Empty;
 
     public AssetRegistry Assets =>
         _assets ?? throw new InvalidOperationException("Not loaded yet.");

@@ -79,6 +79,43 @@ public static class GameDataFiles
 
     /// <summary>Map files under <c>data/maps/</c>, as paths relative to <c>data/</c>.</summary>
     public static IReadOnlyList<string> Maps { get; } = ["maps/test-yard.json"];
+
+    /// <summary>Procedural map blocks under <c>data/blocks/&lt;biome&gt;/</c>, as paths relative to <c>data/</c>.</summary>
+    public static IReadOnlyList<string> Blocks { get; } =
+    [
+        "blocks/industrial/ind-container-yard-1.json",
+        "blocks/industrial/ind-container-yard-2.json",
+        "blocks/industrial/ind-harbor-edge.json",
+        "blocks/industrial/ind-objective-pump-station.json",
+        "blocks/industrial/ind-objective-relay-shed.json",
+        "blocks/industrial/ind-open-depot.json",
+        "blocks/industrial/ind-pipe-yard.json",
+        "blocks/industrial/ind-spawn-loading-bay.json",
+        "blocks/industrial/ind-spawn-quay.json",
+        "blocks/industrial/ind-tram-line.json",
+        "blocks/industrial/ind-warehouse-1.json",
+        "blocks/industrial/ind-warehouse-2.json",
+        "blocks/suburban/sub-grove.json",
+        "blocks/suburban/sub-hedgerows.json",
+        "blocks/suburban/sub-house-1.json",
+        "blocks/suburban/sub-house-2.json",
+        "blocks/suburban/sub-lawn.json",
+        "blocks/suburban/sub-objective-community-hall.json",
+        "blocks/suburban/sub-objective-gazebo.json",
+        "blocks/suburban/sub-park.json",
+        "blocks/suburban/sub-spawn-cul-de-sac.json",
+        "blocks/suburban/sub-spawn-park-gate.json",
+        "blocks/urban/urb-back-lot.json",
+        "blocks/urban/urb-cafe.json",
+        "blocks/urban/urb-crossroads.json",
+        "blocks/urban/urb-objective-data-hub.json",
+        "blocks/urban/urb-objective-kiosk.json",
+        "blocks/urban/urb-parking.json",
+        "blocks/urban/urb-plaza.json",
+        "blocks/urban/urb-shopfront.json",
+        "blocks/urban/urb-spawn-side-street.json",
+        "blocks/urban/urb-spawn-station.json",
+    ];
 }
 
 /// <summary>Every content definition, loaded from JSON, with id lookup and validation.</summary>

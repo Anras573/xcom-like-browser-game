@@ -1,0 +1,19 @@
+{
+  "id": "sub-hedgerows",
+  "biome": "suburban",
+  "size": [10, 10],
+  "tags": ["generic"],
+  "weight": 1.0,
+  "rows": [
+    "..........",
+    ".bbbb.bbb.",
+    "......e...",
+    ".bb.bbbb..",
+    "..........",
+    "..bbb.bb..",
+    "..........",
+    ".bbbbebbb.",
+    "..........",
+    "T........T"
+  ]
+}
