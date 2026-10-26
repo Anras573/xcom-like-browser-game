@@ -12,7 +12,12 @@
     "id": "rescue",
     "name": "Rescue",
     "goal": "Evacuate at least N of M civilians.",
-    "fail": "Too few saved."
+    "fail": "Too few saved.",
+    "parameters": {
+      "civilians": 6,
+      "required": 4,
+      "minDistance": 10
+    }
   },
   {
     "id": "sabotage",
@@ -21,7 +26,10 @@
     "fail": "Timer expires.",
     "parameters": {
       "relayHp": 12,
-      "convergenceReward": -1
+      "convergenceReward": -1,
+      "turnLimit": 8,
+      "turnLimitRecruit": 10,
+      "turnLimitVeteran": 7
     }
   },
   {

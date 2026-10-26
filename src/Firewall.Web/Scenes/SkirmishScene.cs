@@ -21,13 +21,25 @@ namespace Firewall.Web.Scenes;
 /// screen. The pods come from the encounter table of the chosen Force Level (#29). Debug keys: F6
 /// picks an enemy type, F7 its tier, F10 spawns it on the hovered tile (a Relay Node or a pod member).
 /// </summary>
-public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>? squad = null)
+public sealed class SkirmishScene(MissionSpec spec, IReadOnlyList<SoldierSpec>? squad = null)
     : SceneBase
 {
     public const string MapId = "test-yard";
 
-    // The test yard has three enemy spawns.
-    private const int PodCount = 3;
+    /// <summary>The old hard-wired Skirmish: a Purge on the handcrafted test yard.</summary>
+    public static SkirmishScene TestYard(
+        int forceLevel = 2,
+        IReadOnlyList<SoldierSpec>? squad = null
+    ) =>
+        new(
+            new MissionSpec
+            {
+                Type = MissionType.Purge,
+                ForceLevel = forceLevel,
+                StoryMapId = MapId,
+            },
+            squad
+        );
 
     private readonly string[] _debugEnemies =
     [
@@ -72,7 +84,10 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
 
     private const float ResultDelaySeconds = 2f;
 
-    public override string Name => squad is null ? $"Skirmish FL{forceLevel}" : "Skirmish (squad)";
+    public override string Name =>
+        squad is null
+            ? $"Skirmish {spec.Type} FL{spec.ForceLevel}"
+            : $"Skirmish {spec.Type} (squad)";
 
     /// <summary>The soldier currently selected, if any.</summary>
     public TacticalUnit? Selected => _selected is { } id ? _state.Unit(id) : null;
@@ -81,24 +96,23 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
 
     protected override void OnEnter()
     {
-        var source = Ctx.MapSources.FirstOrDefault(m => m.Id == MapId);
-        if (source.Json is null)
-            throw new InvalidOperationException($"Map '{MapId}' was not loaded.");
-        var map = Ctx.Data.LoadMap(source.Json);
-        var rng = new Pcg32Random(Ctx.Seeds.Next());
-        _state = new TacticalState(map, rng);
-        SquadDeployer.Deploy(
-            _state,
-            squad is null
-                ? DebugSquad.Create(_state, Ctx.Data, rng.Fork("squad"))
-                : DebugSquad.Create(_state, Ctx.Data, rng.Fork("squad"), squad)
+        var seed = spec.Seed != 0 ? spec.Seed : Ctx.Seeds.Next();
+        _state = MissionSetup.Create(
+            spec,
+            squad,
+            Ctx.Data,
+            new Pcg32Random(seed),
+            new MissionMaps(Ctx.Blocks, LoadMap)
         );
-        var pods = EncounterBuilder.Build(Ctx.Data, forceLevel, PodCount, rng.Fork("encounter"));
-        PodSpawner.Spawn(_state, Ctx.Data, pods, rng.Fork("pods"));
+        var map = _state.Map;
         _engine = new TacticalEngine(
             _state,
             Ctx.Data,
-            new UtilityAi(Ctx.Data, timingLog: LogAiTiming)
+            new UtilityAi(
+                Ctx.Data,
+                difficulty: MissionSetup.AiDifficultyOf(spec.Difficulty),
+                timingLog: LogAiTiming
+            )
         );
 
         // The tiles change when playback shows the explosion, not when the command runs.
@@ -133,9 +147,25 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
 
     protected override void OnExit() => _tilemaps?.Dispose();
 
+    private TacticalMap LoadMap(string id)
+    {
+        var source = Ctx.MapSources.FirstOrDefault(m => m.Id == id);
+        if (source.Json is null)
+            throw new InvalidOperationException($"Map '{id}' was not loaded.");
+        return Ctx.Data.LoadMap(source.Json);
+    }
+
     // The soldiers who can still be selected: on the map and not down.
     private List<TacticalUnit> Soldiers() =>
-        _state.Units.Where(u => u.Faction == Faction.Firewall && u.IsStanding).ToList();
+        _state
+            .Units.Where(u =>
+                u.IsStanding && (u.Faction == Faction.Firewall || IsRescuedCivilian(u))
+            )
+            .ToList();
+
+    // A civilian a soldier has reached: selectable, can move and evac.
+    private static bool IsRescuedCivilian(TacticalUnit u) =>
+        u is { Faction: Faction.Neutral, Controllable: true };
 
     // Debug builds log how long each enemy took to plan (budget: 30 ms per unit in the browser).
     private static void LogAiTiming(AiTiming timing)
@@ -244,7 +274,8 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
             else if (Ctx.Bindings.WasPressed(GameAction.CenterCamera) && Selected is { } sel)
                 Select(sel);
             else if (
-                _hover is { Faction: Faction.Firewall, IsStanding: true } clicked
+                _hover is { IsStanding: true } clicked
+                && (clicked.Faction == Faction.Firewall || IsRescuedCivilian(clicked))
                 && !Ctx.Ui.PointerOverUi
                 && Ctx.Clicks.ConsumeClick()
             )
@@ -583,7 +614,7 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
             return _range;
         if (
             Selected is not { IsAlive: true } unit
-            || unit.Faction != Faction.Firewall
+            || (unit.Faction != Faction.Firewall && !IsRescuedCivilian(unit))
             || _state.Phase != TacticalPhase.Player
             || _state.Result is not null
             || unit.Statuses.Stunned
@@ -626,6 +657,11 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
                 break;
             case UnitEvacuated evacuated:
                 Ctx.Ui.Toast($"{_state.Unit(evacuated.Unit).DisplayName} evacuated.");
+                break;
+            case CivilianJoined joined:
+                Ctx.Ui.Toast(
+                    $"{_state.Unit(joined.Civilian).DisplayName} will follow your orders."
+                );
                 break;
             case MissionEnded:
                 _resultTimer = ResultDelaySeconds;
@@ -892,7 +928,8 @@ public sealed class SkirmishScene(int forceLevel = 2, IReadOnlyList<SoldierSpec>
             Enemies = VisibleEnemies(),
             Boss = ActiveBoss(),
             Objective = HudModel.ObjectiveText(_state, Ctx.Data, _engine.Objective, IsVisible),
-            MissionName = "Skirmish: Test Yard",
+            ObjectiveUrgent = _engine.Objective.IsUrgent(_state),
+            MissionName = $"Skirmish: {spec.Type}",
             EndTurnBlocked = _engine.Validate(new EndTurnCommand()) is { IsValid: false } end
                 ? end.Reason
                 : null,

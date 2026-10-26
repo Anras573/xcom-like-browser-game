@@ -25,7 +25,7 @@ public sealed partial class TacticalEngine
     {
         State = state;
         _data = data;
-        Objective = objective ?? new PurgeObjective(data);
+        Objective = objective ?? state.Rule ?? new PurgeObjective(data);
         _ai = ai ?? new NullAiController();
         _abilities = abilities ?? AbilityRegistry.CreateDefault();
         Log = new CommandLog(state.Rng is Pcg32Random pcg ? pcg.GetState().Seed : 0UL);
@@ -57,7 +57,8 @@ public sealed partial class TacticalEngine
         State is { Phase: TacticalPhase.Player, Result: null }
         && State.Units.Any(IsOperationalSoldier)
         && !State.Units.Any(u =>
-            IsOperationalSoldier(u) && (u.ActionPoints > 0 || SoldierPerks.CanRunAndGun(u))
+            (IsOperationalSoldier(u) && (u.ActionPoints > 0 || SoldierPerks.CanRunAndGun(u)))
+            || (IsControlledCivilian(u) && u.ActionPoints > 0)
         );
 
     /// <summary>
@@ -200,6 +201,7 @@ public sealed partial class TacticalEngine
                 break;
             case MoveCommand m:
                 ExecuteMove(m, sink);
+                RecruitCivilians(sink);
                 break;
             case UseAbilityCommand a:
                 ExecuteAbility(a, sink);
@@ -224,6 +226,11 @@ public sealed partial class TacticalEngine
 
     // ------------------------------------------------------------------ validation
 
+    // A civilian a soldier has reached acts in the player phase (move and evac only).
+    private bool IsRescuedCivilian(TacticalUnit u) =>
+        u is { Faction: Faction.Neutral, Controllable: true }
+        && State.Phase == TacticalPhase.Player;
+
     private static bool IsOperationalSoldier(TacticalUnit u) =>
         u.Faction == Faction.Firewall && u.IsStanding;
 
@@ -244,7 +251,7 @@ public sealed partial class TacticalEngine
             TacticalPhase.Enemy => Faction.Meridian,
             _ => (Faction?)null,
         };
-        if (phaseFaction is null || unit.Faction != phaseFaction)
+        if (phaseFaction is null || !(unit.Faction == phaseFaction || IsRescuedCivilian(unit)))
             return ValidationResult.Fail("It is not this unit's phase.");
         if (!unit.IsActive)
             return ValidationResult.Fail($"{unit.DisplayName} is inactive.");
@@ -646,9 +653,16 @@ public sealed partial class TacticalEngine
         State.TurnNumber++;
         State.Phase = TacticalPhase.Player;
         events.Add(new PhaseStarted(TacticalPhase.Player, State.TurnNumber));
-        foreach (var unit in State.Units.Where(IsOperationalSoldier).ToList())
+        foreach (
+            var unit in State
+                .Units.Where(u => IsOperationalSoldier(u) || IsControlledCivilian(u))
+                .ToList()
+        )
             BeginUnitTurn(unit, events);
     }
+
+    private static bool IsControlledCivilian(TacticalUnit u) =>
+        u is { Faction: Faction.Neutral, Controllable: true, IsStanding: true };
 
     private bool IsEnemyActor(TacticalUnit u) =>
         u is { Faction: Faction.Meridian, IsAlive: true, IsActive: true }
@@ -719,7 +733,7 @@ public sealed partial class TacticalEngine
 
     private void EndMission(MissionOutcome outcome, List<GameEvent> events)
     {
-        State.Result = MissionResult.Build(State, _data, outcome);
+        State.Result = MissionResult.Build(State, _data, outcome, Objective);
         events.Add(new MissionEnded(State.Result));
     }
 }

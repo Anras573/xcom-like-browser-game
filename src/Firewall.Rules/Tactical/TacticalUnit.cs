@@ -113,6 +113,9 @@ public sealed class TacticalUnit(UnitId id, Faction faction, string defId, strin
     /// <summary>The HP-triggered summon (Cradle Guardian) already happened.</summary>
     public bool HasSummoned { get; set; }
 
+    /// <summary>A neutral the player can move and evacuate (a rescued civilian).</summary>
+    public bool Controllable { get; set; }
+
     /// <summary>Cannot be stunned or hacked.</summary>
     public bool ImmuneToStun { get; set; }
 

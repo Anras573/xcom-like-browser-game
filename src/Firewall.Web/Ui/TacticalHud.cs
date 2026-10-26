@@ -25,6 +25,9 @@ public sealed class HudFrame
     public IReadOnlyList<HudEnemy> Enemies { get; init; } = [];
     public HudBoss? Boss { get; init; }
     public string Objective { get; init; } = "";
+
+    /// <summary>The objective line is drawn red (the Sabotage timer at 2 turns or fewer).</summary>
+    public bool ObjectiveUrgent { get; init; }
     public string MissionName { get; init; } = "";
     public string? EndTurnBlocked { get; init; }
     public string? AbortBlocked { get; init; }
@@ -117,7 +120,8 @@ public static class TacticalHud
         var rect = new UiRect(Margin, Margin, w, 40f);
         var content = ui.Panel(rect);
         ui.Tooltip(rect, "Objective");
-        ui.Label(content with { H = rect.H - 2f * ui.Theme.Padding }, f.Objective, ui.Theme.Body);
+        var text = f.ObjectiveUrgent ? $"[c=#ff4d4d]{f.Objective}[/c]" : f.Objective;
+        ui.Label(content with { H = rect.H - 2f * ui.Theme.Padding }, text, ui.Theme.Body);
     }
 
     private static void DrawTopRight(ScreenCanvas canvas, UiContext ui, HudFrame f, HudResult r)
@@ -364,7 +368,8 @@ public static class TacticalHud
         var x = content.X;
         var y = content.Y - 2f;
         canvas.Text(unit.DisplayName, new Vector2(x, y), ui.Theme.Title);
-        var rank = unit.Rank.ToString().ToUpperInvariant();
+        var rank =
+            unit.Faction == Faction.Neutral ? "CIVILIAN" : unit.Rank.ToString().ToUpperInvariant();
         canvas.Text(
             rank,
             new Vector2(content.Right - canvas.Measure(rank, TextStyles.Small), y + 2f),

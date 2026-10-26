@@ -41,6 +41,20 @@ public static class MissionResultText
                 )
             );
 
+    /// <summary>Civilians saved and lost (Rescue) and the bonus objectives with a tick or a cross.</summary>
+    public static IReadOnlyList<string> ObjectiveLines(MissionResult result)
+    {
+        var lines = new List<string>();
+        if (result.CiviliansSaved + result.CiviliansLost > 0)
+            lines.Add($"Civilians: {result.CiviliansSaved} saved / {result.CiviliansLost} lost");
+        foreach (var o in result.Objectives.Where(o => !o.Primary))
+            lines.Add($"Bonus: {BonusName(o.Id)} {(o.Achieved ? "✓" : "✗")}");
+        return lines;
+    }
+
+    private static string BonusName(string id) =>
+        id == CaptureObjective.BonusId ? "capture a Proxy" : id;
+
     /// <summary>"8 Salvage, 20 Credits, 1 Core"; "Nothing" when empty.</summary>
     public static string Loot(Loot loot)
     {
@@ -153,6 +167,9 @@ public sealed class MissionResultScene(MissionResult result) : SceneBase
             new Vector2(body.X, y + 30f),
             TextStyles.Body
         );
+        var extra = MissionResultText.ObjectiveLines(result);
+        for (var i = 0; i < extra.Count; i++)
+            canvas.Text(extra[i], new Vector2(body.X, y + 60f + 24f * i), TextStyles.Body);
         if (result.Outcome != MissionOutcome.Success)
             canvas.Text(
                 "Loot is only recovered when the mission succeeds.",

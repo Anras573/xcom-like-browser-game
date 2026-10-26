@@ -255,6 +255,8 @@ public static class HudModel
         Func<TacticalUnit, bool> isVisible
     )
     {
+        if (objective is RescueObjective or SabotageObjective)
+            return objective.Describe(state);
         if (objective is not PurgeObjective)
             return objective.Description;
         var known = 0;
@@ -272,7 +274,8 @@ public static class HudModel
                 unexplored = true;
         }
         var count = known == 1 ? "1 hostile" : $"{known} hostiles";
-        return $"Purge: {count} remaining (estimated){(unexplored ? " ?" : "")}";
+        var purge = $"Purge: {count} remaining (estimated){(unexplored ? " ?" : "")}";
+        return objective is CaptureObjective capture ? capture.Describe(state, purge) : purge;
     }
 
     /// <summary>
