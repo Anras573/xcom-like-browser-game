@@ -25,6 +25,9 @@ public static class MissionSetup
     /// <summary>Civilians stand at least this many tiles from the squad's spawn.</summary>
     public const string MinDistanceParameter = "minDistance";
 
+    /// <summary>Civilians start at least this many tiles from every enemy.</summary>
+    public const int MinEnemyDistance = 6;
+
     private const string TurnLimitParameter = "turnLimit";
 
     /// <summary>
@@ -187,39 +190,48 @@ public static class MissionSetup
         var map = state.Map;
         var reach = MapGenerator.ReachableFrom(map, map.PlayerSpawns[0]);
 
-        bool Valid(GridPos t) =>
-            map.InBounds(t)
-            && map.IsWalkable(t)
-            && reach[t.Y * map.Width + t.X]
-            && !state.IsOccupied(t)
-            && !map.EnemySpawns.Contains(t)
-            && !map.EvacTiles.Contains(t)
-            && map.PlayerSpawns.All(p => p.DistanceTo(t) >= minDistance);
-
-        var anchors = Shuffle(spots.Where(Valid).ToList(), rng);
-        var others = new List<GridPos>();
-        for (var y = 0; y < map.Height; y++)
-        for (var x = 0; x < map.Width; x++)
-            if (new GridPos(x, y) is var t && Valid(t) && !anchors.Contains(t))
-                others.Add(t);
-        anchors.AddRange(Shuffle(others, rng));
-
+        var enemies = state.Units.Where(u => u.Faction == Faction.Meridian).ToList();
         var look = rng.Fork("looks");
         var placed = 0;
-        foreach (var anchor in anchors)
+
+        // Civilians start well away from the pods; a cramped map relaxes the gap rather than failing.
+        foreach (var gap in new[] { MinEnemyDistance, MinEnemyDistance / 2, 0 })
         {
+            bool Valid(GridPos t) =>
+                map.InBounds(t)
+                && map.IsWalkable(t)
+                && reach[t.Y * map.Width + t.X]
+                && !state.IsOccupied(t)
+                && !map.EnemySpawns.Contains(t)
+                && !map.EvacTiles.Contains(t)
+                && map.PlayerSpawns.All(p => p.DistanceTo(t) >= minDistance)
+                && enemies.All(e => e.Position.DistanceTo(t) >= gap);
+
+            var anchors = Shuffle(spots.Where(Valid).ToList(), rng);
+            var others = new List<GridPos>();
+            for (var y = 0; y < map.Height; y++)
+            for (var x = 0; x < map.Width; x++)
+                if (new GridPos(x, y) is var t && Valid(t) && !anchors.Contains(t))
+                    others.Add(t);
+            anchors.AddRange(Shuffle(others, rng));
+
+            foreach (var anchor in anchors)
+            {
+                if (placed >= total)
+                    break;
+                if (state.IsOccupied(anchor))
+                    continue;
+                Add(anchor);
+                // Half the clusters hold a second civilian next to the first.
+                if (placed < total && rng.Roll(50))
+                {
+                    var next = Neighbours(anchor).FirstOrDefault(n => Valid(n));
+                    if (Valid(next))
+                        Add(next);
+                }
+            }
             if (placed >= total)
                 break;
-            if (state.IsOccupied(anchor))
-                continue;
-            Add(anchor);
-            // Half the clusters hold a second civilian next to the first.
-            if (placed < total && rng.Roll(50))
-            {
-                var next = Neighbours(anchor).FirstOrDefault(n => Valid(n));
-                if (Valid(next))
-                    Add(next);
-            }
         }
         if (placed < total)
             throw new InvalidOperationException(

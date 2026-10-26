@@ -47,4 +47,28 @@ public class SkirmishMenuTests
         Assert.Equal(MissionType.Rescue, spec.Type);
         Assert.Equal("rescue", spec.MissionId);
     }
+
+    [Fact]
+    public void ResultLinesShowCiviliansAndTheCaptureBonus()
+    {
+        var result = new MissionResult(
+            MissionOutcome.Success,
+            5,
+            [],
+            new Dictionary<string, int>(),
+            Loot.Empty,
+            [],
+            null,
+            [
+                new ObjectiveOutcome("primary", true, true),
+                new ObjectiveOutcome(CaptureObjective.BonusId, false, true),
+            ],
+            4,
+            1
+        );
+        Assert.Equal(
+            ["Civilians: 4 saved / 1 lost", "Bonus: capture a Proxy \u2713"],
+            MissionResultText.ObjectiveLines(result)
+        );
+    }
 }

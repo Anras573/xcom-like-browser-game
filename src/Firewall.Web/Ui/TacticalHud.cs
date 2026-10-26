@@ -368,7 +368,8 @@ public static class TacticalHud
         var x = content.X;
         var y = content.Y - 2f;
         canvas.Text(unit.DisplayName, new Vector2(x, y), ui.Theme.Title);
-        var rank = unit.Rank.ToString().ToUpperInvariant();
+        var rank =
+            unit.Faction == Faction.Neutral ? "CIVILIAN" : unit.Rank.ToString().ToUpperInvariant();
         canvas.Text(
             rank,
             new Vector2(content.Right - canvas.Measure(rank, TextStyles.Small), y + 2f),

@@ -107,6 +107,35 @@ public class MissionSetupTests
     }
 
     [Fact]
+    public void CiviliansStartAwayFromEnemyPods()
+    {
+        foreach (var biome in Biomes)
+            for (ulong seed = 1; seed <= 40; seed++)
+            {
+                var state = Create(Spec(MissionType.Rescue, biome, seed));
+                var enemies = state.Units.Where(u => u.Faction == Faction.Meridian).ToList();
+                foreach (var c in state.Units.Where(Civilians.IsCivilian))
+                    Assert.All(
+                        enemies,
+                        e =>
+                            Assert.True(
+                                e.Position.DistanceTo(c.Position)
+                                    >= MissionSetup.MinEnemyDistance / 2,
+                                $"{biome} seed {seed}: civilian at {c.Position}, enemy at {e.Position}"
+                            )
+                    );
+            }
+    }
+
+    [Fact]
+    public void TheTimerSaysTurnInTheSingular()
+    {
+        var state = Create(Spec(MissionType.Sabotage));
+        state.TurnNumber = 8;
+        Assert.EndsWith("1 turn left", ((IMissionObjective)state.Rule!).Describe(state));
+    }
+
+    [Fact]
     public void SabotagePlacesTheRelayNodeAndTheTimerFollowsDifficulty()
     {
         foreach (

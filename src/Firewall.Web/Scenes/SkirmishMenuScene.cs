@@ -17,9 +17,24 @@ public sealed class SkirmishMenuScene : SceneBase
     private const float RowHeight = 40f;
     private const float ArrowWidth = 36f;
 
-    private readonly SkirmishMenuModel _model = new();
-    private SquadBuilderModel? _squad;
-    private bool _customSquad;
+    // The choices survive leaving the menu, so a mission can be relaunched with a tweak.
+    private static readonly SkirmishMenuModel Remembered = new();
+    private static SquadBuilderModel? _rememberedSquad;
+    private static bool _rememberedCustom;
+
+    private readonly SkirmishMenuModel _model = Remembered;
+
+    private SquadBuilderModel? _squad
+    {
+        get => _rememberedSquad;
+        set => _rememberedSquad = value;
+    }
+
+    private bool _customSquad
+    {
+        get => _rememberedCustom;
+        set => _rememberedCustom = value;
+    }
 
     public override string Name => "Skirmish";
 

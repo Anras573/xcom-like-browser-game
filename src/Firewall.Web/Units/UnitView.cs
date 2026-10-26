@@ -51,10 +51,9 @@ public sealed class UnitView
         _assets = assets;
         Unit = unit;
         _enemy = unit.IsHostile ? data.Enemies[unit.DefId] : null;
-        _tint =
-            unit.DefId == Civilians.DefId
-                ? CivilianTint
-                : UnitPresentation.ParseTint(_enemy?.Sprite.Tint);
+        _tint = unit is { DefId: Civilians.DefId, AppearanceId: "womanGreen" }
+            ? CivilianTint
+            : UnitPresentation.ParseTint(_enemy?.Sprite.Tint);
         _scale = (float)(_enemy?.Sprite.Scale ?? 1.0);
 
         _body = world.CreateEntity();

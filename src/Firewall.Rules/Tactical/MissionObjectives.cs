@@ -65,7 +65,7 @@ public sealed class SabotageObjective(GameData data, int turnLimit)
     public string Describe(TacticalState state) =>
         RelayDestroyed(state)
             ? "Sabotage: Relay destroyed. Evacuate or kill all hostiles."
-            : $"Sabotage: destroy the Relay Node - {TurnsLeft(state)} turns left";
+            : $"Sabotage: destroy the Relay Node - {TurnsLeft(state)} {(TurnsLeft(state) == 1 ? "turn" : "turns")} left";
 
     public bool IsUrgent(TacticalState state) =>
         !RelayDestroyed(state) && TurnsLeft(state) <= UrgentTurns;
